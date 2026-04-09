@@ -85,28 +85,41 @@ function FlattenArrayColumnMajor(matrix) {
 
 // 核心全排列递归函数
 function Solver(Arr, m, brr) {
-    var n = Arr.length - 1;
-    if (m < n) {
-        // 递归处理
-        Solver(Arr, m + 1, brr);
-        for (var i = m + 1; i <= n; i++) {
-            // 交换元素
-            var t = Arr[m];
-            Arr[m] = Arr[i];
-            Arr[i] = t;
-            // 递归处理交换后的排列
+    console.log("Solver 调用: m=" + m + ", Arr.length=" + Arr.length);
+    try {
+        var n = Arr.length - 1;
+        console.log("Solver 内部: n=" + n);
+        if (m < n) {
+            console.log("递归调用 Solver, m+1=" + (m + 1));
+            // 递归处理
             Solver(Arr, m + 1, brr);
-            // 恢复原始顺序（回溯）
-            var t2 = Arr[m];
-            Arr[m] = Arr[i];
-            Arr[i] = t2;
+            for (var i = m + 1; i <= n; i++) {
+                console.log("交换位置: m=" + m + ", i=" + i + ", Arr=" + Arr.toString());
+                // 交换元素
+                var t = Arr[m];
+                Arr[m] = Arr[i];
+                Arr[i] = t;
+                console.log("交换后 Arr=" + Arr.toString());
+                // 递归处理交换后的排列
+                Solver(Arr, m + 1, brr);
+                // 恢复原始顺序（回溯）
+                var t2 = Arr[m];
+                Arr[m] = Arr[i];
+                Arr[i] = t2;
+                console.log("回溯后 Arr=" + Arr.toString());
+            }
+        } else {
+            // 找到一个完整排列，存储到结果数组
+            k++;
+            console.log("找到排列 #" + k + ": " + Arr.toString());
+            for (var i = 0; i < Arr.length; i++) {
+                brr[k - 1][i] = Arr[i];
+            }
+            console.log("已存储到 brr[" + (k - 1) + "]");
         }
-    } else {
-        // 找到一个完整排列，存储到结果数组
-        k++;
-        for (var i = 0; i < Arr.length; i++) {
-            brr[k - 1][i] = Arr[i];
-        }
+    } catch (e) {
+        console.error("Solver 错误: " + (e.message || String(e)));
+        throw e;
     }
 }
 
@@ -185,27 +198,38 @@ function extractDataFromRange(range) {
 
 // 主封装函数：全排列计算并返回二维数组
 function CalculatePermutations(inputArray, isRowMajor) {
+    console.log("开始执行 CalculatePermutations");
     try {
         // 默认参数
         if (isRowMajor === undefined) {
             isRowMajor = true;
         }
+        console.log("isRowMajor: " + isRowMajor);
         
         var tempArray1D = [];
         
+        console.log("检查 inputArray 类型: " + typeof inputArray);
+        console.log("inputArray 是否有 Cells 属性: " + (inputArray && inputArray.Cells ? "是" : "否"));
+        console.log("inputArray 是否有 Value 属性: " + (inputArray && inputArray.Value ? "是" : "否"));
+        console.log("inputArray 是否为数组: " + (Array.isArray(inputArray) ? "是" : "否"));
+        
         // 处理 WPS 范围对象
         if (inputArray && typeof inputArray === 'object' && inputArray.Cells) {
-            // 这是一个 WPS 范围对象
+            console.log("检测到 WPS 范围对象，使用 extractDataFromRange");
             tempArray1D = extractDataFromRange(inputArray);
+            console.log("extractDataFromRange 返回: " + tempArray1D.toString());
         } else if (inputArray && inputArray.Value) {
+            console.log("检测到包含 Value 属性的对象");
             // 可能是包含 Value 属性的对象
             inputArray = inputArray.Value;
             
             // 检测数组维度
             var dimension = GetArrayDimension(inputArray);
+            console.log("数组维度: " + dimension);
             
             // 处理不同维度的数组
             if (dimension === 1) {
+                console.log("处理一维数组");
                 // 一维数组
                 if (Array.isArray(inputArray)) {
                     tempArray1D = inputArray.filter(function(item) {
@@ -221,6 +245,7 @@ function CalculatePermutations(inputArray, isRowMajor) {
                     }
                 }
             } else if (dimension === 2) {
+                console.log("处理二维数组");
                 // 二维数组
                 if (isRowMajor) {
                     tempArray1D = FlattenArrayRowMajor(inputArray);
@@ -232,6 +257,7 @@ function CalculatePermutations(inputArray, isRowMajor) {
                     return item !== undefined && item !== null && item !== '';
                 });
             } else {
+                console.log("维度检测失败，尝试直接处理");
                 // 尝试直接处理
                 if (typeof inputArray === 'object' && inputArray.length) {
                     for (var i = 0; i < inputArray.length; i++) {
@@ -252,8 +278,10 @@ function CalculatePermutations(inputArray, isRowMajor) {
                 }
             }
         } else if (Array.isArray(inputArray)) {
+            console.log("检测为普通 JavaScript 数组");
             // 普通 JavaScript 数组
             if (Array.isArray(inputArray[0])) {
+                console.log("二维数组，使用扁平化");
                 // 二维数组
                 if (isRowMajor) {
                     tempArray1D = FlattenArrayRowMajor(inputArray);
@@ -261,6 +289,7 @@ function CalculatePermutations(inputArray, isRowMajor) {
                     tempArray1D = FlattenArrayColumnMajor(inputArray);
                 }
             } else {
+                console.log("一维数组，直接使用");
                 // 一维数组
                 tempArray1D = inputArray;
             }
@@ -268,17 +297,28 @@ function CalculatePermutations(inputArray, isRowMajor) {
             tempArray1D = tempArray1D.filter(function(item) {
                 return item !== undefined && item !== null && item !== '';
             });
+        } else {
+            console.error("无法识别 inputArray 类型");
+            throw new Error("无法识别输入类型");
         }
+        
+        console.log("处理后的一维数组: " + tempArray1D.toString());
         
         // 获取数组大小
         var arrSize = tempArray1D.length;
+        console.log("数组大小: " + arrSize);
+        
         if (arrSize === 0) {
+            console.error("输入数组为空");
             throw new Error("输入数组为空");
         }
         
+        console.log("开始计算排列");
         // 计算排列总数：n!
         var PermCount = Factorial(arrSize);
+        console.log("排列总数: " + PermCount);
         
+        console.log("初始化结果数组");
         // 初始化结果数组
         var resultArray = [];
         for (var i = 0; i < PermCount; i++) {
@@ -287,28 +327,39 @@ function CalculatePermutations(inputArray, isRowMajor) {
                 resultArray[i][j] = '';
             }
         }
+        console.log("结果数组初始化完成");
         
         // 重置计数器
         k = 0;
+        console.log("计数器重置: k = 0");
         
         // 准备临时数组用于传递
         var tempArray = [];
         for (var i = 0; i < arrSize; i++) {
             tempArray[i] = tempArray1D[i];
         }
+        console.log("临时数组: " + tempArray.toString());
         
+        console.log("调用 Solver 函数");
         // 调用Solver函数
         Solver(tempArray, 0, resultArray);
+        console.log("Solver 函数执行完成，k = " + k);
         
         // 检查结果
         if (k === 0) {
+            console.error("Solver 函数未生成任何排列");
             return null;
         }
         
+        console.log("生成的排列数量: " + k);
+        console.log("第一个排列: " + resultArray[0].toString());
+        
         // 返回结果
+        console.log("CalculatePermutations 执行完成，返回结果");
         return resultArray;
     } catch (error) {
         console.error("全排列错误: " + (error.message || String(error)));
+        console.error("错误详情: " + error.stack);
         return null;
     }
 }
@@ -519,14 +570,81 @@ function TestSimplePermutation() {
     }
 }
 
+// 测试字符串全排列
+function TestStringPermutation() {
+    try {
+        // 测试字符串数组
+        var testArray = ["你", "好", "吗"];
+        console.log("测试字符串数组: " + testArray.toString());
+        
+        var result = CalculatePermutations(testArray, true);
+        
+        if (result) {
+            console.log("计算成功，生成 " + result.length + " 个排列");
+            
+            // 获取或创建工作表
+            var ws = GetOrInitWorksheet("字符串全排列结果");
+            ws.Cells.Clear();
+            
+            // 设置标题行
+            ws.Cells(1, 1).Value = "序号";
+            for (var i = 0; i < result[0].length; i++) {
+                ws.Cells(1, i + 2).Value = "元素 " + (i + 1);
+                ws.Cells(1, i + 2 + result[0].length).Value = "映射 " + (i + 1);
+            }
+            
+            // 创建索引数组
+            var indexArr = [];
+            for (var i = 0; i < result[0].length; i++) {
+                indexArr[i] = i + 1;
+            }
+            var indexResult = CalculatePermutations(indexArr, true);
+            
+            // 写入数据
+            for (var i = 0; i < result.length; i++) {
+                // 序号
+                ws.Cells(i + 2, 1).Value = i + 1;
+                
+                // 原始元素
+                for (var j = 0; j < result[i].length; j++) {
+                    ws.Cells(i + 2, j + 2).Value = result[i][j];
+                }
+                
+                // 索引映射
+                for (var j = 0; j < indexResult[i].length; j++) {
+                    ws.Cells(i + 2, j + 2 + result[i].length).Value = indexResult[i][j];
+                }
+            }
+            
+            // 自动调整列宽
+            ws.Columns.AutoFit();
+            // 激活工作表
+            ws.Activate();
+            
+            try {
+                Application.MsgBox("字符串全排列测试完成！\n原始字符串: 你、好、吗\n排列数量: " + result.length + "\n结果已输出到 '字符串全排列结果' 工作表", 64, "测试完成");
+            } catch (e) {
+                // 忽略 MsgBox 错误
+            }
+        } else {
+            console.error("字符串全排列计算失败");
+            try {
+                Application.MsgBox("字符串全排列计算失败", 48, "错误");
+            } catch (e) {
+                // 忽略 MsgBox 错误
+            }
+        }
+    } catch (error) {
+        console.error("测试错误: " + (error.message || String(error)));
+    }
+}
+
 // 初始化函数，确保代码能在 WPS 中正常运行
 function Initialize() {
     console.log("全排列代码初始化完成");
     console.log("可用函数:");
     console.log("1. TestPermutations2D() - 选择范围进行全排列");
-    console.log("2. TestSimplePermutation() - 使用预设数组测试");
-    console.log("3. CalculatePermutations(inputArray, isRowMajor) - 核心计算函数");
+    console.log("2. TestSimplePermutation() - 使用预设数组 [1,2,3] 测试");
+    console.log("3. TestStringPermutation() - 使用预设字符串 ['你','好','吗'] 测试");
+    console.log("4. CalculatePermutations(inputArray, isRowMajor) - 核心计算函数");
 }
-
-// 自动执行初始化
-Initialize();
