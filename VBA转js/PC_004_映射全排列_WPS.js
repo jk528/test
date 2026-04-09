@@ -112,56 +112,74 @@ function Solver(Arr, m, brr) {
 
 // 从 WPS 范围对象中提取数据
 function extractDataFromRange(range) {
+    console.log("开始提取范围数据");
     var data = [];
     try {
+        console.log("尝试方法1：直接访问单元格");
         // 尝试获取范围的行列数
         var rows = range.Rows.Count;
         var cols = range.Columns.Count;
+        console.log("范围大小: " + rows + "行 × " + cols + "列");
         
         // 遍历所有单元格
         for (var i = 1; i <= rows; i++) {
             for (var j = 1; j <= cols; j++) {
                 var cell = range.Cells(i, j);
                 var value = cell.Value;
+                console.log("单元格 (" + i + "," + j + ") 值: " + value);
                 if (value !== undefined && value !== null && value !== '') {
                     data.push(value);
+                    console.log("添加值: " + value);
                 }
             }
         }
+        console.log("方法1提取完成，数据: " + data.toString());
     } catch (e) {
-        // 如果直接访问行列失败，尝试其他方法
+        console.error("方法1失败: " + (e.message || String(e)));
+        console.log("尝试方法2：获取范围值");
         try {
             // 尝试获取范围值
             var rangeValue = range.Value;
+            console.log("范围值类型: " + typeof rangeValue);
             if (rangeValue) {
                 // 处理二维数组
                 if (Array.isArray(rangeValue)) {
+                    console.log("范围值是数组，长度: " + rangeValue.length);
                     for (var i = 0; i < rangeValue.length; i++) {
                         if (Array.isArray(rangeValue[i])) {
+                            console.log("行 " + i + " 是数组，长度: " + rangeValue[i].length);
                             for (var j = 0; j < rangeValue[i].length; j++) {
                                 var value = rangeValue[i][j];
+                                console.log("单元格 (" + i + "," + j + ") 值: " + value);
                                 if (value !== undefined && value !== null && value !== '') {
                                     data.push(value);
+                                    console.log("添加值: " + value);
                                 }
                             }
                         } else {
                             var value = rangeValue[i];
+                            console.log("索引 " + i + " 值: " + value);
                             if (value !== undefined && value !== null && value !== '') {
                                 data.push(value);
+                                console.log("添加值: " + value);
                             }
                         }
                     }
                 } else {
                     // 单个单元格
+                    console.log("单个单元格值: " + rangeValue);
                     if (rangeValue !== undefined && rangeValue !== null && rangeValue !== '') {
                         data.push(rangeValue);
+                        console.log("添加值: " + rangeValue);
                     }
                 }
             }
+            console.log("方法2提取完成，数据: " + data.toString());
         } catch (e2) {
-            console.error("提取数据失败: " + (e2.message || String(e2)));
+            console.error("方法2失败: " + (e2.message || String(e2)));
         }
     }
+    console.log("最终提取数据: " + data.toString());
     return data;
 }
 
@@ -297,9 +315,11 @@ function CalculatePermutations(inputArray, isRowMajor) {
 
 // 测试函数 - 二维数组（优化版，带索引映射）
 function TestPermutations2D() {
+    console.log("开始执行 TestPermutations2D");
     try {
         // 开始计时
         var startTime = new Date().getTime();
+        console.log("步骤1: 获取用户选择的单元格区域");
         
         // 获取用户选择的单元格区域
         var inputRange = Application.InputBox(
@@ -313,13 +333,17 @@ function TestPermutations2D() {
             8
         );
         
+        console.log("用户选择结果: " + (inputRange ? "成功" : "失败"));
+        
         // 检查用户是否取消选择
         if (inputRange === false) {
+            console.log("用户取消选择");
             return;
         }
         
         // 检查是否成功获取范围
         if (!inputRange) {
+            console.error("未选择有效范围");
             try {
                 Application.MsgBox("未选择有效范围", 48, "错误");
             } catch (e) {
@@ -328,11 +352,15 @@ function TestPermutations2D() {
             return;
         }
         
+        console.log("步骤2: 调用 CalculatePermutations 计算全排列");
         // 调用封装函数（行优先）获取原始元素排列
         var resultArr = CalculatePermutations(inputRange, true);
         
+        console.log("全排列计算结果: " + (resultArr ? "成功" : "失败"));
+        
         // 输出结果
         if (resultArr === null) {
+            console.error("计算错误");
             try {
                 Application.MsgBox("计算错误", 48, "错误");
             } catch (e) {
@@ -341,25 +369,36 @@ function TestPermutations2D() {
             return;
         }
         
+        console.log("步骤3: 准备工作表");
         // 获取或创建工作表
         var ws = GetOrInitWorksheet("全排列结果");
+        console.log("工作表准备完成");
+        
         ws.Cells.Clear();
+        console.log("工作表已清空");
         
         // 获取结果数组的大小
         var rowCount = resultArr.length;
         var colCount = resultArr[0].length;
+        console.log("结果数组大小: " + rowCount + "行 × " + colCount + "列");
         
+        console.log("步骤4: 生成索引数组");
         // 创建索引数组 [1,2,3,...colCount]
         var indexArr = [];
         for (var i = 0; i < colCount; i++) {
             indexArr[i] = i + 1;
         }
+        console.log("索引数组: " + indexArr.toString());
         
+        console.log("步骤5: 计算索引排列");
         // 调用封装函数获取索引排列（使用相同的k值，确保排列顺序一致）
         var indexResultArr = CalculatePermutations(indexArr, true);
         
+        console.log("索引排列计算结果: " + (indexResultArr ? "成功" : "失败"));
+        
         // 检查索引排列是否成功
         if (indexResultArr === null) {
+            console.error("索引排列计算错误");
             try {
                 Application.MsgBox("索引排列计算错误", 48, "错误");
             } catch (e) {
@@ -368,13 +407,16 @@ function TestPermutations2D() {
             return;
         }
         
+        console.log("步骤6: 设置标题行");
         // 设置标题行
         ws.Cells(1, 1).Value = "序号";
         for (var i = 0; i < colCount; i++) {
             ws.Cells(1, i + 2).Value = "元素 " + (i + 1);
             ws.Cells(1, i + 2 + colCount).Value = "映射 " + (i + 1);
         }
+        console.log("标题行设置完成");
         
+        console.log("步骤7: 写入数据");
         // 写入数据
         for (var i = 0; i < rowCount; i++) {
             // 写入序号
@@ -389,10 +431,14 @@ function TestPermutations2D() {
             for (var j = 0; j < colCount; j++) {
                 ws.Cells(i + 2, j + 2 + colCount).Value = indexResultArr[i][j];
             }
+            console.log("写入第 " + (i + 1) + " 行完成");
         }
+        console.log("数据写入完成");
         
+        console.log("步骤8: 调整列宽");
         // 自动调整列宽
         ws.Columns.AutoFit();
+        console.log("列宽调整完成");
         
         // 结束计时
         var endTime = new Date().getTime();
@@ -404,16 +450,21 @@ function TestPermutations2D() {
                      "元素数量: " + colCount + "\n" +
                      "处理用时: " + elapsedTime.toFixed(3) + " 秒";
         
+        console.log("步骤9: 激活工作表");
         // 激活结果工作表
         ws.Activate();
+        console.log("工作表已激活");
         
         // 简单的消息提示
         try {
             Application.MsgBox(message, 64, "全排列测试");
+            console.log("消息框显示完成");
         } catch (e) {
             // 忽略 MsgBox 错误
+            console.log("消息框显示失败: " + (e.message || String(e)));
         }
         
+        console.log("TestPermutations2D 执行完成");
     } catch (error) {
         console.error("测试错误: " + (error.message || String(error)));
         try {
