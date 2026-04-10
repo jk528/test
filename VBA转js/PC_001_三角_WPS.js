@@ -186,12 +186,13 @@ function 生成_统合三角() {
     // 获取用户输入
     const typeChoice = Application.InputBox(
         "请选择三角类型：\n" +
-        "1 = 组合不放回 C(m,k)(杨辉三角)(元素不重复去镜像)\n" +
-        "2 = 组合放回 C(m+k-1,k)（元素重复去镜像）\n" +
-        "3 = 排列不放回 P(m,k)=m!/(m-k)!(元素不重复镜像)\n" +
-        "4 = 排列放回 m^k(元素重复镜像)",
+        "1 = 组合不放回 C(m,k)(杨辉三角)\n" +
+        "2 = 组合放回 C(m+k-1,k)\n" +
+        "3 = 排列不放回 P(m,k)\n" +
+        "4 = 排列放回 m^k\n" +
+        "5 = 全部生成（all）",
         "统合三角类型选择",
-        "",
+        "5",
         100,
         100,
         "",
@@ -200,9 +201,9 @@ function 生成_统合三角() {
     );
 
     if (typeChoice === false) return;
-    const type = parseInt(typeChoice);
-    if (isNaN(type) || type < 1 || type > 4) {
-        Application.MsgBox("类型必须是 1..4 的整数。", 48);
+    const typeInput = parseInt(typeChoice);
+    if (isNaN(typeInput) || typeInput < 1 || typeInput > 5) {
+        Application.MsgBox("类型必须是 1..5 的整数。", 48);
         return;
     }
 
@@ -214,47 +215,41 @@ function 生成_统合三角() {
         return;
     }
 
-    let outArr, sheetName;
+    const startTime = new Date().getTime();
+    const typeConfigs = {
+        1: { name: "三角_组合不放回_杨辉三角", func: 构建_组合不放回_C三角二维数组 },
+        2: { name: "三角_组合放回_重复元素", func: 构建_组合放回_C三角_XX二维数组 },
+        3: { name: "三角_排列不放回_镜像", func: 构建_排列不放回_P三角二维数组 },
+        4: { name: "三角_排列放回_m次幂_完备", func: 构建_m次幂_三角二维数组 }
+    };
 
-    // 根据类型生成二维数组与工作表名
-    switch (type) {
-        case 1:
-            outArr = 构建_组合不放回_C三角二维数组(n);
-            sheetName = "三角_组合不放回_杨辉三角";
-            break;
-        case 2:
-            outArr = 构建_组合放回_C三角_XX二维数组(n);
-            sheetName = "三角_组合放回_重复元素";
-            break;
-        case 3:
-            outArr = 构建_排列不放回_P三角二维数组(n);
-            sheetName = "三角_排列不放回_镜像";
-            break;
-        case 4:
-            outArr = 构建_m次幂_三角二维数组(n);
-            sheetName = "三角_排列放回_m次幂_完备";
-            break;
-    }
+    const typesToGenerate = typeInput === 5 ? [1, 2, 3, 4] : [typeInput];
 
-    // 获取或创建工作表
-    let ws = GetOrInitWorksheet(sheetName);
-    ws.Cells.Clear();
-    // 写入数据
-    const rows = outArr.length;
-    const cols = outArr[0].length;
-    try {
-        // 尝试直接数组赋值
-        const range = ws.Range(ws.Cells(1, 1), ws.Cells(rows, cols));
-        range.Value2 = outArr;
-    } catch (e) {
-        // 提示数组赋值失败
-        Application.MsgBox("数组赋值失败，正在使用逐单元格写入方式...", 48, "提示");
-        // 回退到逐单元格写入
-        for (let i = 0; i < rows; i++) {
-            for (let j = 0; j < cols; j++) {
-                ws.Cells(i + 1, j + 1).Value = outArr[i][j];
+    for (let t = 0; t < typesToGenerate.length; t++) {
+        const type = typesToGenerate[t];
+        const config = typeConfigs[type];
+
+        let outArr = config.func(n);
+        let ws = GetOrInitWorksheet(config.name);
+        ws.Cells.Clear();
+
+        const rows = outArr.length;
+        const cols = outArr[0].length;
+        try {
+            const range = ws.Range(ws.Cells(1, 1), ws.Cells(rows, cols));
+            range.Value2 = outArr;
+        } catch (e) {
+            Application.MsgBox("数组赋值失败，正在使用逐单元格写入方式...", 48, "提示");
+            for (let i = 0; i < rows; i++) {
+                for (let j = 0; j < cols; j++) {
+                    ws.Cells(i + 1, j + 1).Value2 = outArr[i][j];
+                }
             }
         }
     }
 
+    const endTime = new Date().getTime();
+    const elapsed = ((endTime - startTime) / 1000).toFixed(3);
+    const typeLabel = typeInput === 5 ? "全部4种三角" : ["组合不放回", "组合放回", "排列不放回", "排列放回"][typeInput - 1];
+    console.log("已生成【" + typeLabel + "】（N=0.." + n + "）到工作表。用时：" + elapsed + " 秒");
 }
