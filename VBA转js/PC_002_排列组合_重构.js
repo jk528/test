@@ -16,9 +16,9 @@ function ShowMessage(message, type) {
     }
 }
 
-function WPSInputBox(prompt, title, type) {
+function WPSInputBox(prompt, title, type, defaultValue) {
     try {
-        return Application.InputBox(prompt, title || "", "", 100, 100, "", 0, type || 8);
+        return Application.InputBox(prompt, title || "", defaultValue || "", 100, 100, "", 0, type || 8);
     } catch (e) {
         console.error("InputBox 调用失败: " + (e.message || String(e)));
         return null;
@@ -336,7 +336,7 @@ function 组合排列_范围选取_示例() {
             ShowMessage("无效选择（请输入 1~4）。", 48);
             return;
         }
-        var comboRangeInput = WPSInputBox("组合长度：输入 all（全部：1..n）或 单值k 或 区间 k1-k2", "组合长度", 2);
+        var comboRangeInput = WPSInputBox("组合长度：输入 all（全部：1..n）或 单值k 或 区间 k1-k2", "组合长度", 2, "all");
         if (!comboRangeInput) return;
         var rangeResult = ParseComboRange(String(comboRangeInput), Arr.length);
         if (!rangeResult) {
