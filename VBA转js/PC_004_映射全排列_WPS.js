@@ -3,6 +3,22 @@
 // 用于记录排列索引的全局变量
 var k = 0;
 
+// WPS 兼容的消息提示函数
+function ShowMessage(message, type) {
+    try {
+        // type: 64=信息, 48=错误
+        if (typeof Application.MsgBox === 'function') {
+            Application.MsgBox(message, type || 64, "全排列");
+        } else if (typeof Application.Alert === 'function') {
+            Application.Alert(message);
+        } else {
+            console.log("【消息】" + message);
+        }
+    } catch (e) {
+        console.log("【消息】" + message);
+    }
+}
+
 // 计算阶乘
 function Factorial(n) {
     var result = 1;
@@ -125,74 +141,80 @@ function Solver(Arr, m, brr) {
 
 // 从 WPS 范围对象中提取数据
 function extractDataFromRange(range) {
-    console.log("开始提取范围数据");
+    console.log("=== 开始 extractDataFromRange ===");
+    console.log("range 参数类型: " + typeof range);
+    console.log("range 是否有 Cells: " + (range && range.Cells ? "是" : "否"));
+    console.log("range 是否有 Rows: " + (range && range.Rows ? "是" : "否"));
+    console.log("range 是否有 Columns: " + (range && range.Columns ? "是" : "否"));
+    console.log("range 是否有 Value: " + (range && range.Value ? "是" : "否"));
+
     var data = [];
+
+    // 方法1：直接访问 Rows.Count 和 Columns.Count
     try {
-        console.log("尝试方法1：直接访问单元格");
-        // 尝试获取范围的行列数
+        console.log("尝试方法1：直接访问 Rows.Count 和 Columns.Count");
         var rows = range.Rows.Count;
         var cols = range.Columns.Count;
         console.log("范围大小: " + rows + "行 × " + cols + "列");
-        
+
         // 遍历所有单元格
         for (var i = 1; i <= rows; i++) {
             for (var j = 1; j <= cols; j++) {
-                var cell = range.Cells(i, j);
-                var value = cell.Value;
-                console.log("单元格 (" + i + "," + j + ") 值: " + value);
-                if (value !== undefined && value !== null && value !== '') {
-                    data.push(value);
-                    console.log("添加值: " + value);
+                try {
+                    var cell = range.Cells(i, j);
+                    var value = cell.Value;
+                    console.log("单元格 (" + i + "," + j + ") 值: " + value + ", 类型: " + typeof value);
+                    if (value !== undefined && value !== null && value !== '') {
+                        data.push(value);
+                        console.log("已添加值: " + value);
+                    }
+                } catch (cellError) {
+                    console.error("读取单元格 (" + i + "," + j + ") 失败: " + (cellError.message || String(cellError)));
                 }
             }
         }
-        console.log("方法1提取完成，数据: " + data.toString());
+        console.log("方法1执行完成，当前数据: " + data.toString());
     } catch (e) {
         console.error("方法1失败: " + (e.message || String(e)));
-        console.log("尝试方法2：获取范围值");
+        console.error("错误: " + (e.stack || "无堆栈"));
+
+        // 方法2：尝试直接获取 Value
+        console.log("尝试方法2：直接获取 range.Value");
         try {
-            // 尝试获取范围值
             var rangeValue = range.Value;
-            console.log("范围值类型: " + typeof rangeValue);
-            if (rangeValue) {
-                // 处理二维数组
+            console.log("range.Value 类型: " + typeof rangeValue);
+            console.log("range.Value 是否为数组: " + (Array.isArray(rangeValue) ? "是" : "否"));
+
+            if (rangeValue !== undefined && rangeValue !== null) {
                 if (Array.isArray(rangeValue)) {
-                    console.log("范围值是数组，长度: " + rangeValue.length);
+                    console.log("处理二维数组 Value");
                     for (var i = 0; i < rangeValue.length; i++) {
                         if (Array.isArray(rangeValue[i])) {
-                            console.log("行 " + i + " 是数组，长度: " + rangeValue[i].length);
                             for (var j = 0; j < rangeValue[i].length; j++) {
                                 var value = rangeValue[i][j];
-                                console.log("单元格 (" + i + "," + j + ") 值: " + value);
                                 if (value !== undefined && value !== null && value !== '') {
                                     data.push(value);
-                                    console.log("添加值: " + value);
                                 }
                             }
                         } else {
                             var value = rangeValue[i];
-                            console.log("索引 " + i + " 值: " + value);
                             if (value !== undefined && value !== null && value !== '') {
                                 data.push(value);
-                                console.log("添加值: " + value);
                             }
                         }
                     }
                 } else {
-                    // 单个单元格
-                    console.log("单个单元格值: " + rangeValue);
-                    if (rangeValue !== undefined && rangeValue !== null && rangeValue !== '') {
-                        data.push(rangeValue);
-                        console.log("添加值: " + rangeValue);
-                    }
+                    console.log("Value 是单个值: " + rangeValue);
+                    data.push(rangeValue);
                 }
             }
-            console.log("方法2提取完成，数据: " + data.toString());
+            console.log("方法2执行完成，当前数据: " + data.toString());
         } catch (e2) {
-            console.error("方法2失败: " + (e2.message || String(e2)));
+            console.error("方法2也失败: " + (e2.message || String(e2)));
         }
     }
-    console.log("最终提取数据: " + data.toString());
+
+    console.log("=== extractDataFromRange 最终结果: " + data.toString() + " ===");
     return data;
 }
 
@@ -218,64 +240,101 @@ function CalculatePermutations(inputArray, isRowMajor) {
             console.log("检测到 WPS 范围对象，使用 extractDataFromRange");
             tempArray1D = extractDataFromRange(inputArray);
             console.log("extractDataFromRange 返回: " + tempArray1D.toString());
-        } else if (inputArray && inputArray.Value) {
-            console.log("检测到包含 Value 属性的对象");
-            // 可能是包含 Value 属性的对象
-            inputArray = inputArray.Value;
-            
-            // 检测数组维度
-            var dimension = GetArrayDimension(inputArray);
-            console.log("数组维度: " + dimension);
-            
-            // 处理不同维度的数组
-            if (dimension === 1) {
-                console.log("处理一维数组");
-                // 一维数组
-                if (Array.isArray(inputArray)) {
-                    tempArray1D = inputArray.filter(function(item) {
-                        return item !== undefined && item !== null && item !== '';
-                    });
-                } else if (typeof inputArray === 'object' && inputArray.length) {
-                    // 类数组对象
-                    for (var i = 0; i < inputArray.length; i++) {
-                        var value = inputArray[i];
-                        if (value !== undefined && value !== null && value !== '') {
-                            tempArray1D.push(value);
-                        }
+        } else if (inputArray && typeof inputArray === 'function') {
+            console.log("检测到 inputArray 是函数，尝试获取其返回值");
+            // WPS JavaScript 中 InputBox 返回的是函数代理，需要调用
+            try {
+                // 调用函数获取 Range 对象
+                var rangeObj = inputArray();
+                console.log("函数调用返回类型: " + typeof rangeObj);
+                console.log("返回对象: " + JSON.stringify(rangeObj));
+                console.log("返回对象是否有 Cells: " + (rangeObj && rangeObj.Cells ? "是" : "否"));
+                console.log("返回对象是否有 Value: " + (rangeObj && rangeObj.Value ? "是" : "否"));
+                console.log("返回对象是否有 Address: " + (rangeObj && rangeObj.Address ? "是" : "否"));
+                console.log("返回对象构造函数: " + (rangeObj && rangeObj.constructor ? rangeObj.constructor.name : "无"));
+                
+                // 尝试遍历返回对象的所有属性
+                if (rangeObj && typeof rangeObj === 'object') {
+                    console.log("返回对象的属性列表:");
+                    for (var prop in rangeObj) {
+                        console.log("  - " + prop + ": " + typeof rangeObj[prop]);
                     }
                 }
-            } else if (dimension === 2) {
-                console.log("处理二维数组");
-                // 二维数组
-                if (isRowMajor) {
-                    tempArray1D = FlattenArrayRowMajor(inputArray);
-                } else {
-                    tempArray1D = FlattenArrayColumnMajor(inputArray);
-                }
-                // 过滤空值
-                tempArray1D = tempArray1D.filter(function(item) {
-                    return item !== undefined && item !== null && item !== '';
-                });
-            } else {
-                console.log("维度检测失败，尝试直接处理");
-                // 尝试直接处理
-                if (typeof inputArray === 'object' && inputArray.length) {
-                    for (var i = 0; i < inputArray.length; i++) {
-                        if (typeof inputArray[i] === 'object' && inputArray[i].length) {
-                            for (var j = 0; j < inputArray[i].length; j++) {
-                                var value = inputArray[i][j];
+                
+                if (rangeObj && rangeObj.Cells) {
+                    console.log("调用 extractDataFromRange 处理返回对象");
+                    tempArray1D = extractDataFromRange(rangeObj);
+                    console.log("extractDataFromRange 返回: " + tempArray1D.toString());
+                } else if (rangeObj && typeof rangeObj === 'object') {
+                    console.log("返回对象是普通对象，检查 Value 属性");
+                    if (rangeObj.Value) {
+                        var val = rangeObj.Value;
+                        console.log("Value 类型: " + typeof val);
+                        if (Array.isArray(val)) {
+                            console.log("Value 是数组");
+                            inputArray = val;
+                        } else if (val && val.Cells) {
+                            console.log("Value 是范围对象");
+                            tempArray1D = extractDataFromRange(val);
+                        } else {
+                            console.log("Value 是单个值: " + val);
+                            tempArray1D = [val];
+                        }
+                    } else if (Array.isArray(rangeObj)) {
+                        console.log("返回对象是数组，直接处理");
+                        console.log("数组内容: " + JSON.stringify(rangeObj));
+                        // 直接扁平化这个二维数组
+                        for (var i = 0; i < rangeObj.length; i++) {
+                            if (Array.isArray(rangeObj[i])) {
+                                for (var j = 0; j < rangeObj[i].length; j++) {
+                                    var value = rangeObj[i][j];
+                                    console.log("处理值 [" + i + "][" + j + "]: " + value);
+                                    if (value !== undefined && value !== null && value !== '') {
+                                        tempArray1D.push(value);
+                                    }
+                                }
+                            } else {
+                                var value = rangeObj[i];
+                                console.log("处理值 [" + i + "]: " + value);
                                 if (value !== undefined && value !== null && value !== '') {
                                     tempArray1D.push(value);
                                 }
                             }
-                        } else {
-                            var value = inputArray[i];
-                            if (value !== undefined && value !== null && value !== '') {
-                                tempArray1D.push(value);
-                            }
                         }
+                        console.log("处理后的一维数组: " + tempArray1D.toString());
+                    } else {
+                        console.log("返回对象是普通值: " + rangeObj);
+                        tempArray1D = [rangeObj];
                     }
+                } else {
+                    console.error("函数未返回有效的范围对象");
                 }
+            } catch (funcError) {
+                console.error("函数调用失败: " + (funcError.message || String(funcError)));
+                console.error("错误堆栈: " + (funcError.stack || "无"));
+            }
+        } else if (inputArray && typeof inputArray === 'object' && inputArray.Value) {
+            console.log("检测到包含 Value 属性的对象，尝试获取 Value");
+            // 可能是包含 Value 属性的对象
+            try {
+                var valueData = inputArray.Value;
+                console.log("Value 属性类型: " + typeof valueData);
+                console.log("Value 属性是否为数组: " + (Array.isArray(valueData) ? "是" : "否"));
+                
+                if (Array.isArray(valueData)) {
+                    inputArray = valueData;
+                } else if (valueData && valueData.Cells) {
+                    // Value 返回的是范围对象
+                    console.log("Value 返回范围对象");
+                    tempArray1D = extractDataFromRange(valueData);
+                    console.log("extractDataFromRange 返回: " + tempArray1D.toString());
+                } else {
+                    // 单个值
+                    console.log("单个值: " + valueData);
+                    tempArray1D = [valueData];
+                }
+            } catch (valueError) {
+                console.error("获取 Value 失败: " + (valueError.message || String(valueError)));
             }
         } else if (Array.isArray(inputArray)) {
             console.log("检测为普通 JavaScript 数组");
@@ -373,18 +432,28 @@ function TestPermutations2D() {
         console.log("步骤1: 获取用户选择的单元格区域");
         
         // 获取用户选择的单元格区域
-        var inputRange = Application.InputBox(
-            "请选择要进行全排列的数据范围",
-            "选择数据范围",
-            "",
-            100,
-            100,
-            "",
-            0,
-            8
-        );
-        
-        console.log("用户选择结果: " + (inputRange ? "成功" : "失败"));
+        console.log("步骤1: 获取用户选择的单元格区域");
+        try {
+            // Application.InputBox(prompt, title, default, left, top, helpFile, helpContextID, type)
+            // Type = 8 表示 Range 对象
+            var inputRange = Application.InputBox(
+                "请选择要进行全排列的数据范围\n（支持一列、一行或矩形范围）",
+                "选择数据范围",
+                "",
+                100,
+                100,
+                "",
+                0,
+                8
+            );
+            console.log("用户选择结果: " + (inputRange ? "成功" : "失败"));
+        } catch (inputError) {
+            console.error("InputBox 调用失败: " + (inputError.message || String(inputError)));
+            try {
+                ShowMessage("无法获取用户选择，请重试", 48);
+            } catch (e) {}
+            return;
+        }
         
         // 检查用户是否取消选择
         if (inputRange === false) {
@@ -396,7 +465,7 @@ function TestPermutations2D() {
         if (!inputRange) {
             console.error("未选择有效范围");
             try {
-                Application.MsgBox("未选择有效范围", 48, "错误");
+                ShowMessage("未选择有效范围", 48);
             } catch (e) {
                 console.error("未选择有效范围");
             }
@@ -413,7 +482,7 @@ function TestPermutations2D() {
         if (resultArr === null) {
             console.error("计算错误");
             try {
-                Application.MsgBox("计算错误", 48, "错误");
+                ShowMessage("计算错误", 48);
             } catch (e) {
                 console.error("计算错误");
             }
@@ -451,7 +520,7 @@ function TestPermutations2D() {
         if (indexResultArr === null) {
             console.error("索引排列计算错误");
             try {
-                Application.MsgBox("索引排列计算错误", 48, "错误");
+                ShowMessage("索引排列计算错误", 48);
             } catch (e) {
                 console.error("索引排列计算错误");
             }
@@ -460,31 +529,91 @@ function TestPermutations2D() {
         
         console.log("步骤6: 设置标题行");
         // 设置标题行
-        ws.Cells(1, 1).Value = "序号";
-        for (var i = 0; i < colCount; i++) {
-            ws.Cells(1, i + 2).Value = "元素 " + (i + 1);
-            ws.Cells(1, i + 2 + colCount).Value = "映射 " + (i + 1);
+        try {
+            var totalCols = 1 + colCount * 2; // 序号 + 元素 + 映射
+            
+            // 创建标题数组
+            var headerArray = [];
+            headerArray[0] = [];
+            headerArray[0][0] = "序号";
+            for (var i = 0; i < colCount; i++) {
+                headerArray[0][i + 1] = "元素 " + (i + 1);
+                headerArray[0][i + 1 + colCount] = "映射 " + (i + 1);
+            }
+            
+            console.log("标题数组: " + headerArray[0].toString());
+            
+            // 尝试使用 Range 写入
+            try {
+                var headerRange = ws.Range(ws.Cells(1, 1), ws.Cells(1, totalCols));
+                headerRange.Value2 = headerArray;
+                console.log("标题行 Range 写入成功");
+            } catch (headerError) {
+                console.error("标题行 Range 写入失败: " + (headerError.message || String(headerError)));
+                // 逐单元格写入
+                ws.Cells(1, 1).Value = "序号";
+                for (var i = 0; i < colCount; i++) {
+                    ws.Cells(1, i + 2).Value = "元素 " + (i + 1);
+                    ws.Cells(1, i + 2 + colCount).Value = "映射 " + (i + 1);
+                }
+                console.log("逐单元格标题写入成功");
+            }
+            console.log("标题行设置完成");
+        } catch (titleError) {
+            console.error("标题行设置失败: " + (titleError.message || String(titleError)));
+            try {
+                ShowMessage("标题行设置失败: " + (titleError.message || String(titleError)), 48);
+            } catch (e) {}
+            return;
         }
-        console.log("标题行设置完成");
         
         console.log("步骤7: 写入数据");
         // 写入数据
-        for (var i = 0; i < rowCount; i++) {
-            // 写入序号
-            ws.Cells(i + 2, 1).Value = i + 1;
-            
-            // 写入原始元素
-            for (var j = 0; j < colCount; j++) {
-                ws.Cells(i + 2, j + 2).Value = resultArr[i][j];
+        try {
+            var allData = [];
+            for (var i = 0; i < rowCount; i++) {
+                allData[i] = [];
+                // 序号
+                allData[i][0] = i + 1;
+                // 原始元素
+                for (var j = 0; j < colCount; j++) {
+                    allData[i][j + 1] = resultArr[i][j];
+                }
+                // 索引映射
+                for (var j = 0; j < colCount; j++) {
+                    allData[i][j + 1 + colCount] = indexResultArr[i][j];
+                }
             }
             
-            // 写入索引映射
-            for (var j = 0; j < colCount; j++) {
-                ws.Cells(i + 2, j + 2 + colCount).Value = indexResultArr[i][j];
+            console.log("数据数组合并完成");
+            
+            // 尝试使用 Range 批量写入
+            try {
+                var dataRange = ws.Range(ws.Cells(2, 1), ws.Cells(rowCount + 1, totalCols));
+                dataRange.Value2 = allData;
+                console.log("Range 批量写入成功");
+            } catch (dataError) {
+                console.error("Range 批量写入失败: " + (dataError.message || String(dataError)));
+                // 逐行写入
+                for (var i = 0; i < rowCount; i++) {
+                    ws.Cells(i + 2, 1).Value = i + 1;
+                    for (var j = 0; j < colCount; j++) {
+                        ws.Cells(i + 2, j + 2).Value = resultArr[i][j];
+                    }
+                    for (var j = 0; j < colCount; j++) {
+                        ws.Cells(i + 2, j + 2 + colCount).Value = indexResultArr[i][j];
+                    }
+                }
+                console.log("逐行写入完成");
             }
-            console.log("写入第 " + (i + 1) + " 行完成");
+            console.log("数据写入完成");
+        } catch (writeError) {
+            console.error("数据写入失败: " + (writeError.message || String(writeError)));
+            try {
+                ShowMessage("数据写入失败: " + (writeError.message || String(writeError)), 48);
+            } catch (e) {}
+            return;
         }
-        console.log("数据写入完成");
         
         console.log("步骤8: 调整列宽");
         // 自动调整列宽
@@ -508,10 +637,15 @@ function TestPermutations2D() {
         
         // 简单的消息提示
         try {
-            Application.MsgBox(message, 64, "全排列测试");
+            if (typeof Application.MsgBox === 'function') {
+                ShowMessage(message, 64);
+            } else if (typeof Application.Alert === 'function') {
+                Application.Alert(message);
+            } else {
+                console.log("消息提示: " + message);
+            }
             console.log("消息框显示完成");
         } catch (e) {
-            // 忽略 MsgBox 错误
             console.log("消息框显示失败: " + (e.message || String(e)));
         }
         
@@ -519,7 +653,7 @@ function TestPermutations2D() {
     } catch (error) {
         console.error("测试错误: " + (error.message || String(error)));
         try {
-            Application.MsgBox("错误: " + (error.message || String(error)), 48, "测试错误");
+            ShowMessage("错误: " + (error.message || String(error)), 48);
         } catch (e) {
             // 忽略 MsgBox 错误
         }
@@ -560,7 +694,7 @@ function TestSimplePermutation() {
             ws.Activate();
             
             try {
-                Application.MsgBox("简单测试完成，结果已输出到 '测试结果' 工作表", 64, "测试完成");
+                ShowMessage("简单测试完成，结果已输出到 '测试结果' 工作表", 64);
             } catch (e) {
                 // 忽略 MsgBox 错误
             }
@@ -572,70 +706,207 @@ function TestSimplePermutation() {
 
 // 测试字符串全排列
 function TestStringPermutation() {
+    console.log("开始执行 TestStringPermutation");
     try {
         // 测试字符串数组
         var testArray = ["你", "好", "吗"];
         console.log("测试字符串数组: " + testArray.toString());
-        
+
         var result = CalculatePermutations(testArray, true);
-        
+        console.log("计算结果: " + (result ? "成功" : "失败"));
+
         if (result) {
             console.log("计算成功，生成 " + result.length + " 个排列");
-            
+
             // 获取或创建工作表
+            console.log("创建或获取工作表");
             var ws = GetOrInitWorksheet("字符串全排列结果");
+            console.log("工作表获取成功");
+
+            console.log("清空工作表");
             ws.Cells.Clear();
-            
+            console.log("工作表已清空");
+
             // 设置标题行
-            ws.Cells(1, 1).Value = "序号";
-            for (var i = 0; i < result[0].length; i++) {
-                ws.Cells(1, i + 2).Value = "元素 " + (i + 1);
-                ws.Cells(1, i + 2 + result[0].length).Value = "映射 " + (i + 1);
+            console.log("设置标题行");
+            try {
+                // 使用 Range 对象写入标题行，更可靠
+                var colCount = result[0].length;
+                var totalCols = 1 + colCount * 2; // 序号 + 元素 + 映射
+                
+                // 创建标题数组
+                var headerArray = [];
+                headerArray[0] = [];
+                headerArray[0][0] = "序号";
+                for (var i = 0; i < colCount; i++) {
+                    headerArray[0][i + 1] = "元素 " + (i + 1);
+                    headerArray[0][i + 1 + colCount] = "映射 " + (i + 1);
+                }
+                
+                console.log("标题数组: " + headerArray[0].toString());
+                
+                // 尝试使用 Range 写入
+                try {
+                    console.log("创建 Range 对象");
+                    var headerRange = ws.Range(ws.Cells(1, 1), ws.Cells(1, totalCols));
+                    console.log("Range 对象创建成功");
+                    console.log("尝试写入 headerArray");
+                    console.log("headerArray 类型: " + typeof headerArray);
+                    console.log("headerArray 是否为数组: " + (Array.isArray(headerArray) ? "是" : "否"));
+                    headerRange.Value = headerArray;
+                    console.log("标题行 Range 写入成功");
+                } catch (rangeError) {
+                    console.error("Range 写入失败: " + (rangeError.message || String(rangeError)));
+                    console.error("错误名称: " + (rangeError.name || "未知"));
+                    console.error("错误堆栈: " + (rangeError.stack || "无堆栈信息"));
+                    console.log("尝试使用 Value2 写入");
+                    try {
+                        headerRange.Value2 = headerArray;
+                        console.log("Value2 写入成功");
+                    } catch (value2Error) {
+                        console.error("Value2 写入也失败: " + (value2Error.message || String(value2Error)));
+                        console.log("尝试逐单元格写入");
+                        
+                        // 逐单元格写入
+                        ws.Cells(1, 1).Value = "序号";
+                        for (var i = 0; i < colCount; i++) {
+                            ws.Cells(1, i + 2).Value = "元素 " + (i + 1);
+                            ws.Cells(1, i + 2 + colCount).Value = "映射 " + (i + 1);
+                        }
+                        console.log("逐单元格标题写入成功");
+                    }
+                }
+                console.log("标题行设置完成");
+            } catch (titleError) {
+                console.error("标题行设置失败: " + (titleError.message || String(titleError)));
+                console.error("错误详情: " + (titleError.stack || "无堆栈信息"));
+                try {
+                    ShowMessage("标题行设置失败: " + (titleError.message || String(titleError)), 48);
+                } catch (e) {}
+                return;
             }
-            
+
             // 创建索引数组
+            console.log("创建索引数组");
             var indexArr = [];
             for (var i = 0; i < result[0].length; i++) {
                 indexArr[i] = i + 1;
             }
+            console.log("索引数组: " + indexArr.toString());
+
+            console.log("计算索引排列");
             var indexResult = CalculatePermutations(indexArr, true);
-            
-            // 写入数据
-            for (var i = 0; i < result.length; i++) {
-                // 序号
-                ws.Cells(i + 2, 1).Value = i + 1;
-                
-                // 原始元素
-                for (var j = 0; j < result[i].length; j++) {
-                    ws.Cells(i + 2, j + 2).Value = result[i][j];
-                }
-                
-                // 索引映射
-                for (var j = 0; j < indexResult[i].length; j++) {
-                    ws.Cells(i + 2, j + 2 + result[i].length).Value = indexResult[i][j];
-                }
+            console.log("索引排列计算结果: " + (indexResult ? "成功" : "失败"));
+
+            if (!indexResult) {
+                console.error("索引排列计算失败");
+                try {
+                    Application.MsgBox("索引排列计算失败", 48, "错误");
+                } catch (e) {}
+                return;
             }
-            
-            // 自动调整列宽
-            ws.Columns.AutoFit();
-            // 激活工作表
-            ws.Activate();
-            
+
+            // 写入数据
+            console.log("开始写入数据，行数: " + result.length);
             try {
-                Application.MsgBox("字符串全排列测试完成！\n原始字符串: 你、好、吗\n排列数量: " + result.length + "\n结果已输出到 '字符串全排列结果' 工作表", 64, "测试完成");
+                var rowCount = result.length;
+                var colCount = result[0].length;
+                var totalCols = 1 + colCount * 2; // 序号 + 元素 + 映射
+
+                // 合并所有数据到一个数组
+                var allData = [];
+                for (var i = 0; i < rowCount; i++) {
+                    allData[i] = [];
+                    // 序号
+                    allData[i][0] = i + 1;
+                    // 原始元素
+                    for (var j = 0; j < colCount; j++) {
+                        allData[i][j + 1] = result[i][j];
+                    }
+                    // 索引映射
+                    for (var j = 0; j < colCount; j++) {
+                        allData[i][j + 1 + colCount] = indexResult[i][j];
+                    }
+                }
+
+                console.log("数据数组合并完成");
+
+                // 尝试使用 Range 批量写入
+                try {
+                    console.log("创建数据 Range 对象");
+                    var dataRange = ws.Range(ws.Cells(2, 1), ws.Cells(rowCount + 1, totalCols));
+                    console.log("数据 Range 对象创建成功");
+                    console.log("尝试写入 allData");
+                    console.log("allData 长度: " + allData.length);
+                    console.log("allData[0] 长度: " + (allData[0] ? allData[0].length : "undefined"));
+                    dataRange.Value = allData;
+                    console.log("Range 批量写入成功");
+                } catch (dataError) {
+                    console.error("Range 批量写入失败: " + (dataError.message || String(dataError)));
+                    console.error("错误名称: " + (dataError.name || "未知"));
+                    console.error("错误堆栈: " + (dataError.stack || "无堆栈信息"));
+                    console.log("尝试使用 Value2 写入");
+                    try {
+                        dataRange.Value2 = allData;
+                        console.log("Value2 批量写入成功");
+                    } catch (value2Error) {
+                        console.error("Value2 写入也失败: " + (value2Error.message || String(value2Error)));
+                        console.log("尝试逐行写入");
+                        
+                        // 逐行写入
+                        for (var i = 0; i < rowCount; i++) {
+                            // 序号
+                            ws.Cells(i + 2, 1).Value = i + 1;
+                            // 原始元素
+                            for (var j = 0; j < colCount; j++) {
+                                ws.Cells(i + 2, j + 2).Value = result[i][j];
+                            }
+                            // 索引映射
+                            for (var j = 0; j < colCount; j++) {
+                                ws.Cells(i + 2, j + 2 + colCount).Value = indexResult[i][j];
+                            }
+                        }
+                        console.log("逐行写入完成");
+                    }
+                }
+                console.log("数据写入完成");
+            } catch (dataError) {
+                console.error("数据写入失败: " + (dataError.message || String(dataError)));
+                console.error("错误详情: " + (dataError.stack || "无堆栈信息"));
+                try {
+                    ShowMessage("数据写入失败: " + (dataError.message || String(dataError)), 48);
+                } catch (e) {}
+                return;
+            }
+
+            // 自动调整列宽
+            console.log("调整列宽");
+            ws.Columns.AutoFit();
+
+            // 激活工作表
+            console.log("激活工作表");
+            ws.Activate();
+
+            try {
+                ShowMessage("字符串全排列测试完成！\n原始字符串: 你、好、吗\n排列数量: " + result.length + "\n结果已输出到 '字符串全排列结果' 工作表", 64);
             } catch (e) {
                 // 忽略 MsgBox 错误
             }
         } else {
             console.error("字符串全排列计算失败");
             try {
-                Application.MsgBox("字符串全排列计算失败", 48, "错误");
+                ShowMessage("字符串全排列计算失败", 48);
             } catch (e) {
                 // 忽略 MsgBox 错误
             }
         }
     } catch (error) {
         console.error("测试错误: " + (error.message || String(error)));
+        try {
+            ShowMessage("错误: " + (error.message || String(error)), 48);
+        } catch (e) {
+            // 忽略 MsgBox 错误
+        }
     }
 }
 
