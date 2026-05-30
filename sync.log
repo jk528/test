@@ -1,3 +1,6 @@
 ﻿[2026-05-29 20:54:14] 无变更，跳过同步 (分支: main, 工作区干净)
 [2026-05-30 02:54:22] 无变更，跳过同步
 [2026-05-30 10:54:45] 无变更，跳过同步
+[2026-05-30 17:27:02] [INFO] Start checking sync status...
+[2026-05-30 17:27:03] [INFO] Changes detected, preparing sync...
+[2026-05-30 17:27:03] [DETAIL] Changes:  M sync.log; ?? auto-sync.ps1; ?? sync-enhanced.ps1
