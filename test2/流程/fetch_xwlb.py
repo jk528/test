@@ -3,12 +3,40 @@
 """
 央视网新闻联播视频列表提取脚本（解决动态加载问题）
 通过分析页面源码中的 script/json 数据，提取完整的视频列表
+
+版本：v1.1.0（2026-06-26）
+变更：
+  v1.1.0 - 添加网络请求重试逻辑（失败等待3秒重试1次）
+  v1.1.0 - 添加日志文件输出（fetch_xwlb.log）
+  v1.0.0 - 初始版本
 """
 import requests
 import re
 import json
 import sys
+import os
+import time
+import logging
 from urllib.parse import unquote
+
+# 日志配置：同时输出到控制台和文件
+LOG_DIR = os.path.dirname(os.path.abspath(__file__))
+LOG_FILE = os.path.join(LOG_DIR, "fetch_xwlb.log")
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_FILE, encoding="utf-8"),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
+
+MAX_RETRIES = 1       # 最大重试次数
+RETRY_DELAY = 3       # 重试等待秒数
+REQUEST_TIMEOUT = 30   # 请求超时秒数
+
 
 def fetch_xwlb_list(date_str):
     """
@@ -24,9 +52,28 @@ def fetch_xwlb_list(date_str):
         "Referer": "https://tv.cctv.com/lm/xwlb/",
     }
 
-    resp = requests.get(url, headers=headers, timeout=30)
-    resp.encoding = 'utf-8'
-    html = resp.text
+    # 带重试的网络请求
+    html = None
+    for attempt in range(MAX_RETRIES + 1):
+        try:
+            logger.info(f"请求 {url}（第{attempt+1}次，共{MAX_RETRIES+1}次）")
+            resp = requests.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
+            resp.raise_for_status()
+            resp.encoding = 'utf-8'
+            html = resp.text
+            logger.info(f"请求成功，页面长度: {len(html)} 字符")
+            break
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"请求失败（第{attempt+1}次）: {e}")
+            if attempt < MAX_RETRIES:
+                logger.info(f"等待 {RETRY_DELAY} 秒后重试...")
+                time.sleep(RETRY_DELAY)
+            else:
+                logger.error(f"请求最终失败，已耗尽 {MAX_RETRIES+1} 次尝试")
+                return []
+
+    if not html:
+        return []
 
     # 央视网页面中，视频列表通常以特定格式存储
     # 方法：从页面源码中提取所有包含 [视频] 标题 + 时长 + URL 的条目
@@ -34,11 +81,6 @@ def fetch_xwlb_list(date_str):
     results = []
 
     # 匹配模式1：查找 <li> 内的完整视频条目
-    # 央视网列表结构：
-    # <li>
-    #   <span class="time">HH:MM:SS</span>
-    #   <a href="https://tv.cctv.com/.../VIDE...shtml">[视频]标题</a>
-    # </li>
     li_pattern = re.compile(
         r'<li[^>]*>.*?'
         r'(?:(\d{2}:\d{2}:\d{2})|class=["\']time["\'][^>]*>(\d{2}:\d{2}:\d{2})).*?'
@@ -60,11 +102,11 @@ def fetch_xwlb_list(date_str):
             continue
         seen_urls.add(video_url)
 
-        # 清理标题
+        # 清理标题：去除HTML标签和URL编码，保留原标题（含完整版标识）
         title = re.sub(r'<[^>]+>', '', title_raw).strip()
         title = unquote(title)
         title = title.replace('[视频]', '').strip()
-        title = re.sub(r'^完整版', '', title).strip()
+        # 注意：不自动去除"完整版"前缀，由调用方判断是否单独列出
 
         results.append({
             "title": title,
@@ -72,22 +114,22 @@ def fetch_xwlb_list(date_str):
             "url": video_url
         })
 
+    logger.info(f"模式1匹配到 {len(matches)} 条原始结果，去重后 {len(results)} 条")
+
     # 如果上面的模式没匹配到，使用方法2：逐条提取
     if not results:
-        # 提取所有视频URL
+        logger.warning("模式1无结果，切换到逐条提取模式")
+
         url_pattern = re.compile(r'https://tv\.cctv\.com/\d{4}/\d{2}/\d{2}/VIDE[^\s"<>]+\.shtml')
         all_urls = url_pattern.findall(html)
         unique_urls = list(dict.fromkeys(all_urls))
 
-        # 提取所有 [视频]标题
         title_pattern = re.compile(r'\[视频\]([^<\n]+)')
         titles = title_pattern.findall(html)
 
-        # 提取所有时长
         duration_pattern = re.compile(r'(\d{2}:\d{2}:\d{2})')
         durations = duration_pattern.findall(html)
 
-        # 简单对齐（按顺序匹配）
         for i, video_url in enumerate(unique_urls):
             title = titles[i].strip() if i < len(titles) else ""
             duration = durations[i] if i < len(durations) else ""
@@ -96,6 +138,12 @@ def fetch_xwlb_list(date_str):
                 "duration": duration,
                 "url": video_url
             })
+
+        logger.info(f"逐条提取模式获取 {len(results)} 条")
+
+    # 断言URL唯一性
+    assert len(set(r['url'] for r in results)) == len(results), "存在重复URL！"
+    logger.info(f"URL唯一性验证通过，共 {len(results)} 条唯一URL")
 
     return results
 
@@ -110,7 +158,7 @@ def save_config(results, date_str, output_path):
     }
     with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(config, f, ensure_ascii=False, indent=2)
-    print(f"配置文件已保存: {output_path}")
+    logger.info(f"配置文件已保存: {output_path}")
     return config
 
 
@@ -118,14 +166,25 @@ def main():
     date_str = sys.argv[1] if len(sys.argv) > 1 else "20260624"
     output_path = sys.argv[2] if len(sys.argv) > 2 else f"xwlb_{date_str}.json"
 
-    print(f"正在获取 {date_str} 的新闻联播视频列表...")
+    logger.info(f"开始获取 {date_str} 的新闻联播视频列表")
     results = fetch_xwlb_list(date_str)
 
     if not results:
-        print("未获取到视频列表，请检查日期是否正确")
+        logger.error("未获取到视频列表，请检查日期是否正确")
         return
 
-    print(f"\n成功获取 {len(results)} 条视频:\n")
+    logger.info(f"成功获取 {len(results)} 条视频")
+    print()
+
+    print("=" * 60)
+    print("⚠️  警告：本脚本基于正则匹配提取，存在以下限制：")
+    print("   1. 若央视网页面结构变更，可能遗漏条目")
+    print("   2. 仅提取央视网数据，不含齐鲁网等第三方来源")
+    print("   3. 输出数量不固定，以当天实际播出为准")
+    print("   4. 请务必人工核对页面实际条目数，确认无遗漏")
+    print("=" * 60)
+    print()
+
     for i, r in enumerate(results, 1):
         print(f"第{i}条:")
         print(f"  标题: {r['title']}")
@@ -142,6 +201,10 @@ def main():
     print("|------|------|------|----------|")
     for i, r in enumerate(results, 1):
         print(f"| {i} | {r['duration']} | {r['title']} | {r['url']} |")
+    print()
+    print("注意：请将'完整版'条目单独列出，不纳入常规新闻序号。")
+
+    logger.info(f"{date_str} 数据提取完成，共 {len(results)} 条")
 
 
 if __name__ == '__main__':
