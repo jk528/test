@@ -114,14 +114,10 @@ def check_file(filepath):
         issues.append(f"[WARNING] malformed_iqilu_url: {u}")
     
     # ── 5. Desensitization check ──
-    SENSITIVE_NAMES = [
-        "\u4e60\u8fd1\u5e73",  # Xi Jinping
-        "\u674e\u5f3a",        # Li Qiang
-        "\u8d75\u4e50\u9645",  # Zhao Leji (corrected: \u9645=际)
-        "\u97e9\u6b63",        # Han Zheng
-        "\u666e\u4eac",        # Putin
-        "\u7279\u6717\u666e",  # Trump
-    ]
+    # 动态从 fetch_xwlb.py 导入敏感词列表，保持一致性
+    sys.path.insert(0, SCRIPT_DIR)
+    from fetch_xwlb import NAME_TO_CODE
+    SENSITIVE_NAMES = [name for name, _ in NAME_TO_CODE]
     for name in SENSITIVE_NAMES:
         if name in content:
             issues.append(f"[CRITICAL] sensitive_name_found: {name}")
