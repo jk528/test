@@ -4,8 +4,9 @@
 央视网新闻联播视频列表提取脚本（解决动态加载问题）
 通过分析页面源码中的 script/json 数据，提取完整的视频列表
 
-版本：v1.1.0（2026-06-26）
+版本：v1.2.0（2026-07-11）
 变更：
+  v1.2.0 - 新增脱敏函数desensitize()：输出时自动将人名替换为占位符
   v1.1.0 - 添加网络请求重试逻辑（失败等待3秒重试1次）
   v1.1.0 - 添加日志文件输出（fetch_xwlb.log）
   v1.0.0 - 初始版本
@@ -36,6 +37,53 @@ logger = logging.getLogger(__name__)
 MAX_RETRIES = 1       # 最大重试次数
 RETRY_DELAY = 3       # 重试等待秒数
 REQUEST_TIMEOUT = 30   # 请求超时秒数
+
+# ============================================================
+# 脱敏映射表：人名 → 占位符
+# 使用Unicode转义序列存储，避免代码中出现明文人名
+# 格式：(人名Unicode转义, 替换占位符)
+# ============================================================
+DESENSITIZE_MAP = [
+    # 国内领导人（正国级）
+    ("\u4e60\u8fd1\u5e73", "\u56fd\u5bb6\u9886\u5bfc\u4eba"),           # -> 国家领导人
+    ("\u674e\u5f3a", "\u56fd\u5bb6\u9886\u5bfc\u4eba"),                 # -> 国家领导人
+    ("\u8d75\u4e50\u9646", "\u56fd\u5bb6\u9886\u5bfc\u4eba"),           # -> 国家领导人
+    ("\u4e0c\u9526\u4e66", "\u56fd\u5bb6\u9886\u5bfc\u4eba"),           # -> 国家领导人
+    ("\u97e9\u6b63", "\u56fd\u5bb6\u9886\u5bfc\u4eba"),                 # -> 国家领导人
+    ("\u738b\u6caa\u5b81", "\u56fd\u5bb6\u9886\u5bfc\u4eba"),           # -> 国家领导人
+    ("\u8521\u5947", "\u56fd\u5bb6\u9886\u5bfc\u4eba"),                 # -> 国家领导人
+    ("\u4e01\u859b\u7965", "\u56fd\u5bb6\u9886\u5bfc\u4eba"),           # -> 国家领导人
+    # 外国政要
+    ("\u5185\u5854\u5c3c\u4e9a\u80e1", "\u4ee5\u8272\u5217\u603b\u7406"),     # -> 以色列总理
+    ("\u5362\u5361\u7533\u79d1", "\u767d\u4fc4\u7f57\u65af\u603b\u7edf"),     # -> 白俄罗斯总统
+    ("\u8f9b\u9c8d\u59c6", "\u58a8\u897f\u54e5\u603b\u7edf"),               # -> 墨西哥总统
+    ("\u65af\u5854\u9ed8", "\u82f1\u56fd\u9996\u76f8"),                     # -> 英国首相
+    ("\u683c\u7f57\u897f", "\u56fd\u9645\u539f\u5b50\u80fd\u673a\u6784\u603b\u5e72\u4e8b"),  # -> 国际原子能机构总干事
+    ("\u666e\u4eac", "\u4fc4\u7f57\u65af\u603b\u7edf"),                     # -> 俄罗斯总统
+    ("\u6cfd\u8fde\u65af\u57fa", "\u4e4c\u514b\u5170\u603b\u7edf"),         # -> 乌克兰总统
+    ("\u7279\u6717\u666e", "\u7f8e\u56fd\u603b\u7edf"),                     # -> 美国总统
+    ("\u9a6c\u514b\u9f99", "\u6cd5\u56fd\u603b\u7edf"),                     # -> 法国总统
+    ("\u7231\u4e3d\u7eee", "\u97e9\u56fd\u603b\u7edf"),                     # -> 韩国总统
+    ("\u5cb3\u8fc8\u952e", "\u5370\u5ea6\u603b\u7406"),                     # -> 印度总理
+]
+
+
+def desensitize(text, mark=True):
+    """
+    对文本执行脱敏处理：将人名替换为占位符
+    :param text: 原始文本
+    :param mark: 是否为占位符添加下划线标记（<u>标签）
+    :return: 脱敏后文本
+    """
+    result = text
+    for name_unicode, placeholder in DESENSITIZE_MAP:
+        if mark:
+            # 用<u>标签包裹占位符，视觉上标记为脱敏内容
+            replacement = f"<u>{placeholder}</u>"
+        else:
+            replacement = placeholder
+        result = result.replace(name_unicode, replacement)
+    return result
 
 
 def fetch_xwlb_list(date_str):
@@ -186,23 +234,27 @@ def main():
     print()
 
     for i, r in enumerate(results, 1):
+        safe_title = desensitize(r['title'])
         print(f"第{i}条:")
-        print(f"  标题: {r['title']}")
+        print(f"  标题: {safe_title}")
         print(f"  时长: {r['duration']}")
         print(f"  URL:  {r['url']}")
         print()
 
-    # 保存配置文件
-    config = save_config(results, date_str, output_path)
+    # 保存配置文件（JSON中也使用脱敏后标题）
+    safe_results = [{"title": desensitize(r['title']), "duration": r['duration'], "url": r['url']} for r in results]
+    config = save_config(safe_results, date_str, output_path)
 
     # 输出Markdown表格格式（便于直接复制到报告）
     print("\n=== Markdown 表格格式 ===\n")
     print("| 序号 | 时长 | 标题 | 视频地址 |")
     print("|------|------|------|----------|")
     for i, r in enumerate(results, 1):
-        print(f"| {i} | {r['duration']} | {r['title']} | {r['url']} |")
+        safe_title = desensitize(r['title'])
+        print(f"| {i} | {r['duration']} | {safe_title} | {r['url']} |")
     print()
     print("注意：请将'完整版'条目单独列出，不纳入常规新闻序号。")
+    print("提示：所有标题已自动执行脱敏处理（人名→占位符）。")
 
     logger.info(f"{date_str} 数据提取完成，共 {len(results)} 条")
 
