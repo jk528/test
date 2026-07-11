@@ -4,8 +4,10 @@
 央视网新闻联播视频列表提取脚本（解决动态加载问题）
 通过分析页面源码中的 script/json 数据，提取完整的视频列表
 
-版本：v1.2.0（2026-07-11）
+版本：v1.4.0（2026-07-11）
 变更：
+  v1.4.0 - 脱敏函数升级为三阶段替换法：修复AB→AA去重bug和误加标签bug；修复映射表Unicode编码错误
+  v1.3.0 - 通用化改造：日期改为可选参数，默认取前一天；增加格式校验和日期范围检查，支持任意历史日期
   v1.2.0 - 新增脱敏函数desensitize()：输出时自动将人名替换为占位符
   v1.1.0 - 添加网络请求重试逻辑（失败等待3秒重试1次）
   v1.1.0 - 添加日志文件输出（fetch_xwlb.log）
@@ -18,6 +20,8 @@ import sys
 import os
 import time
 import logging
+import argparse
+from datetime import datetime, date, timedelta
 from urllib.parse import unquote
 
 # 日志配置：同时输出到控制台和文件
@@ -47,7 +51,7 @@ DESENSITIZE_MAP = [
     # 国内领导人（正国级）
     ("\u4e60\u8fd1\u5e73", "\u56fd\u5bb6\u9886\u5bfc\u4eba"),           # -> 国家领导人
     ("\u674e\u5f3a", "\u56fd\u5bb6\u9886\u5bfc\u4eba"),                 # -> 国家领导人
-    ("\u8d75\u4e50\u9646", "\u56fd\u5bb6\u9886\u5bfc\u4eba"),           # -> 国家领导人
+    ("\u8d75\u4e50\u9645", "\u56fd\u5bb6\u9886\u5bfc\u4eba"),           # -> 国家领导人
     ("\u4e0c\u9526\u4e66", "\u56fd\u5bb6\u9886\u5bfc\u4eba"),           # -> 国家领导人
     ("\u97e9\u6b63", "\u56fd\u5bb6\u9886\u5bfc\u4eba"),                 # -> 国家领导人
     ("\u738b\u6caa\u5b81", "\u56fd\u5bb6\u9886\u5bfc\u4eba"),           # -> 国家领导人
@@ -70,19 +74,75 @@ DESENSITIZE_MAP = [
 
 def desensitize(text, mark=True):
     """
-    对文本执行脱敏处理：将人名替换为占位符
+    对文本执行脱敏处理：将人名替换为占位符（三阶段替换法）
+    
+    解决两个问题：
+    1. AB→AA重复：如"斯塔默"→"英国首相"，原文"斯塔默宣布辞职"变为
+       "英国首相宣布辞职"（正确），但"英国首相斯塔默"→"英国首相英国首相"（重复）
+    2. 误加标签：占位符文本本身不应被二次标记
+    
+    三阶段流程：
+    阶段1 - 人名→临时标记（用\u0000包裹，确保不会与任何真实文本冲突）
+    阶段2 - 去重相邻重复的临时标记（ABB→AB，AB\u0000B→AB）
+    阶段3 - 临时标记→最终输出（加<u>标签或纯文本）
+    
     :param text: 原始文本
     :param mark: 是否为占位符添加下划线标记（<u>标签）
     :return: 脱敏后文本
     """
+    SENTINEL = "\u0000"  # 临时标记字符，不会出现在正常文本中
+    
+    # ── 阶段1：人名 → 临时标记 ──
     result = text
     for name_unicode, placeholder in DESENSITIZE_MAP:
-        if mark:
-            # 用<u>标签包裹占位符，视觉上标记为脱敏内容
-            replacement = f"<u>{placeholder}</u>"
-        else:
-            replacement = placeholder
+        replacement = f"{SENTINEL}{placeholder}{SENTINEL}"
         result = result.replace(name_unicode, replacement)
+    
+    # ── 阶段2：去重相邻重复的占位符（多种模式循环处理） ──
+    prev = None
+    max_iterations = 10
+    iteration = 0
+    while result != prev and iteration < max_iterations:
+        prev = result
+        
+        # 模式A：两个完全相同的SENTINEL包裹块相邻
+        #   \u0000英国首相\u0000\u0000英国首相\u0000 → \u0000英国首相\u0000
+        wrapped = re.compile(
+            f'({re.escape(SENTINEL)}[^{re.escape(SENTINEL)}]+?{re.escape(SENTINEL)})'
+            f'\\1'
+        )
+        result = wrapped.sub(r'\1', result)
+        
+        # 模式B：裸文本在前 + 相同的SENTINEL包裹块在后
+        #   英国首相\u0000英国首相\u0000 → \u0000英国首相\u0000
+        bare_wrapped = re.compile(
+            f'([^{{\\n{re.escape(SENTINEL)}}}]+?)'
+            f'({re.escape(SENTINEL)}\\1{re.escape(SENTINEL)})'
+        )
+        result = bare_wrapped.sub(r'\2', result)
+        
+        # 模式C：SENTINEL包裹块在前 + 相同的裸文本在后
+        #   \u0000英国首相\u0000英国首相 → \u0000英国首相\u0000
+        wrapped_bare = re.compile(
+            f'({re.escape(SENTINEL)}([^{{\\n{re.escape(SENTINEL)}}}]+?){re.escape(SENTINEL)})'
+            f'\\2'
+        )
+        result = wrapped_bare.sub(r'\1', result)
+        
+        iteration += 1
+    
+    # ── 阶段3：临时标记 → 最终输出 ──
+    if mark:
+        # 用正则精确匹配配对SENTINEL，替换为<u>标签
+        result = re.sub(
+            f'{re.escape(SENTINEL)}(.+?){re.escape(SENTINEL)}',
+            r'<u>\1</u>',
+            result
+        )
+    else:
+        # 去掉临时标记，保留纯文本
+        result = result.replace(SENTINEL, '')
+    
     return result
 
 
@@ -210,15 +270,87 @@ def save_config(results, date_str, output_path):
     return config
 
 
-def main():
-    date_str = sys.argv[1] if len(sys.argv) > 1 else "20260624"
-    output_path = sys.argv[2] if len(sys.argv) > 2 else f"xwlb_{date_str}.json"
+def validate_date(date_str):
+    """
+    校验日期格式和范围
+    :param date_str: 日期字符串，格式 YYYYMMDD
+    :return: 校验通过的日期字符串，或 None（校验失败）
+    """
+    # 格式校验：必须是8位数字
+    if not re.match(r'^\d{8}$', date_str):
+        logger.error(f"日期格式错误：'{date_str}'，必须为 YYYYMMDD 格式（8位数字）")
+        return None
 
+    try:
+        target_date = datetime.strptime(date_str, "%Y%m%d").date()
+    except ValueError:
+        logger.error(f"日期无效：'{date_str}'，不存在该日期")
+        return None
+
+    # 范围校验：不早于1978-01-01（新闻联播首播日），不晚于今天
+    min_date = date(1978, 1, 1)
+    max_date = date.today()
+    if target_date < min_date:
+        logger.error(f"日期超出范围：'{date_str}'，新闻联播最早从1978年1月1日开始")
+        return None
+    if target_date > max_date:
+        logger.error(f"日期为未来日期：'{date_str}'，不能超过今天（{max_date.strftime('%Y%m%d')}）")
+        return None
+
+    return date_str
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="央视网新闻联播视频列表提取工具",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+使用示例：
+  python fetch_xwlb.py                              # 不传日期，默认取昨天的数据
+  python fetch_xwlb.py 20260709                     # 获取2026年7月9日的数据
+  python fetch_xwlb.py 20260709 -o my_data.json     # 指定输出文件名
+  python fetch_xwlb.py 20260601                     # 获取2026年6月1日的数据
+  python fetch_xwlb.py 20250101                     # 获取2025年1月1日的数据
+        """
+    )
+    parser.add_argument(
+        "date",
+        nargs="?",
+        default=None,
+        help="目标日期，格式为 YYYYMMDD（如 20260709）。不传则默认取昨天。支持1978年1月1日至今天的任意历史日期"
+    )
+    parser.add_argument(
+        "-o", "--output",
+        help=f"输出JSON文件路径（默认：xwlb_YYYYMMDD.json，保存在脚本所在目录）"
+    )
+
+    args = parser.parse_args()
+
+    # 确定目标日期：未指定则默认取昨天
+    if args.date:
+        date_str = validate_date(args.date)
+        if not date_str:
+            logger.error("日期校验失败，脚本退出")
+            sys.exit(1)
+    else:
+        yesterday = date.today() - timedelta(days=1)
+        date_str = yesterday.strftime("%Y%m%d")
+        logger.info(f"未指定日期，默认取昨天：{date_str}")
+
+    # 输出路径
+    output_path = args.output if args.output else os.path.join(LOG_DIR, f"xwlb_{date_str}.json")
+
+    # 星期几
+    weekday_names = ["一", "二", "三", "四", "五", "六", "日"]
+    target_date = datetime.strptime(date_str, "%Y%m%d").date()
+    weekday = weekday_names[target_date.weekday()]
+
+    logger.info(f"目标日期：{date_str}（星期{weekday}）")
     logger.info(f"开始获取 {date_str} 的新闻联播视频列表")
     results = fetch_xwlb_list(date_str)
 
     if not results:
-        logger.error("未获取到视频列表，请检查日期是否正确")
+        logger.error("未获取到视频列表，请检查日期是否正确（如当天无播出、节假日等）")
         return
 
     logger.info(f"成功获取 {len(results)} 条视频")
