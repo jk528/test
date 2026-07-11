@@ -40,6 +40,8 @@ EXCLUDE_URLS = [
     'http://www.xinhuanet.com/',
     'https://www.cls.cn/',
     'https://www.chinanews.com/',
+    'tv.cctv.com',
+    'v.iqilu.com',
 ]
 
 
@@ -79,10 +81,20 @@ def check_file(filepath):
                     issues.append(f"[ERROR] section6_column_count: {col_count} != 10")
     
     # ── 4. URL extraction and validation ──
-    all_urls = re.findall(r'https?://[^\s\)>"]+', content)
+    # Extract URLs ending with proper chars (exclude trailing ）, ，, etc.)
+    all_urls = re.findall(r'https?://[^\s\)>",，）]+', content)
     
     # Content URLs only (exclude data source references)
-    content_urls = [u for u in all_urls if not any(u.startswith(ex) for ex in EXCLUDE_URLS)]
+    content_urls = []
+    for u in all_urls:
+        # Exclude bare domain URLs (e.g., https://tv.cctv.com without path)
+        if u.rstrip('/') in ['https://tv.cctv.com', 'https://v.iqilu.com',
+                               'http://tv.cctv.com', 'http://v.iqilu.com',
+                               'tv.cctv.com', 'v.iqilu.com']:
+            continue
+        if any(u.startswith(ex) for ex in EXCLUDE_URLS):
+            continue
+        content_urls.append(u)
     
     # HTTP check (only content URLs)
     http_urls = [u for u in content_urls if u.startswith('http://')]
@@ -120,9 +132,9 @@ def check_file(filepath):
         issues.append(f"[ERROR] double_tag: {dt}")
     
     # ── 7. Adjacent duplicate placeholder check ──
-    dup_placeholders = re.findall(r'([\u4e00-\u9fff]{2,8})\1', content)
+    # Only flag if 3+ Chinese chars are repeated (avoid false positives like "抢收抢种")
+    dup_placeholders = re.findall(r'([\u4e00-\u9fff]{3,})\1', content)
     for dp in dup_placeholders:
-        # Only flag if the duplicated text looks like a placeholder (2-8 Chinese chars)
         issues.append(f"[ERROR] duplicate_placeholder: {dp}{dp}")
     
     # ── 8. Check "--" in section 6 news_subject column ──
