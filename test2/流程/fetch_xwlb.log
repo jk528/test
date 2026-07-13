@@ -1883,3 +1883,46 @@
 2026-07-13 06:01:45,910 [INFO]   向后连续2页无新条目，停止
 2026-07-13 06:01:45,911 [INFO] 连续翻页补全完成，共收集 14 条子条目
 2026-07-13 06:01:45,916 [INFO] JSON已保存: C:\Users\Administrator\Documents\这是什么\JK-temp\test2\流程\iqilu_20260712.json
+2026-07-14 06:04:44,469 [INFO] 目标日期：20260713（星期一）
+2026-07-14 06:04:44,470 [INFO] 开始获取 20260713 的新闻联播视频列表
+2026-07-14 06:04:44,471 [INFO] 请求 https://tv.cctv.com/lm/xwlb/day/20260713.shtml（第1次，共2次）
+2026-07-14 06:04:44,760 [INFO] 请求成功，页面长度: 9355 字符
+2026-07-14 06:04:44,762 [INFO] 模式1匹配到 15 条原始结果，去重后 15 条
+2026-07-14 06:04:44,762 [INFO] URL唯一性验证通过，共 15 条唯一URL
+2026-07-14 06:04:44,763 [INFO] 成功获取 15 条视频
+2026-07-14 06:04:44,772 [INFO] 配置文件已保存: C:\Users\Administrator\Documents\这是什么\JK-temp\test2\流程\xwlb_20260713.json
+2026-07-14 06:04:44,775 [INFO] 20260713 数据提取完成，共 15 条
+2026-07-14 06:05:41,292 [INFO] 目标日期: 2026-07-13
+2026-07-14 06:05:41,293 [INFO] 搜索索引页 1: https://v.iqilu.com/jcdb/ysxwlb/index.html
+2026-07-14 06:05:41,903 [INFO]   >> 在页面 1 找到目标日期 2026-07-13
+2026-07-14 06:05:41,906 [INFO]   当前页收集到 19 条子条目
+2026-07-14 06:05:41,906 [INFO] 开始连续翻页补全，主页面: 1
+2026-07-14 06:05:41,908 [INFO]   向后检查页 2 (offset=+1): https://v.iqilu.com/jcdb/ysxwlb/index_1.html
+2026-07-14 06:05:42,399 [INFO]   向后检查页 3 (offset=+2): https://v.iqilu.com/jcdb/ysxwlb/index_2.html
+2026-07-14 06:05:42,873 [INFO]   向后连续2页无新条目，停止
+2026-07-14 06:05:42,873 [INFO] 连续翻页补全完成，共收集 19 条子条目
+2026-07-14 06:05:42,873 [INFO] 开始抓取 19 个独立页面内容...
+2026-07-14 06:05:42,874 [INFO]   [1/19] 抓取: https://v.iqilu.com/jcdb/ysxwlb/202607/13/5916685.html
+2026-07-14 06:05:43,270 [INFO]   [2/19] 抓取: https://v.iqilu.com/jcdb/ysxwlb/202607/13/5916689.html
+2026-07-14 06:05:43,687 [INFO]   [3/19] 抓取: https://v.iqilu.com/jcdb/ysxwlb/202607/13/5916691.html
+2026-07-14 06:05:44,117 [INFO]   [4/19] 抓取: https://v.iqilu.com/jcdb/ysxwlb/202607/13/5916693.html
+2026-07-14 06:05:44,488 [INFO]   [5/19] 抓取: https://v.iqilu.com/jcdb/ysxwlb/202607/13/5916695.html
+2026-07-14 06:05:44,944 [INFO]   [6/19] 抓取: https://v.iqilu.com/jcdb/ysxwlb/202607/13/5916697.html
+2026-07-14 06:05:45,463 [INFO]   [7/19] 抓取: https://v.iqilu.com/jcdb/ysxwlb/202607/13/5916703.html
+2026-07-14 06:05:45,844 [INFO]   [8/19] 抓取: https://v.iqilu.com/jcdb/ysxwlb/202607/13/5916705.html
+2026-07-14 06:05:46,193 [INFO]   [9/19] 抓取: https://v.iqilu.com/jcdb/ysxwlb/202607/13/5916707.html
+2026-07-14 06:05:46,605 [INFO]   [10/19] 抓取: https://v.iqilu.com/jcdb/ysxwlb/202607/13/5916709.html
+2026-07-14 06:05:47,045 [INFO]   [11/19] 抓取: https://v.iqilu.com/jcdb/ysxwlb/202607/13/5916711.html
+2026-07-14 06:05:47,462 [INFO]   [12/19] 抓取: https://v.iqilu.com/jcdb/ysxwlb/202607/13/5916713.html
+2026-07-14 06:05:47,839 [INFO]   [13/19] 抓取: https://v.iqilu.com/jcdb/ysxwlb/202607/13/5916715.html
+2026-07-14 06:05:48,209 [INFO]   [14/19] 抓取: https://v.iqilu.com/jcdb/ysxwlb/202607/13/5916717.html
+2026-07-14 06:05:48,640 [INFO]   [15/19] 抓取: https://v.iqilu.com/jcdb/ysxwlb/202607/13/5916719.html
+2026-07-14 06:05:49,047 [INFO]   [16/19] 抓取: https://v.iqilu.com/jcdb/ysxwlb/202607/13/5916721.html
+2026-07-14 06:05:49,479 [INFO]   [17/19] 抓取: https://v.iqilu.com/jcdb/ysxwlb/202607/13/5916723.html
+2026-07-14 06:05:49,885 [INFO]   [18/19] 抓取: https://v.iqilu.com/jcdb/ysxwlb/202607/13/5916725.html
+2026-07-14 06:05:50,258 [INFO]   [19/19] 抓取: https://v.iqilu.com/jcdb/ysxwlb/202607/13/5916729.html
+2026-07-14 06:05:50,723 [INFO] 独立页面内容抓取完成
+2026-07-14 06:05:50,745 [INFO] 加载央视网数据: 15 条（来自 C:\Users\Administrator\Documents\这是什么\JK-temp\test2\流程\xwlb_20260713.json）
+2026-07-14 06:05:50,746 [INFO] 开始央视网交叉比对...
+2026-07-14 06:05:50,756 [INFO] 交叉比对结果: 央视网14条常规新闻中，齐鲁网覆盖14条（精确/模糊12条，拆分2条，关联0条），未独立收录0条
+2026-07-14 06:05:50,758 [INFO] JSON已保存: C:\Users\Administrator\Documents\这是什么\JK-temp\test2\流程\iqilu_20260713.json
