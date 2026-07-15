@@ -35,11 +35,15 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
 from fetch_xwlb import desensitize
 
+# 日志和缓存保存到系统临时目录，保持流程文件夹整洁
+TEMP_DIR = os.path.join(os.environ.get('TEMP', os.environ.get('TMP', '/tmp')), 'xwlb_cache')
+os.makedirs(TEMP_DIR, exist_ok=True)
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
-        logging.FileHandler(os.path.join(SCRIPT_DIR, "fetch_iqilu.log"), encoding="utf-8"),
+        logging.FileHandler(os.path.join(TEMP_DIR, "fetch_iqilu.log"), encoding="utf-8"),
         logging.StreamHandler(sys.stdout)
     ]
 )
@@ -375,7 +379,7 @@ def load_xwlb_data(date_str):
     :param date_str: 日期 YYYYMMDD
     :return: list[dict] 央视网条目列表，或 None（文件不存在）
     """
-    json_path = os.path.join(SCRIPT_DIR, f"xwlb_{date_str}.json")
+    json_path = os.path.join(TEMP_DIR, f"xwlb_{date_str}.json")
     if not os.path.exists(json_path):
         logger.info(f"央视网JSON不存在: {json_path}，跳过交叉比对")
         return None
@@ -732,7 +736,7 @@ def main():
             ]
     
     # 保存JSON
-    output_path = args.output if args.output else os.path.join(SCRIPT_DIR, f"iqilu_{args.date}.json")
+    output_path = args.output if args.output else os.path.join(TEMP_DIR, f"iqilu_{args.date}.json")
     with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(result, f, ensure_ascii=False, indent=2)
     logger.info(f"JSON已保存: {output_path}")

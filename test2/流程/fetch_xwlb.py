@@ -25,9 +25,10 @@ import argparse
 from datetime import datetime, date, timedelta
 from urllib.parse import unquote
 
-# 日志配置：同时输出到控制台和文件
-LOG_DIR = os.path.dirname(os.path.abspath(__file__))
-LOG_FILE = os.path.join(LOG_DIR, "fetch_xwlb.log")
+# 日志配置：同时输出到控制台和文件（日志保存到系统临时目录，保持流程文件夹整洁）
+TEMP_DIR = os.path.join(os.environ.get('TEMP', os.environ.get('TMP', '/tmp')), 'xwlb_cache')
+os.makedirs(TEMP_DIR, exist_ok=True)
+LOG_FILE = os.path.join(TEMP_DIR, "fetch_xwlb.log")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -382,8 +383,8 @@ def main():
         date_str = yesterday.strftime("%Y%m%d")
         logger.info(f"未指定日期，默认取昨天：{date_str}")
 
-    # 输出路径
-    output_path = args.output if args.output else os.path.join(LOG_DIR, f"xwlb_{date_str}.json")
+    # 输出路径（默认保存到临时缓存目录，保持流程文件夹整洁）
+    output_path = args.output if args.output else os.path.join(TEMP_DIR, f"xwlb_{date_str}.json")
 
     # 星期几
     weekday_names = ["一", "二", "三", "四", "五", "六", "日"]

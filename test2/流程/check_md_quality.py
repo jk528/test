@@ -4,7 +4,7 @@
 MD file quality check script for news broadcast summaries.
 Checks: 7-part structure, URL validity, section 6 table format, desensitization.
 
-Version: v1.0.0 (2026-07-11)
+Version: v1.1.0 (2026-07-15)
 Usage:
   python check_md_quality.py <file_path>              # Check single file
   python check_md_quality.py --dir <directory>        # Batch check directory
@@ -114,10 +114,24 @@ def check_file(filepath):
         issues.append(f"[WARNING] malformed_iqilu_url: {u}")
     
     # ── 5. Desensitization check ──
-    # 动态从 fetch_xwlb.py 导入敏感词列表，保持一致性
-    sys.path.insert(0, SCRIPT_DIR)
-    from fetch_xwlb import NAME_TO_CODE
-    SENSITIVE_NAMES = [name for name, _ in NAME_TO_CODE]
+    # 动态从 fetch_xwlb.py 导入敏感词列表，保持一致性；导入失败时使用内置备选列表
+    SENSITIVE_NAMES = []
+    try:
+        sys.path.insert(0, SCRIPT_DIR)
+        from fetch_xwlb import NAME_TO_CODE
+        SENSITIVE_NAMES = [name for name, _ in NAME_TO_CODE]
+    except Exception:
+        # 内置备选列表（与fetch_xwlb.py映射表保持同步，定期手动更新）
+        SENSITIVE_NAMES = [
+            "\u4e60\u8fd1\u5e73", "\u674e\u5f3a", "\u8d75\u4e50\u9645",
+            "\u6817\u6218\u4e66", "\u97e9\u6b63", "\u738b\u6caa\u5b81",
+            "\u8521\u5947", "\u4e01\u859b\u7965", "\u5185\u5854\u5c3c\u4e9a\u80e1",
+            "\u5362\u5361\u7533\u79d1", "\u8f9b\u9c8d\u59c6", "\u65af\u5854\u9ed8",
+            "\u683c\u7f57\u897f", "\u666e\u4eac", "\u6cfd\u8fde\u65af\u57fa",
+            "\u7279\u6717\u666e", "\u9a6c\u514b\u9f99", "\u7231\u4e3d\u7eee",
+            "\u5cb3\u8fc8\u952e",
+        ]
+    
     for name in SENSITIVE_NAMES:
         if name in content:
             issues.append(f"[CRITICAL] sensitive_name_found: {name}")
@@ -155,11 +169,30 @@ def check_file(filepath):
             issues.append(f"[WARNING] section4_missing_subsections")
     
     # ── 11. Check N/D/M/K/X stats present in section 5 ──
+    # 支持两种格式：(a) N=标记格式 或 (b) 表格形式统计
     if "## 五、完整性检测与播放时间" in content:
         s5_content = content[content.find("## 五、完整性检测与播放时间"):]
-        for stat in ['N=', 'D=', 'M=', 'K=', 'X=']:
-            if stat not in s5_content:
-                issues.append(f"[ERROR] missing_stat_{stat}")
+        # 格式(a): 直接N=/D=/M=/K=/X=标记
+        has_direct_markers = all(s in s5_content for s in ['N=', 'D=', 'M=', 'K=', 'X='])
+        # 格式(b): 表格形式统计（核心指标必须存在，合并快讯时国内/国际子条目可能缺失）
+        required_indicators = [
+            '央视网视频分条',      # 对应N
+            '快讯目录',            # 对应D
+            '实际独立新闻总数',    # 对应X
+        ]
+        # 国内/国际子条目为可选（合并快讯场景可能只有一条"快讯子条目"而非分开的国内/国际）
+        optional_indicators = [
+            '国内快讯子条目',      # 对应M（分开快讯）
+            '国际快讯子条目',      # 对应K（分开快讯）
+            '快讯子条目',          # 对应合并快讯（如"加：快讯子条目 +6条"）
+        ]
+        has_required = all(ind in s5_content for ind in required_indicators)
+        # 若存在快讯子条目，需至少出现一种（国内/国际/合并）
+        has_optional = any(ind in s5_content for ind in optional_indicators)
+        has_table_stats = has_required and has_optional
+        
+        if not has_direct_markers and not has_table_stats:
+            issues.append("[ERROR] missing_stats: 第五部分缺少N/D/M/K/X统计信息（需包含标记格式或表格形式）")
     
     return issues, {
         'size_kb': file_size_kb,
