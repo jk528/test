@@ -1233,7 +1233,366 @@ exe = EXE(
 
 ---
 
-## 六、风险与对策
+## 六、受限环境应对方案
+
+### 6.1 问题背景
+
+Excel/WPS 作为系统级办公软件，天然在企业白名单中，不会被杀毒软件拦截。而 Python 打包的独立 exe 程序面临多重安全障碍：
+
+| 障碍 | 说明 | 严重程度 |
+|------|------|:---:|
+| 杀毒软件误报 | PyInstaller 打包特征与恶意软件相似，极易被误报为木马 | ★★★★★ |
+| SmartScreen 拦截 | 未签名 exe 首次运行弹出风险警告，用户不敢继续 | ★★★★ |
+| 企业 IT 策略 | 企业域控可能禁止运行未知 exe，需审批加白名单 | ★★★★★ |
+| 数字签名缺失 | 代码签名证书费用高（200-2000 元/年），个人开发者难获取 | ★★★ |
+| 运行时体积 | PyInstaller 打包 50-100MB，Electron 打包 80-150MB | ★★ |
+
+### 6.2 五种应对方案对比
+
+| 方案 | 防拦截能力 | 实现难度 | 性能优势 | 适用场景 |
+|------|:---:|:---:|:---:|------|
+| **A. VBA 为主 + Python 辅助** | ★★★★★ | 低 | 中 | 受限最严格的企业内网 |
+| **B. Python 脚本直接运行** | ★★★★ | 低 | 高 | 允许装 Python 的环境 |
+| **C. Nuitka 编译打包** | ★★★ | 中 | 高 | 允许运行签名 exe 的环境 |
+| **D. PyInstaller + 数字签名** | ★★★ | 高 | 高 | 外部分发、正式发布 |
+| **E. Excel 插件（VSTO/xlwings）** | ★★★★★ | 中 | 高 | 企业 Office 环境 |
+
+### 6.3 方案 A：VBA 为主 + Python 辅助（推荐：受限最严环境）
+
+**核心思路**：日常阅读、目录、查询等继续用 VBA Excel，仅把性能瓶颈功能交给 Python 处理，结果回写 Excel。
+
+```
+┌─────────────────────────────────────────────────┐
+│  Excel VBA（主程序，在白名单中）                   │
+│  ├── 文件导入 / 章节识别 / 目录跳转 / 查询        │
+│  ├── 日常阅读（Characters 上色，慢但可用）        │
+│  │                                                │
+│  │  遇到性能瓶颈时 ↓                              │
+│  │                                                │
+│  ├── [调用 Python] 字频统计（Counter + jieba）    │
+│  ├── [调用 Python] 数据聚合（numpy 矩阵运算）     │
+│  ├── [调用 Python] EPUB 转换（ebooklib）          │
+│  └── [调用 Python] 批量上色 → 生成 HTML → 回写    │
+│                                                  │
+│  Python 脚本（不打包，通过 Shell 调用）            │
+│  ├── 接收 JSON 参数（文件路径、处理模式）          │
+│  ├── 执行计算                                    │
+│  └── 输出 JSON 结果 / 生成临时文件                │
+└─────────────────────────────────────────────────┘
+```
+
+**VBA 调用 Python 的实现**：
+
+```vba
+' VBA 端：调用 Python 脚本处理数据
+Function CallPythonScript(scriptPath As String, jsonArgs As String) As String
+    Dim wsh As Object
+    Set wsh = CreateObject("WScript.Shell")
+
+    ' 将参数写入临时 JSON 文件（避免命令行长度限制）
+    Dim tempFile As String
+    tempFile = Environ("TEMP") & "\python_args.json"
+    Dim fnum As Integer
+    fnum = FreeFile
+    Open tempFile For Output As #fnum
+    Print #fnum, jsonArgs
+    Close #fnum
+
+    ' 调用 Python 脚本（不打包 exe，直接运行 .py）
+    Dim cmd As String
+    cmd = "python """ & scriptPath & """ """ & tempFile & """"
+
+    Dim result As String
+    result = wsh.Exec(cmd).StdOut.ReadAll
+
+    Kill tempFile  ' 删除临时文件
+    CallPythonScript = result
+End Function
+
+' 示例：调用 Python 做字频统计
+Sub 字频统计_Python加速()
+    Dim jsonArgs As String
+    jsonArgs = "{""file"":""" & ActiveSheet.Range("A1").Value & """,""mode"":1}"
+
+    Dim result As String
+    result = CallPythonScript("D:\tools\frequency_stats.py", jsonArgs)
+
+    ' 解析 JSON 结果，写入工作表
+    Dim resultDict As Object
+    Set resultDict = JsonConverter.ParseJson(result)
+
+    Dim row As Long: row = 1
+    For Each key In resultDict.Keys
+        Cells(row, 5).Value = key        ' 字
+        Cells(row, 6).Value = resultDict(key)  ' 频率
+        row = row + 1
+    Next
+End Sub
+```
+
+```python
+# frequency_stats.py — Python 端：接收参数，处理数据，返回 JSON
+import sys
+import json
+from collections import Counter
+import re
+
+def main():
+    # 读取 VBA 传来的 JSON 参数
+    args_file = sys.argv[1]
+    with open(args_file, 'r', encoding='utf-8') as f:
+        args = json.load(f)
+
+    # 读取文件
+    with open(args['file'], 'r', encoding='utf-8') as f:
+        text = f.read()
+
+    # 字频统计（Counter 替代 VBA 逐字 Mid）
+    chinese_only = re.sub(r'[^\u4e00-\u9fa5]', '', text)
+    counter = Counter(chinese_only)
+
+    # 输出 JSON 结果
+    result = dict(counter.most_common(1000))  # Top 1000
+    print(json.dumps(result, ensure_ascii=False))
+
+if __name__ == '__main__':
+    main()
+```
+
+**优势**：
+- Excel 仍在白名单中，不会被拦截
+- Python 脚本（.py 文件）不被杀毒软件标记为可疑
+- 享受 Python 性能优势（Counter、numpy、jieba）
+- 无需打包，无需数字签名
+
+**局限**：
+- 需要目标机器安装 Python（或使用便携版 Python）
+- VBA ↔ Python 通过 JSON 文件通信，有少量 IO 开销
+- 上色仍需回 Excel（Characters 慢）或生成 HTML 用 WebBrowser 显示
+
+### 6.4 方案 B：Python 脚本直接运行（推荐：允许装 Python 的环境）
+
+**核心思路**：不打包 exe，直接 `python main.py` 运行，避免 PyInstaller 打包特征触发杀毒误报。
+
+```
+部署方式：
+  1. 在目标机器安装 Python 3.11+（或使用便携版 Python）
+  2. 复制项目文件夹 + pip install -r requirements.txt
+  3. 创建桌面快捷方式 → pythonw.exe main.py（无控制台窗口）
+```
+
+**便携版 Python 方案**（无需管理员权限安装）：
+
+```batch
+@echo off
+REM 启动脚本 — 放在项目根目录
+REM 使用嵌入式 Python（无需安装，解压即用）
+
+SET PYTHON_DIR=%~dp0python-3.11-embed
+SET PATH=%PYTHON_DIR%;%PYTHON_DIR%\Scripts;%PATH%
+SET PYTHONPATH=%~dp0src
+
+REM 安装依赖（首次运行）
+IF NOT EXIST "%PYTHON_DIR%\Lib\site-packages\PyQt6" (
+    python -m pip install -r requirements.txt
+)
+
+REM 启动应用（pythonw 无控制台窗口）
+start "" pythonw.exe main.py
+```
+
+**优势**：
+- 不打包 exe，完全避免杀毒误报
+- 嵌入式 Python 无需管理员权限安装
+- 性能与打包版本一致
+
+**局限**：
+- 需要携带 Python 运行时（约 30MB）
+- 首次需安装依赖（可预装到便携版中）
+- 快捷方式指向 pythonw.exe 而非应用本身
+
+### 6.5 方案 C：Nuitka 编译打包（推荐：允许运行 exe 的环境）
+
+**核心思路**：用 Nuitka 替代 PyInstaller，将 Python 编译为 C 代码再编译为真正的原生 exe，误报率远低于 PyInstaller。
+
+```bash
+# Nuitka 编译命令（替代 PyInstaller）
+python -m nuitka \
+    --standalone \
+    --onefile \
+    --enable-plugin=qt-plugins \
+    --include-package=jieba \
+    --include-package=opencc \
+    --include-package=ebooklib \
+    --windows-disable-console \
+    --output-filename=NovelReader.exe \
+    main.py
+```
+
+**PyInstaller vs Nuitka 误报对比**：
+
+| 打包工具 | 原理 | 杀毒误报率 | 体积 | 启动速度 |
+|---------|------|:---:|:---:|:---:|
+| PyInstaller | 将字节码和解释器捆绑为 exe | 高（约 15-30%） | 50-100MB | 慢（需解压临时目录） |
+| Nuitka | 编译为 C 代码 → 编译为原生 exe | 低（约 1-5%） | 40-80MB | 快（原生代码） |
+
+**优势**：
+- 编译为真正的原生 exe，非捆绑包
+- 误报率大幅降低
+- 启动速度更快
+- 代码有一定加密效果（编译为 C）
+
+**局限**：
+- 编译过程需要 C 编译器（MinGW/MSVC）
+- 编译时间较长（5-15 分钟）
+- 仍可能被部分严格的企业杀毒拦截
+
+### 6.6 方案 D：PyInstaller + 数字签名（推荐：正式发布）
+
+**核心思路**：购买代码签名证书，对 exe 进行数字签名，消除 SmartScreen 警告。
+
+```bash
+# 1. 使用 signtool 对 exe 签名
+signtool sign /f certificate.pfx /p password /t http://timestamp.digicert.com NovelReader.exe
+
+# 2. 验证签名
+signtool verify /pa NovelReader.exe
+```
+
+**证书选择**：
+
+| 证书类型 | 价格 | 信任级别 | SmartScreen | 适用场景 |
+|---------|------|---------|:---:|---------|
+| 自签名证书 | 免费 | 低 | 仍拦截 | 内部测试 |
+| OV 代码签名 | 200-800 元/年 | 中 | 需积累信誉 | 小范围分发 |
+| EV 代码签名 | 1500-3000 元/年 | 高 | 立即通过 | 正式发布 |
+
+**优势**：
+- EV 证书可立即消除 SmartScreen 警告
+- 提高用户信任度
+- 正式发布标准做法
+
+**局限**：
+- 证书费用高
+- EV 证书需硬件 USB Token（无法在 CI/CD 中自动签名）
+- 企业域控仍可能拦截（需单独加白名单）
+
+### 6.7 方案 E：Excel 插件 — xlwings（推荐：企业 Office 环境）
+
+**核心思路**：用 xlwings 将 Python 逻辑注册为 Excel 自定义函数（UDF）或宏，在 Excel 进程内运行，完全继承 Excel 的白名单地位。
+
+```python
+# xlwings 插件：在 Excel 中调用 Python 函数
+import xlwings as xw
+from collections import Counter
+import re
+
+@xw.func
+def char_frequency(text: str) -> str:
+    """
+    在 Excel 中作为自定义函数使用
+    =char_frequency(A1:A1000)
+    """
+    chinese_only = re.sub(r'[^\u4e00-\u9fa5]', '', text)
+    counter = Counter(chinese_only)
+    # 返回前 100 个高频字
+    result = '\n'.join(f'{char}\t{count}' for char, count in counter.most_common(100))
+    return result
+
+@xw.func
+def aggregate_data(data: list, step: int) -> list:
+    """
+    数据聚合，在 Excel 中直接调用
+    =aggregate_data(A1:Z100, 5)
+    """
+    import numpy as np
+    arr = np.array(data)
+    n_cols = arr.shape[1] // step
+    result = arr[:, :n_cols*step].reshape(arr.shape[0], n_cols, step).sum(axis=2)
+    return result.tolist()
+```
+
+```
+部署架构：
+  ┌──────────────────────────────────────┐
+  │  Excel 进程（在白名单中）              │
+  │  ├── 用户在单元格输入公式              │
+  │  │  =char_frequency(A1:A1000)        │
+  │  ├── Excel 调用 xlwings 插件          │
+  │  │                                   │
+  │  └── xlwings → Python 进程（子进程）   │
+  │      ├── 执行 Counter / numpy         │
+  │      └── 结果返回 Excel 单元格         │
+  └──────────────────────────────────────┘
+```
+
+**优势**：
+- 完全继承 Excel 白名单地位
+- 用户在 Excel 中直接用公式调用，零学习成本
+- Python 逻辑可复用（同一套核心代码）
+- 保留 Excel 的数据分析能力（透视表、条件格式等）
+
+**局限**：
+- GUI 仍受限于 Excel（无法用 PyQt 自定义界面）
+- 需要 Excel + Python 双环境
+- xlwings 需要安装 Excel 插件（一次性配置）
+
+### 6.8 方案选型决策树
+
+```
+是否在企业内网/受限环境？
+│
+├─ 否（个人电脑/外部分发）
+│   └─ 是否正式发布？
+│       ├─ 是 → 方案 D（PyInstaller + EV 证书签名）
+│       └─ 否 → 方案 C（Nuitka 编译打包）
+│
+└─ 是（企业内网）
+    │
+    ├─ 是否允许安装 Python？
+    │   │
+    │   ├─ 是 → 是否允许运行 exe？
+    │   │   │
+    │   │   ├─ 是 → 方案 C（Nuitka 编译打包）
+    │   │   └─ 否 → 方案 B（Python 脚本直接运行）
+    │   │
+    │   └─ 否 → 是否允许使用 Excel？
+    │       │
+    │       ├─ 是 → 是否能用 xlwings？
+    │       │   ├─ 是 → 方案 E（xlwings Excel 插件）
+    │       │   └─ 否 → 方案 A（VBA 为主 + Python 辅助）
+    │       │
+    │       └─ 否 → 无法部署（仅保持现有 VBA）
+```
+
+### 6.9 混合方案：分阶段部署
+
+在实际项目中，可采用分阶段渐进式迁移策略：
+
+| 阶段 | 方案 | 目标 | 环境 |
+|------|------|------|------|
+| **阶段 1** | 方案 A（VBA + Python 辅助） | 解决性能瓶颈，验证 Python 逻辑 | 企业内网（最严格） |
+| **阶段 2** | 方案 E（xlwings 插件） | Python 函数直接在 Excel 中调用 | 企业内网（允许 xlwings） |
+| **阶段 3** | 方案 B（Python 脚本直接运行） | 完整 PyQt6 应用，脱离 Excel | 允许装 Python 的环境 |
+| **阶段 4** | 方案 C/D（Nuitka/签名 exe） | 独立 exe 发布 | 外部分发 |
+
+```
+阶段 1（第 1-2 周）           阶段 2（第 3-4 周）          阶段 3（第 5-6 周）          阶段 4（第 7-8 周）
+┌──────────────┐            ┌──────────────┐           ┌──────────────┐           ┌──────────────┐
+│ Excel VBA     │            │ Excel +       │           │ Python PyQt6  │           │ 独立 exe      │
+│ + Python脚本  │  ────→    │ xlwings插件   │  ────→   │ 完整应用      │  ────→   │ Nuitka/签名   │
+│               │            │               │           │               │           │               │
+│ VBA做主程序   │            │ Python注册为  │           │ 脱离Excel     │           │ 独立分发      │
+│ Python做加速  │            │ Excel自定义函数│           │ PyQt6界面     │           │ 无需Python    │
+└──────────────┘            └──────────────┘           └──────────────┘           └──────────────┘
+    最受限环境                  允许xlwings              允许装Python               允许运行exe
+```
+
+**核心原则**：每个阶段都是可独立使用的完整版本，无需依赖后续阶段。环境越受限，Excel 占比越高；环境越开放，Python 占比越高。
+
+---
+
+## 七、风险与对策
 
 | 风险 | 概率 | 影响 | 对策 |
 |------|:---:|:---:|------|
@@ -1247,7 +1606,7 @@ exe = EXE(
 
 ---
 
-## 七、时间线总览
+## 八、时间线总览
 
 ```
 第1-2周    ████████████  短期：核心功能复刻
@@ -1267,7 +1626,7 @@ exe = EXE(
 
 ---
 
-## 八、快速启动清单
+## 九、快速启动清单
 
 ### 环境准备
 
