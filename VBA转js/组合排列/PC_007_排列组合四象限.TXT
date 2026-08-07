@@ -1,0 +1,635 @@
+Attribute VB_Name = "PC_007_排列组合四象限"
+Option Explicit
+
+' ============================================================
+' PC_007_排列组合四象限.TXT
+' 排列组合四象限计算 - VBA 版本
+' 补全 PC_001（三角矩阵）缺失的单点查询与枚举功能
+'
+' 四象限定义：
+'   Type 1: 组合不放回 C(n, k)
+'   Type 2: 组合放回 C(n+k-1, k)
+'   Type 3: 排列不放回 A(n, k) = n!/(n-k)!
+'   Type 4: 排列放回 n^k
+'
+' 使用方式：
+'   1. 打开 WPS/Excel → Alt+F11 进入 VBA 编辑器
+'   2. 插入 → 模块
+'   3. 把本文件全部内容粘贴到模块中
+'   4. 运行 生成_排列组合四象限矩阵() 等入口
+'
+' 提供 API：
+'   CountCombNoRepet(n, k)             计数：组合不放回
+'   CountCombRepet(n, k)               计数：组合放回
+'   CountPermNoRepet(n, k)             计数：排列不放回
+'   CountPermRepet(n, k)               计数：排列放回
+'   CountByType(n, k, type)            统一计数入口
+'   EnumerateByType(arr, k, type)      枚举：生成具体列表
+'   构建_排列组合四象限_矩阵(n, type)  矩阵：带表头二维数组
+'   生成_排列组合四象限矩阵()          入口：写入工作表
+' ============================================================
+
+' —— 常量：象限类型
+Private Const TYPE_NOREP_COMB As Long = 1   ' 组合不放回
+Private Const TYPE_REP_COMB As Long = 2     ' 组合放回
+Private Const TYPE_NOREP_PERM As Long = 3   ' 排列不放回
+Private Const TYPE_REP_PERM As Long = 4     ' 排列放回
+
+Private Const MAX_ENUM As Long = 10000000   ' 枚举安全上限
+
+' ============================================================
+' 计数函数
+' ============================================================
+
+' —— 组合不放回 C(n,k)
+Public Function CountCombNoRepet(ByVal n As Long, ByVal k As Long) As Double
+    Dim res As Double, i As Long
+    If k < 0 Or k > n Then
+        CountCombNoRepet = 0#
+        Exit Function
+    End If
+    If k = 0 Or k = n Then
+        CountCombNoRepet = 1#
+        Exit Function
+    End If
+    If k > n - k Then k = n - k   ' 对称性优化
+    res = 1#
+    For i = 1 To k
+        res = res * (n - k + i) / i
+    Next i
+    CountCombNoRepet = CDbl(CLng(res))   ' 修正浮点
+End Function
+
+' —— 组合放回 C(n+k-1,k)
+Public Function CountCombRepet(ByVal n As Long, ByVal k As Long) As Double
+    If k < 0 Or n < 1 Then
+        CountCombRepet = 0#
+        Exit Function
+    End If
+    If k = 0 Then
+        CountCombRepet = 1#
+        Exit Function
+    End If
+    CountCombRepet = CountCombNoRepet(n + k - 1, k)
+End Function
+
+' —— 排列不放回 A(n,k)
+Public Function CountPermNoRepet(ByVal n As Long, ByVal k As Long) As Double
+    Dim res As Double, i As Long
+    If k < 0 Or k > n Then
+        CountPermNoRepet = 0#
+        Exit Function
+    End If
+    If k = 0 Then
+        CountPermNoRepet = 1#
+        Exit Function
+    End If
+    res = 1#
+    For i = 0 To k - 1
+        res = res * (n - i)
+    Next i
+    CountPermNoRepet = res
+End Function
+
+' —— 排列放回 n^k
+Public Function CountPermRepet(ByVal n As Long, ByVal k As Long) As Double
+    If k < 0 Then
+        CountPermRepet = 0#
+        Exit Function
+    End If
+    If k = 0 Then
+        CountPermRepet = 1#
+        Exit Function
+    End If
+    CountPermRepet = n ^ k
+End Function
+
+' —— 统一计数入口
+Public Function CountByType(ByVal n As Long, ByVal k As Long, ByVal type As Long) As Double
+    Select Case type
+        Case TYPE_NOREP_COMB: CountByType = CountCombNoRepet(n, k)
+        Case TYPE_REP_COMB:   CountByType = CountCombRepet(n, k)
+        Case TYPE_NOREP_PERM: CountByType = CountPermNoRepet(n, k)
+        Case TYPE_REP_PERM:   CountByType = CountPermRepet(n, k)
+        Case Else:            CountByType = 0#
+    End Select
+End Function
+
+' ============================================================
+' 入口：生成排列组合四象限矩阵到工作表
+' ============================================================
+Public Sub 生成_排列组合四象限矩阵()
+    Dim typeChoice As Variant, NInput As Variant
+    Dim typeInput As Long, n As Long
+    Dim ws As Worksheet, outArr As Variant
+    Dim sheetName As String
+
+    typeChoice = Application.InputBox(prompt:= _
+        "请选择类型：" & vbCrLf & _
+        "1 = 组合不放回 C(n,k)" & vbCrLf & _
+        "2 = 组合放回 C(n+k-1,k)" & vbCrLf & _
+        "3 = 排列不放回 A(n,k)" & vbCrLf & _
+        "4 = 排列放回 n^k" & vbCrLf & _
+        "5 = 全部生成（all）", _
+        Type:=1, Title:="排列组合四象限类型选择")
+    If typeChoice = False Then Exit Sub
+    If Not IsNumeric(typeChoice) Then
+        MsgBox "类型必须是 1..5 的整数。", vbExclamation
+        Exit Sub
+    End If
+    typeInput = CLng(typeChoice)
+    If typeInput < 1 Or typeInput > 5 Then
+        MsgBox "类型必须是 1..5 的整数。", vbExclamation
+        Exit Sub
+    End If
+
+    NInput = Application.InputBox(prompt:="请输入总数最大值 N（>=0）：", _
+        Type:=1, Title:="排列组合四象限 - N设置")
+    If NInput = False Then Exit Sub
+    If Not IsNumeric(NInput) Or CLng(NInput) < 0 Then
+        MsgBox "N 必须为 >= 0 的整数。", vbExclamation
+        Exit Sub
+    End If
+    n = CLng(NInput)
+
+    ' 大数预警
+    Dim maxVal As Double
+    maxVal = CountByType(n, CLng(n / 2), TYPE_NOREP_COMB)
+    If maxVal > 1E+14 Then
+        If MsgBox("N=" & n & " 时部分值可能超出精确表示范围 (2^53)，" & vbCrLf & _
+                  "结果将出现浮点精度损失。" & vbCrLf & vbCrLf & _
+                  "是否继续？", vbYesNo + vbExclamation, "大数精度预警") <> vbYes Then Exit Sub
+    End If
+
+    Dim typesToGenerate() As Long
+    Dim t As Long
+
+    If typeInput = 5 Then
+        ReDim typesToGenerate(1 To 4)
+        typesToGenerate(1) = 1: typesToGenerate(2) = 2
+        typesToGenerate(3) = 3: typesToGenerate(4) = 4
+    Else
+        ReDim typesToGenerate(1 To 1)
+        typesToGenerate(1) = typeInput
+    End If
+
+    For t = 1 To UBound(typesToGenerate)
+        Dim cfgType As Long, cfgName As String
+        cfgType = typesToGenerate(t)
+        cfgName = GetTypeName(cfgType)
+
+        outArr = 构建_排列组合四象限_矩阵(n, cfgType)
+        Set ws = GetOrInitWorksheet(cfgName)
+        ws.Cells.Clear
+        ws.Range(ws.Cells(1, 1), ws.Cells(UBound(outArr, 1), UBound(outArr, 2))).Value = outArr
+        ws.Columns.AutoFit
+    Next t
+
+    MsgBox "已生成矩阵（N=0.." & n & "）。", vbInformation
+End Sub
+
+' ============================================================
+' 枚举函数（VBA 原生实现，使用数组返回）
+' ============================================================
+
+' —— 枚举：组合不放回（回溯法）
+' 返回：二维数组 (1 To total, 1 To k)，每行为一个组合
+Public Function EnumerateCombNoRepet(ByVal arr As Variant, ByVal k As Long) As Variant
+    Dim n As Long, total As Long
+    Dim result() As Variant
+    Dim usedArr() As Boolean
+    Dim resArr() As Long
+    Dim idx As Long
+
+    If Not IsArray(arr) Then
+        EnumerateCombNoRepet = Empty
+        Exit Function
+    End If
+    n = UBound(arr) - LBound(arr) + 1
+    If k < 1 Or k > n Then
+        EnumerateCombNoRepet = Empty
+        Exit Function
+    End If
+
+    total = CountCombNoRepet(n, k)
+    If total > MAX_ENUM Then
+        EnumerateCombNoRepet = Empty
+        Exit Function
+    End If
+
+    ReDim result(1 To total, 1 To k)
+    ReDim resArr(0 To k)
+    resArr(0) = 0   ' 哨兵值，保证 RecCombNoRepet 中 resArr(depth-1) 访问合法
+    idx = 1
+
+    Call RecCombNoRepet(arr, LBound(arr), n, k, 1, resArr, result, idx)
+
+    EnumerateCombNoRepet = result
+End Function
+
+' —— 枚举：组合放回
+Public Function EnumerateCombRepet(ByVal arr As Variant, ByVal k As Long) As Variant
+    Dim n As Long, total As Long
+    Dim result() As Variant
+    Dim idx As Long, i As Long, p As Long
+    Dim indices() As Long
+
+    If Not IsArray(arr) Then
+        EnumerateCombRepet = Empty
+        Exit Function
+    End If
+    n = UBound(arr) - LBound(arr) + 1
+    If k < 1 Or n < 1 Then
+        EnumerateCombRepet = Empty
+        Exit Function
+    End If
+
+    total = CountCombRepet(n, k)
+    If total > MAX_ENUM Then
+        EnumerateCombRepet = Empty
+        Exit Function
+    End If
+
+    ReDim result(1 To total, 1 To k)
+    ReDim indices(0 To k - 1)
+    For i = 0 To k - 1
+        indices(i) = 0
+    Next i
+
+    idx = 1
+    Do While True
+        For i = 0 To k - 1
+            result(idx, i + 1) = arr(LBound(arr) + indices(i))
+        Next i
+        idx = idx + 1
+
+        p = k - 1
+        Do While p >= 0 And indices(p) >= n - 1
+            p = p - 1
+        Loop
+        If p < 0 Then Exit Do
+        indices(p) = indices(p) + 1
+        For i = p + 1 To k - 1
+            indices(i) = indices(p)
+        Next i
+    Loop
+
+    EnumerateCombRepet = result
+End Function
+
+' —— 枚举：排列不放回（回溯法）
+Public Function EnumeratePermNoRepet(ByVal arr As Variant, ByVal k As Long) As Variant
+    Dim n As Long, total As Long
+    Dim result() As Variant
+    Dim used() As Boolean
+    Dim resArr() As Long
+    Dim idx As Long
+
+    If Not IsArray(arr) Then
+        EnumeratePermNoRepet = Empty
+        Exit Function
+    End If
+    n = UBound(arr) - LBound(arr) + 1
+    If k < 1 Or k > n Then
+        EnumeratePermNoRepet = Empty
+        Exit Function
+    End If
+
+    total = CountPermNoRepet(n, k)
+    If total > MAX_ENUM Then
+        EnumeratePermNoRepet = Empty
+        Exit Function
+    End If
+
+    ReDim result(1 To total, 1 To k)
+    ReDim used(0 To n - 1)
+    ReDim resArr(0 To k)
+    resArr(0) = 0   ' 哨兵值，保证 RecPermNoRepet 中 resArr(depth-1) 访问合法
+    idx = 1
+
+    Call RecPermNoRepet(arr, LBound(arr), n, k, 1, used, resArr, result, idx)
+
+    EnumeratePermNoRepet = result
+End Function
+
+' —— 枚举：排列放回
+Public Function EnumeratePermRepet(ByVal arr As Variant, ByVal k As Long) As Variant
+    Dim n As Long, total As Long
+    Dim result() As Variant
+    Dim idx As Long, i As Long, p As Long
+    Dim indices() As Long
+
+    If Not IsArray(arr) Then
+        EnumeratePermRepet = Empty
+        Exit Function
+    End If
+    n = UBound(arr) - LBound(arr) + 1
+    If k < 1 Or n < 1 Then
+        EnumeratePermRepet = Empty
+        Exit Function
+    End If
+
+    total = CountPermRepet(n, k)
+    If total > MAX_ENUM Then
+        EnumeratePermRepet = Empty
+        Exit Function
+    End If
+
+    ReDim result(1 To total, 1 To k)
+    ReDim indices(0 To k - 1)
+    For i = 0 To k - 1
+        indices(i) = 0
+    Next i
+
+    idx = 1
+    Do While True
+        For i = 0 To k - 1
+            result(idx, i + 1) = arr(LBound(arr) + indices(i))
+        Next i
+        idx = idx + 1
+
+        p = k - 1
+        Do While p >= 0 And indices(p) >= n - 1
+            p = p - 1
+        Loop
+        If p < 0 Then Exit Do
+        indices(p) = indices(p) + 1
+        For i = p + 1 To k - 1
+            indices(i) = 0
+        Next i
+    Loop
+
+    EnumeratePermRepet = result
+End Function
+
+' —— 统一枚举入口
+Public Function EnumerateByType(ByVal arr As Variant, ByVal k As Long, ByVal type As Long) As Variant
+    Select Case type
+        Case TYPE_NOREP_COMB: EnumerateByType = EnumerateCombNoRepet(arr, k)
+        Case TYPE_REP_COMB:   EnumerateByType = EnumerateCombRepet(arr, k)
+        Case TYPE_NOREP_PERM: EnumerateByType = EnumeratePermNoRepet(arr, k)
+        Case TYPE_REP_PERM:   EnumerateByType = EnumeratePermRepet(arr, k)
+        Case Else:            EnumerateByType = Empty
+    End Select
+End Function
+
+' —— 入口：单点查询
+Public Sub 演示_单点查询()
+    Dim nInput As Variant, kInput As Variant
+    Dim n As Long, k As Long
+    Dim msg As String
+
+    nInput = Application.InputBox(prompt:="请输入 n：", _
+        Title:="单点查询-n", Default:="5", Type:=1)
+    If nInput = False Then Exit Sub
+    If Not IsNumeric(nInput) Then
+        MsgBox "n 必须是整数", vbExclamation
+        Exit Sub
+    End If
+    n = CLng(nInput)
+
+    kInput = Application.InputBox(prompt:="请输入 k：", _
+        Title:="单点查询-k", Default:="2", Type:=1)
+    If kInput = False Then Exit Sub
+    If Not IsNumeric(kInput) Then
+        MsgBox "k 必须是整数", vbExclamation
+        Exit Sub
+    End If
+    k = CLng(kInput)
+
+    msg = "n=" & n & ", k=" & k & vbCrLf & vbCrLf
+    msg = msg & "组合不放回 C(n,k) = " & CountCombNoRepet(n, k) & vbCrLf
+    msg = msg & "组合放回 C(n+k-1,k) = " & CountCombRepet(n, k) & vbCrLf
+    msg = msg & "排列不放回 A(n,k) = " & CountPermNoRepet(n, k) & vbCrLf
+    msg = msg & "排列放回 n^k = " & CountPermRepet(n, k)
+
+    MsgBox msg, vbInformation, "排列组合单点查询"
+End Sub
+
+' —— 入口：枚举演示
+Public Sub 演示_枚举生成()
+    Dim dataInput As Variant, kInput As Variant, typeInput As Long
+    Dim arr() As Variant, result As Variant
+    Dim n As Long, i As Long, j As Long
+    Dim ws As Worksheet
+
+    dataInput = Application.InputBox(prompt:="请输入元素列表（逗号分隔）：" & vbCrLf & "例如: A,B,C,D", _
+        Title:="枚举生成-元素", Default:="A,B,C", Type:=2)
+    If dataInput = False Then Exit Sub
+
+    ' 解析字符串数组
+    Dim raw() As String, item As String
+    raw = Split(CStr(dataInput), ",")
+    n = 0
+    For i = 0 To UBound(raw)
+        item = Trim(raw(i))
+        If Len(item) > 0 Then
+            n = n + 1
+            ReDim Preserve arr(1 To n)
+            arr(n) = item
+        End If
+    Next i
+    If n = 0 Then
+        MsgBox "元素列表为空", vbExclamation
+        Exit Sub
+    End If
+
+    kInput = Application.InputBox(prompt:="请输入 k（选取数量）：", _
+        Title:="枚举生成-k", Default:="2", Type:=1)
+    If kInput = False Then Exit Sub
+    If Not IsNumeric(kInput) Then
+        MsgBox "k 必须是整数", vbExclamation
+        Exit Sub
+    End If
+    Dim k As Long
+    k = CLng(kInput)
+
+    typeInput = Application.InputBox(prompt:= _
+        "请选择类型：" & vbCrLf & _
+        "1 = 组合不放回" & vbCrLf & _
+        "2 = 组合放回" & vbCrLf & _
+        "3 = 排列不放回" & vbCrLf & _
+        "4 = 排列放回", _
+        Title:="枚举生成-类型", Default:="1", Type:=1)
+    If typeInput = False Then Exit Sub
+    If Not IsNumeric(typeInput) Then
+        MsgBox "类型必须是 1..4", vbExclamation
+        Exit Sub
+    End If
+    typeInput = CLng(typeInput)
+    If typeInput < 1 Or typeInput > 4 Then
+        MsgBox "类型必须是 1..4", vbExclamation
+        Exit Sub
+    End If
+
+    result = EnumerateByType(arr, k, typeInput)
+    If IsEmpty(result) Then
+        Dim total As Double
+        total = CountByType(n, k, typeInput)
+        If total > MAX_ENUM Then
+            MsgBox "结果数量 = " & total & " 超过上限 " & MAX_ENUM & "，无法枚举。", vbExclamation, "数量过大"
+        Else
+            MsgBox "无法生成（参数非法？）", vbExclamation
+        End If
+        Exit Sub
+    End If
+
+    Dim rowCount As Long
+    rowCount = UBound(result, 1) - LBound(result, 1) + 1
+
+    Set ws = GetOrInitWorksheet("枚举结果")
+    ws.Cells.Clear
+
+    ' 表头
+    Dim header() As Variant
+    ReDim header(1 To k + 1)
+    For i = 1 To k
+        header(i) = "第" & i & "位"
+    Next i
+    header(k + 1) = "序号"
+    ws.Range(ws.Cells(1, 1), ws.Cells(1, k + 1)).Value = header
+
+    ' 数据
+    Dim rowData() As Variant
+    ReDim rowData(1 To rowCount, 1 To k + 1)
+    For i = 1 To rowCount
+        For j = 1 To k
+            rowData(i, j) = result(i, j)
+        Next j
+        rowData(i, k + 1) = i
+    Next i
+
+    ws.Range(ws.Cells(2, 1), ws.Cells(rowCount + 1, k + 1)).Value = rowData
+    ws.Columns.AutoFit
+
+    MsgBox "已生成 " & rowCount & " 条结果到工作表【枚举结果】", vbInformation, "枚举完成"
+End Sub
+
+' ============================================================
+' 矩阵构建
+' ============================================================
+
+' —— 构建排列组合四象限矩阵二维数组
+' 行：n = 0..nMax；列：k = 0..nMax
+Public Function 构建_排列组合四象限_矩阵(ByVal nMax As Long, ByVal type As Long) As Variant
+    Dim rowsTotal As Long, colsTotal As Long
+    Dim outArr() As Variant
+    Dim colStart As Long
+    Dim n As Long, k As Long, row As Long
+    Dim sumRow As Double, val As Double
+
+    rowsTotal = nMax + 2
+    colsTotal = nMax + 3
+    colStart = 3
+    ReDim outArr(1 To rowsTotal, 1 To colsTotal)
+
+    ' 表头
+    outArr(1, 1) = "总和"
+    outArr(1, 2) = "总数"
+    For k = 0 To nMax
+        outArr(1, colStart + k) = "选" & k & "个"
+    Next k
+
+    row = 2
+    For n = 0 To nMax
+        outArr(row, 2) = n
+        sumRow = 0#
+
+        ' k=0: 恒为 1
+        outArr(row, colStart + 0) = 1#
+        sumRow = sumRow + 1#
+
+        ' k=1..nMax
+        For k = 1 To nMax
+            If type = TYPE_REP_COMB Or type = TYPE_REP_PERM Then
+                ' 放回类型：对所有 k 都有意义
+                val = CountByType(n, k, type)
+                outArr(row, colStart + k) = val
+                sumRow = sumRow + val
+            Else
+                ' 不放回：k > n 时无意义
+                If k <= n Then
+                    val = CountByType(n, k, type)
+                    outArr(row, colStart + k) = val
+                    sumRow = sumRow + val
+                Else
+                    outArr(row, colStart + k) = vbNullString
+                End If
+            End If
+        Next k
+
+        outArr(row, 1) = sumRow
+        row = row + 1
+    Next n
+
+    构建_排列组合四象限_矩阵 = outArr
+End Function
+
+' ============================================================
+' 工具函数（私有）
+' ============================================================
+
+' —— 获取类型中文名
+Private Function GetTypeName(ByVal type As Long) As String
+    Select Case type
+        Case TYPE_NOREP_COMB: GetTypeName = "排列组合_组合不放回_C(n,k)"
+        Case TYPE_REP_COMB:   GetTypeName = "排列组合_组合放回_C(n+k-1,k)"
+        Case TYPE_NOREP_PERM: GetTypeName = "排列组合_排列不放回_A(n,k)"
+        Case TYPE_REP_PERM:   GetTypeName = "排列组合_排列放回_n^k"
+        Case Else:            GetTypeName = "排列组合_未知类型"
+    End Select
+End Function
+
+' —— 获取或创建工作表
+Private Function GetOrInitWorksheet(ByVal Name As String) As Worksheet
+    Dim ws As Worksheet
+    On Error Resume Next
+    Set ws = ThisWorkbook.Worksheets(Name)
+    On Error GoTo 0
+    If ws Is Nothing Then
+        Set ws = ThisWorkbook.Worksheets.Add
+        ws.Name = Name
+    End If
+    Set GetOrInitWorksheet = ws
+End Function
+
+' —— 递归：组合不放回
+Private Sub RecCombNoRepet(ByVal arr As Variant, ByVal arrBase As Long, ByVal n As Long, _
+                           ByVal k As Long, ByVal depth As Long, ByRef resArr() As Long, _
+                           ByRef result() As Variant, ByRef idx As Long)
+    Dim i As Long
+    If depth > k Then
+        Dim j As Long
+        For j = 1 To k
+            result(idx, j) = arr(arrBase + resArr(j) - 1)
+        Next j
+        idx = idx + 1
+        Exit Sub
+    End If
+    For i = resArr(depth - 1) + 1 To n - (k - depth)
+        resArr(depth) = i
+        Call RecCombNoRepet(arr, arrBase, n, k, depth + 1, resArr, result, idx)
+    Next i
+End Sub
+
+' —— 递归：排列不放回
+Private Sub RecPermNoRepet(ByVal arr As Variant, ByVal arrBase As Long, ByVal n As Long, _
+                           ByVal k As Long, ByVal depth As Long, ByRef used() As Boolean, _
+                           ByRef resArr() As Long, ByRef result() As Variant, ByRef idx As Long)
+    Dim i As Long, j As Long
+    If depth > k Then
+        For j = 1 To k
+            result(idx, j) = arr(arrBase + resArr(j) - 1)
+        Next j
+        idx = idx + 1
+        Exit Sub
+    End If
+    For i = 0 To n - 1
+        If Not used(i) Then
+            used(i) = True
+            resArr(depth) = i + 1
+            Call RecPermNoRepet(arr, arrBase, n, k, depth + 1, used, resArr, result, idx)
+            used(i) = False
+        End If
+    Next i
+End Sub
