@@ -147,14 +147,16 @@ git commit --allow-empty -m "测试提交"
 
 | 文件 | 路径 | 用途 |
 |---|---|---|
-| 详细配置文档 | `Gitee同步与Trae配置逻辑.md` | 完整配置流程 |
+| 详细配置文档 | [Gitee同步与Trae配置逻辑.md](./Gitee同步与Trae配置逻辑.md) | 完整配置流程 |
 | SSH 私钥 | `C:\Users\Administrator\.ssh\id_ed25519` | 认证密钥（保密） |
 | SSH 公钥 | `C:\Users\Administrator\.ssh\id_ed25519.pub` | 上传 Gitee |
 | SSH config | `C:\Users\Administrator\.ssh\config` | SSH 主机配置 |
-| Git 配置 | `.git/config` | 远程 URL、仓库级身份 |
-| .gitignore | `.gitignore` | 忽略规则 |
-| 备用 SSH config | `.git-ssh-config` | Trae 内测试用 |
+| Git 配置 | `../.git/config` | 远程 URL、仓库级身份 |
+| .gitignore | `../.gitignore` | 忽略规则 |
+| 备用 SSH config | [.git-ssh-config](./.git-ssh-config) | Trae 内测试用 |
+| 核心配置逻辑 | [Gitee同步核心配置逻辑.md](./Gitee同步核心配置逻辑.md) | 可复现零踩坑版 |
+| 项目规则文件 | [../.trae/rules/project_rules.md](../.trae/rules/project_rules.md) | Trae AI 行为约束 |
 
 ---
 
-**文档结束** | 如需完整版配置流程，参见 [Gitee同步与Trae配置逻辑.md](./Gitee同步与Trae配置逻辑.md)
+**文档结束** | 详细配置：[Gitee同步与Trae配置逻辑.md](./Gitee同步与Trae配置逻辑.md) | 核心逻辑：[Gitee同步核心配置逻辑.md](./Gitee同步核心配置逻辑.md) | 项目规则：[../.trae/rules/project_rules.md](../.trae/rules/project_rules.md)

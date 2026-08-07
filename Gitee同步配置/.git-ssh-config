@@ -1,0 +1,14 @@
+# Gitee SSH 备用 config（Trae 内测试用）
+# 使用方法：
+#   $env:GIT_SSH_COMMAND = "ssh -F Gitee同步配置/.git-ssh-config"
+#   git fetch origin
+
+Host gitee.com
+    HostName gitee.com
+    User git
+    Port 22
+    IdentityFile C:/Users/Administrator/.ssh/id_ed25519
+    IdentitiesOnly yes
+    StrictHostKeyChecking accept-new
+    ServerAliveInterval 60
+    ServerAliveCountMax 3
