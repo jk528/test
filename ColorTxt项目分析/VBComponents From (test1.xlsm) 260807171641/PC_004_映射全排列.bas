@@ -1,0 +1,254 @@
+Attribute VB_Name = "PC_004_映射全排列"
+Option Explicit
+' 用于记录排列索引的模块级变量
+Private k As Long
+' 主封装函数：全排列计算并返回二维数组
+' 参数:
+'   inputArray - 输入的一维或二维数组
+'   isRowMajor - 可选参数，True表示按行优先排列，False表示按列优先排列（默认True）
+' 返回值:
+'   包含所有排列的二维数组
+
+Public Function CalculatePermutations(inputArray As Variant, Optional isRowMajor As Boolean = True) As Variant
+    Dim resultArray()
+    Dim tempArray()
+    Dim tempArray1D As Variant
+    Dim arrSize As Integer
+    Dim PermCount As Long
+    Dim i As Integer, j As Integer
+    Dim dimension As Integer
+    Dim errorMsg As String
+    On Error GoTo ErrorHandler
+    ' 检测数组维度
+    dimension = GetArrayDimension(inputArray)
+    ' 验证输入
+    If dimension < 1 Or dimension > 2 Then
+        errorMsg = "输入必须是一维或二维数组"
+        GoTo ErrorHandler
+    End If
+    ' 根据维度准备处理
+    If dimension = 1 Then
+        ' 一维数组直接处理
+        tempArray1D = inputArray
+    Else
+        ' 二维数组，按指定方式转换为一维
+        If isRowMajor Then
+            ' 行优先
+            tempArray1D = FlattenArrayRowMajor(inputArray)
+        Else
+            ' 列优先
+            tempArray1D = FlattenArrayColumnMajor(inputArray)
+        End If
+    End If
+    ' 获取数组大小
+    arrSize = UBound(tempArray1D) - LBound(tempArray1D) + 1
+    ' 计算排列总数：n!
+    PermCount = Factorial(arrSize)
+    ' 初始化结果数组
+    ReDim resultArray(1 To PermCount, 1 To arrSize)
+    ' 重置计数器
+    k = 0
+    ' 调用全排列核心函数
+    ' 准备临时数组用于传递（确保从1开始索引）
+    ReDim tempArray(1 To arrSize)
+    For i = 1 To arrSize
+        tempArray(i) = tempArray1D(LBound(tempArray1D) + i - 1)
+    Next i
+    ' 调用Solver函数
+    Solver tempArray, LBound(tempArray), resultArray
+    ' 返回结果
+    CalculatePermutations = resultArray
+    ' 释放临时数组
+    Erase tempArray
+    tempArray1D = Empty
+    Exit Function
+ErrorHandler:
+    ' 错误处理
+    CalculatePermutations = CVErr(xlErrValue)
+    If errorMsg <> "" Then
+        MsgBox errorMsg, vbCritical, "全排列错误"
+    End If
+    ' 释放临时数组
+    On Error Resume Next
+    Erase tempArray
+    tempArray1D = Empty
+End Function
+' 核心全排列递归函数
+
+Private Function Solver(Arr(), m As Integer, ByRef brr())
+    Dim i, n, t
+    n = UBound(Arr)
+    If m < n Then
+        ' 递归处理
+        Solver Arr, m + 1, brr
+        For i = m + 1 To n
+            ' 交换元素
+            t = Arr(m): Arr(m) = Arr(i): Arr(i) = t
+            ' 递归处理交换后的排列
+            Solver Arr, m + 1, brr
+            ' 恢复原始顺序（回溯）
+            t = Arr(m): Arr(m) = Arr(i): Arr(i) = t
+        Next i
+    Else
+        ' 找到一个完整排列，存储到结果数组
+        k = k + 1
+        For i = LBound(Arr) To UBound(Arr)
+            brr(k, i) = Arr(i)
+        Next i
+    End If
+End Function
+' 检测数组维度
+
+Private Function GetArrayDimension(Arr As Variant) As Integer
+    Dim dimension As Integer
+    Dim Temp As Variant
+    On Error GoTo ErrorHandler
+    ' 检查是否为数组
+    If Not IsArray(Arr) Then
+        GetArrayDimension = 0
+        Exit Function
+    End If
+    ' 尝试访问不同维度，直到出错
+    dimension = 0
+    Do While True
+        dimension = dimension + 1
+        Temp = UBound(Arr, dimension)
+    Loop
+ErrorHandler:
+    ' 捕获错误时，维度为当前值减1
+    GetArrayDimension = dimension - 1
+End Function
+' 按行优先将二维数组转换为一维数组
+
+Private Function FlattenArrayRowMajor(matrix As Variant) As Variant
+    Dim rowCount As Integer, colCount As Integer
+    Dim result() As Variant
+    Dim i As Integer, j As Integer, Index As Integer
+    rowCount = UBound(matrix, 1) - LBound(matrix, 1) + 1
+    colCount = UBound(matrix, 2) - LBound(matrix, 2) + 1
+    ReDim result(1 To rowCount * colCount)
+    Index = 1
+    For i = LBound(matrix, 1) To UBound(matrix, 1)
+        For j = LBound(matrix, 2) To UBound(matrix, 2)
+            result(Index) = matrix(i, j)
+            Index = Index + 1
+        Next j
+    Next i
+    FlattenArrayRowMajor = result
+    Erase result ' 释放局部数组
+End Function
+' 按列优先将二维数组转换为一维数组
+
+Private Function FlattenArrayColumnMajor(matrix As Variant) As Variant
+    Dim rowCount As Integer, colCount As Integer
+    Dim result() As Variant
+    Dim i As Integer, j As Integer, Index As Integer
+    rowCount = UBound(matrix, 1) - LBound(matrix, 1) + 1
+    colCount = UBound(matrix, 2) - LBound(matrix, 2) + 1
+    ReDim result(1 To rowCount * colCount)
+    Index = 1
+    For j = LBound(matrix, 2) To UBound(matrix, 2)
+        For i = LBound(matrix, 1) To UBound(matrix, 1)
+            result(Index) = matrix(i, j)
+            Index = Index + 1
+        Next i
+    Next j
+    FlattenArrayColumnMajor = result
+    Erase result ' 释放局部数组
+End Function
+' 计算阶乘
+
+Private Function Factorial(n As Integer) As Long
+    Dim result As Long
+    Dim i As Integer
+    result = 1
+    For i = 2 To n
+        result = result * i
+    Next i
+    Factorial = result
+End Function
+' 测试函数 - 二维数组（优化版，带索引映射）
+
+Sub TestPermutations2D()
+    Dim inputArr
+    Dim resultArr()
+    Dim indexArr()
+    Dim ws As Worksheet
+    Dim i As Integer
+    Dim outputRange As Range
+    Dim startTime As Double, endTime As Double
+    Dim rowCount, colCount
+    ' 开始计时
+    startTime = Timer
+    ' 获取用户选择的单元格区域
+    inputArr = Application.InputBox( _
+    prompt:="默认是：全排列不放回", _
+    Title:="选择数据范围", _
+    Type:=8)
+    ' 检查用户是否取消选择
+    If IsArray(inputArr) Then
+    Else
+        If inputArr = False Then
+            Exit Sub
+        End If
+    End If
+    ' 调用封装函数（行优先）获取原始元素排列
+    resultArr = CalculatePermutations(inputArr, True)
+    ' 输出结果
+    If IsError(resultArr) Then
+        MsgBox "计算错误", vbCritical
+        Exit Sub
+    End If
+    ' 创建或获取工作表
+    On Error Resume Next
+    Set ws = ThisWorkbook.Worksheets("二维数组测试结果")
+    If ws Is Nothing Then
+        Set ws = ThisWorkbook.Worksheets.Add
+        ws.Name = "二维数组测试结果"
+    End If
+    On Error GoTo 0
+    ' 获取结果数组的大小
+    rowCount = UBound(resultArr, 1)
+    colCount = UBound(resultArr, 2)
+    ' 清空工作表
+    ws.Cells.Clear
+    ' 及时释放inputArr
+    inputArr = Empty
+    ' 创建索引数组 [1,2,3,...colCount]
+    ReDim indexArr(1 To colCount)
+    For i = 1 To colCount
+        indexArr(i) = i
+    Next
+    ' 调用封装函数获取索引排列（使用相同的k值，确保排列顺序一致）
+    Dim indexResultArr()
+    indexResultArr = CalculatePermutations(indexArr, True)
+    ' 释放索引数组
+    Erase indexArr
+    ' 设置标题行
+    For i = 1 To colCount
+        ws.Cells(1, i).Value = "元素 " & i
+        ws.Cells(1, i + colCount).Value = "映射 " & i
+    Next i
+    ' 直接将原始元素排列写入工作表（从第2行开始）
+    Set outputRange = ws.Range("A2").Resize(rowCount, colCount)
+    outputRange.Value = resultArr
+    ' 直接将索引排列写入工作表右侧
+    Set outputRange = ws.Range("A2").Offset(0, colCount).Resize(rowCount, colCount)
+    outputRange.Value = indexResultArr
+    ' 释放结果数组
+    Erase resultArr
+    Erase indexResultArr
+    Set outputRange = Nothing
+    ' 结束计时
+    endTime = Timer
+    ' 显示完成信息和用时
+    MsgBox "二维数组全排列完成！" & vbCrLf & _
+    "排列总数: " & rowCount & vbCrLf & _
+    "元素数量: " & colCount & vbCrLf & _
+    "处理用时: " & Format(endTime - startTime, "0.000") & " 秒", vbInformation, "全排列测试"
+    ' 释放工作表对象
+    Set ws = Nothing
+    ' 激活结果工作表
+    ThisWorkbook.Worksheets("二维数组测试结果").Activate
+End Sub
+
