@@ -1,0 +1,429 @@
+Attribute VB_Name = "CELL_001_邻近单元格操作"
+Option Explicit
+
+' ============================================================
+' CELL_001_邻近单元格操作.TXT
+' 功能：自定义函数，遍历选中单元格的邻近单元格
+'   1. 连接：用特定字符连接邻近单元格的值
+'   2. 运算：对邻近单元格进行加减乘除
+' 适用：WPS / Excel VBA（直接粘贴到模块即可运行）
+' 日期：2026-08-07
+' ============================================================
+
+' —— 方向常量定义（便于代码可读）
+Public Const DIR_RIGHT As Long = 1       ' 右
+Public Const DIR_LEFT As Long = 2        ' 左
+Public Const DIR_DOWN As Long = 3        ' 下
+Public Const DIR_UP As Long = 4          ' 上
+Public Const DIR_DOWNRIGHT As Long = 5   ' 右下
+Public Const DIR_UPRIGHT As Long = 6     ' 右上
+Public Const DIR_DOWNLEFT As Long = 7    ' 左下
+Public Const DIR_UPLEFT As Long = 8      ' 左上
+Public Const DIR_ALL8 As Long = 9        ' 8 方向全部
+Public Const DIR_ROW_RIGHT As Long = 10  ' 同行向右连续
+Public Const DIR_ROW_LEFT As Long = 11   ' 同行向左连续
+Public Const DIR_COL_DOWN As Long = 12   ' 同列向下连续
+Public Const DIR_COL_UP As Long = 13     ' 同列向上连续
+
+' ============================================================
+' 一、入口 Sub（菜单运行）
+' ============================================================
+
+' —— 入口：演示连接邻近单元格
+Public Sub 演示_连接邻近单元格()
+    Dim rng As Range
+    Dim dirChoice As Variant, sep As String
+    Dim dirCode As Long, result As String
+
+    On Error GoTo errH
+
+    ' 选择起始单元格
+    Set rng = Application.InputBox(prompt:="请选择起始单元格：", Type:=8, Title:="邻近单元格操作")
+    If rng Is Nothing Then Exit Sub
+
+    ' 选择方向
+    dirChoice = Application.InputBox(prompt:="请选择方向：" & vbCrLf & _
+        "1=右  2=左  3=下  4=上" & vbCrLf & _
+        "5=右下  6=右上  7=左下  8=左上" & vbCrLf & _
+        "9=8方向全部  10=同行向右连续" & vbCrLf & _
+        "11=同行向左连续  12=同列向下连续  13=同列向上连续", _
+        Type:=1, Title:="方向选择")
+    If dirChoice = False Then Exit Sub
+    If Not IsNumeric(dirChoice) Or dirChoice < 1 Or dirChoice > 13 Then
+        MsgBox "方向必须是 1..13 的整数。", vbExclamation
+        Exit Sub
+    End If
+    dirCode = CLng(dirChoice)
+
+    ' 输入分隔符
+    sep = InputBox("请输入分隔符（留空则无分隔）：", "分隔符", "-")
+    If sep = "" Then sep = ""
+
+    ' 调用连接函数
+    result = 连接邻近单元格(rng, dirCode, sep)
+
+    MsgBox "连接结果：" & vbCrLf & result, vbInformation, "邻近单元格连接"
+
+    Exit Sub
+errH:
+    MsgBox "错误：" & Err.Description, vbExclamation
+End Sub
+
+' —— 入口：演示邻近单元格四则运算
+Public Sub 演示_邻近单元格运算()
+    Dim rng As Range
+    Dim dirChoice As Variant, opChoice As Variant
+    Dim dirCode As Long, op As String
+    Dim result As Double
+
+    On Error GoTo errH
+
+    ' 选择起始单元格
+    Set rng = Application.InputBox(prompt:="请选择起始单元格：", Type:=8, Title:="邻近单元格运算")
+    If rng Is Nothing Then Exit Sub
+
+    ' 选择方向
+    dirChoice = Application.InputBox(prompt:="请选择方向（1=右 2=左 3=下 4=上 5=右下 6=右上 7=左下 8=左上 9=8方向全部）：", _
+        Type:=1, Title:="方向选择")
+    If dirChoice = False Then Exit Sub
+    If Not IsNumeric(dirChoice) Or dirChoice < 1 Or dirChoice > 9 Then
+        MsgBox "运算功能方向必须是 1..9 的整数。", vbExclamation
+        Exit Sub
+    End If
+    dirCode = CLng(dirChoice)
+
+    ' 选择运算符
+    opChoice = Application.InputBox(prompt:="请选择运算：" & vbCrLf & _
+        "1=加(+)  2=减(-)  3=乘(*)  4=除(/)", _
+        Type:=1, Title:="运算选择")
+    If opChoice = False Then Exit Sub
+    Select Case CLng(opChoice)
+        Case 1: op = "+"
+        Case 2: op = "-"
+        Case 3: op = "*"
+        Case 4: op = "/"
+        Case Else
+            MsgBox "运算必须是 1..4 的整数。", vbExclamation
+            Exit Sub
+    End Select
+
+    ' 调用运算函数
+    result = 邻近单元格运算(rng, dirCode, op)
+
+    MsgBox "运算结果：" & result, vbInformation, "邻近单元格 " & op & " 运算"
+
+    Exit Sub
+errH:
+    MsgBox "错误：" & Err.Description, vbExclamation
+End Sub
+
+' ============================================================
+' 二、核心自定义函数（可作为工作表 UDF 使用）
+' ============================================================
+
+' —— 函数1：连接邻近单元格的值
+' 参数：
+'   rng  - 起始单元格
+'   dir  - 方向代码（1..13，见常量定义）
+'   sep  - 分隔符（字符串）
+' 返回：String，连接后的字符串
+Public Function 连接邻近单元格(ByVal rng As Range, ByVal dir As Long, ByVal sep As String) As String
+    Dim vals As Variant
+    Dim i As Long, result As String
+
+    vals = 获取邻近单元格值(rng, dir)
+    If IsEmpty(vals) Then
+        连接邻近单元格 = ""
+        Exit Function
+    End If
+
+    result = ""
+    For i = LBound(vals) To UBound(vals)
+        If result = "" Then
+            result = CStr(vals(i))
+        Else
+            result = result & sep & CStr(vals(i))
+        End If
+    Next i
+
+    连接邻近单元格 = result
+End Function
+
+' —— 函数2：邻近单元格四则运算
+' 参数：
+'   rng  - 起始单元格
+'   dir  - 方向代码（1..9，仅单方向或8方向全部）
+'   op   - 运算符 "+" "-" "*" "/"
+' 返回：Double，运算结果
+' 注意：
+'   - 加法：所有邻近单元格求和
+'   - 减法：以起始单元格为被减数，依次减去邻近单元格
+'   - 乘法：所有邻近单元格连乘
+'   - 除法：以起始单元格为被除数，依次除以邻近单元格
+Public Function 邻近单元格运算(ByVal rng As Range, ByVal dir As Long, ByVal op As String) As Double
+    Dim vals As Variant
+    Dim i As Long, baseVal As Double
+
+    vals = 获取邻近单元格值(rng, dir)
+    If IsEmpty(vals) Then
+        邻近单元格运算 = 0
+        Exit Function
+    End If
+
+    ' 起始单元格的值作为运算基准
+    baseVal = Val(rng.Value)
+
+    Select Case op
+        Case "+"
+            ' 加法：起始值 + 所有邻近值
+            For i = LBound(vals) To UBound(vals)
+                baseVal = baseVal + Val(vals(i))
+            Next i
+            邻近单元格运算 = baseVal
+
+        Case "-"
+            ' 减法：起始值 - 所有邻近值
+            For i = LBound(vals) To UBound(vals)
+                baseVal = baseVal - Val(vals(i))
+            Next i
+            邻近单元格运算 = baseVal
+
+        Case "*"
+            ' 乘法：起始值 * 所有邻近值
+            For i = LBound(vals) To UBound(vals)
+                baseVal = baseVal * Val(vals(i))
+            Next i
+            邻近单元格运算 = baseVal
+
+        Case "/"
+            ' 除法：起始值 / 所有邻近值
+            For i = LBound(vals) To UBound(vals)
+                If Val(vals(i)) = 0 Then
+                    MsgBox "第 " & (i - LBound(vals) + 1) & " 个邻近单元格值为 0，无法除法。", vbExclamation
+                    邻近单元格运算 = 0
+                    Exit Function
+                End If
+                baseVal = baseVal / Val(vals(i))
+            Next i
+            邻近单元格运算 = baseVal
+
+        Case Else
+            邻近单元格运算 = 0
+    End Select
+End Function
+
+' —— 函数3：遍历邻近单元格，返回值数组
+' 参数：
+'   rng  - 起始单元格
+'   dir  - 方向代码（1..13）
+' 返回：Variant（一维数组，下标从 0 开始）
+Public Function 遍历邻近单元格(ByVal rng As Range, ByVal dir As Long) As Variant
+    遍历邻近单元格 = 获取邻近单元格值(rng, dir)
+End Function
+
+' —— 函数4：获取邻近单元格的数量
+Public Function 邻近单元格数量(ByVal rng As Range, ByVal dir As Long) As Long
+    Dim vals As Variant
+    vals = 获取邻近单元格值(rng, dir)
+    If IsEmpty(vals) Then
+        邻近单元格数量 = 0
+    Else
+        邻近单元格数量 = UBound(vals) - LBound(vals) + 1
+    End If
+End Function
+
+' ============================================================
+' 三、内部辅助函数
+' ============================================================
+
+' —— 内部：根据方向获取邻近单元格的值数组
+Private Function 获取邻近单元格值(ByVal rng As Range, ByVal dir As Long) As Variant
+    Dim r As Long, c As Long
+    Dim result() As Variant
+    Dim count As Long
+
+    r = rng.Row
+    c = rng.Column
+    count = -1
+
+    Select Case dir
+        ' ===== 单方向：仅取相邻 1 格 =====
+        Case DIR_RIGHT      ' 右
+            count = count + 1
+            ReDim Preserve result(0 To count)
+            result(count) = rng.Parent.Cells(r, c + 1).Value
+
+        Case DIR_LEFT       ' 左
+            count = count + 1
+            ReDim Preserve result(0 To count)
+            result(count) = rng.Parent.Cells(r, c - 1).Value
+
+        Case DIR_DOWN       ' 下
+            count = count + 1
+            ReDim Preserve result(0 To count)
+            result(count) = rng.Parent.Cells(r + 1, c).Value
+
+        Case DIR_UP         ' 上
+            count = count + 1
+            ReDim Preserve result(0 To count)
+            result(count) = rng.Parent.Cells(r - 1, c).Value
+
+        Case DIR_DOWNRIGHT  ' 右下
+            count = count + 1
+            ReDim Preserve result(0 To count)
+            result(count) = rng.Parent.Cells(r + 1, c + 1).Value
+
+        Case DIR_UPRIGHT    ' 右上
+            count = count + 1
+            ReDim Preserve result(0 To count)
+            result(count) = rng.Parent.Cells(r - 1, c + 1).Value
+
+        Case DIR_DOWNLEFT   ' 左下
+            count = count + 1
+            ReDim Preserve result(0 To count)
+            result(count) = rng.Parent.Cells(r + 1, c - 1).Value
+
+        Case DIR_UPLEFT     ' 左上
+            count = count + 1
+            ReDim Preserve result(0 To count)
+            result(count) = rng.Parent.Cells(r - 1, c - 1).Value
+
+        ' ===== 8 方向全部 =====
+        Case DIR_ALL8
+            Dim dr As Variant, dc As Variant
+            Dim k As Long
+            dr = Array(0, 0, 1, -1, 1, -1, 1, -1)
+            dc = Array(1, -1, 0, 0, 1, 1, -1, -1)
+            For k = 0 To 7
+                count = count + 1
+                ReDim Preserve result(0 To count)
+                result(count) = rng.Parent.Cells(r + dr(k), c + dc(k)).Value
+            Next k
+
+        ' ===== 同行向右连续（直到遇到空单元格）=====
+        Case DIR_ROW_RIGHT
+            Dim cc As Long
+            cc = c + 1
+            Do While rng.Parent.Cells(r, cc).Value <> ""
+                count = count + 1
+                ReDim Preserve result(0 To count)
+                result(count) = rng.Parent.Cells(r, cc).Value
+                cc = cc + 1
+            Loop
+
+        ' ===== 同行向左连续 =====
+        Case DIR_ROW_LEFT
+            cc = c - 1
+            Do While rng.Parent.Cells(r, cc).Value <> ""
+                count = count + 1
+                ReDim Preserve result(0 To count)
+                result(count) = rng.Parent.Cells(r, cc).Value
+                cc = cc - 1
+            Loop
+
+        ' ===== 同列向下连续 =====
+        Case DIR_COL_DOWN
+            Dim rr As Long
+            rr = r + 1
+            Do While rng.Parent.Cells(rr, c).Value <> ""
+                count = count + 1
+                ReDim Preserve result(0 To count)
+                result(count) = rng.Parent.Cells(rr, c).Value
+                rr = rr + 1
+            Loop
+
+        ' ===== 同列向上连续 =====
+        Case DIR_COL_UP
+            rr = r - 1
+            Do While rng.Parent.Cells(rr, c).Value <> ""
+                count = count + 1
+                ReDim Preserve result(0 To count)
+                result(count) = rng.Parent.Cells(rr, c).Value
+                rr = rr - 1
+            Loop
+
+        Case Else
+            获取邻近单元格值 = Empty
+            Exit Function
+    End Select
+
+    If count < 0 Then
+        获取邻近单元格值 = Empty
+    Else
+        获取邻近单元格值 = result
+    End If
+End Function
+
+' —— 内部：获取或初始化工作表
+Private Function GetOrInitWorksheet(ByVal sheetName As String) As Worksheet
+    Dim ws As Worksheet
+    On Error Resume Next
+    Set ws = ThisWorkbook.Worksheets(sheetName)
+    On Error GoTo 0
+    If ws Is Nothing Then
+        Set ws = ThisWorkbook.Worksheets.Add(After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.count))
+        ws.Name = sheetName
+    End If
+    Set GetOrInitWorksheet = ws
+End Function
+
+' ============================================================
+' 四、批量演示：在工作表中输出遍历结果
+' ============================================================
+
+' —— 入口：批量演示邻近单元格遍历
+Public Sub 演示_批量遍历邻近单元格()
+    Dim rng As Range, cell As Range
+    Dim ws As Worksheet
+    Dim dirChoice As Variant, dirCode As Long
+    Dim outRow As Long
+
+    On Error GoTo errH
+
+    ' 选择单元格范围
+    Set rng = Application.InputBox(prompt:="请选择要遍历的单元格范围：", Type:=8, Title:="批量遍历")
+    If rng Is Nothing Then Exit Sub
+
+    ' 选择方向
+    dirChoice = Application.InputBox(prompt:="请选择方向（1=右 2=左 3=下 4=上 9=8方向全部 10=同行向右连续）：", _
+        Type:=1, Title:="方向选择")
+    If dirChoice = False Then Exit Sub
+    If Not IsNumeric(dirChoice) Or dirChoice < 1 Or dirChoice > 13 Then
+        MsgBox "方向必须是 1..13 的整数。", vbExclamation
+        Exit Sub
+    End If
+    dirCode = CLng(dirChoice)
+
+    ' 创建输出工作表
+    Set ws = GetOrInitWorksheet("邻近遍历结果")
+    ws.Cells.Clear
+    ws.Cells(1, 1).Value = "单元格"
+    ws.Cells(1, 2).Value = "行"
+    ws.Cells(1, 3).Value = "列"
+    ws.Cells(1, 4).Value = "邻近数量"
+    ws.Cells(1, 5).Value = "连接结果(-)"
+    ws.Cells(1, 6).Value = "加法"
+    ws.Cells(1, 7).Value = "乘法"
+    outRow = 2
+
+    ' 遍历选中范围
+    For Each cell In rng
+        If cell.Value <> "" Then
+            ws.Cells(outRow, 1).Value = cell.Address(False, False)
+            ws.Cells(outRow, 2).Value = cell.Row
+            ws.Cells(outRow, 3).Value = cell.Column
+            ws.Cells(outRow, 4).Value = 邻近单元格数量(cell, dirCode)
+            ws.Cells(outRow, 5).Value = 连接邻近单元格(cell, dirCode, "-")
+            ws.Cells(outRow, 6).Value = 邻近单元格运算(cell, dirCode, "+")
+            ws.Cells(outRow, 7).Value = 邻近单元格运算(cell, dirCode, "*")
+            outRow = outRow + 1
+        End If
+    Next cell
+
+    ws.Columns.AutoFit
+    MsgBox "已生成遍历结果，共 " & (outRow - 2) & " 行。", vbInformation
+
+    Exit Sub
+errH:
+    MsgBox "错误：" & Err.Description, vbExclamation
+End Sub
