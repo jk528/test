@@ -201,3 +201,107 @@ Private Function CollectNumbers( _
 
     If count < 0 Then CollectNumbers = Empty Else CollectNumbers = result
 End Function
+
+' ============================================================
+' 四、环形相邻计数（扩展"相邻"概念）
+' 规则：
+'   1. 找最大值 max 和最小值 min，定义"相邻值" = max - min
+'   2. 将数值序列视为环形（首尾相接：最后一个→第一个 也是相邻）
+'   3. 对每对相邻计算 |a[i] - a[i+1]|
+'   4. 若差绝对值 == 1 或 == 相邻值(max-min)，则计数 +1
+'   5. 返回总计数
+' 示例：1 2 3 4 5
+'   max=5, min=1, 相邻值=4
+'   环形相邻对（5对）：
+'     5→1: |5-1|=4  ✓（=相邻值4）  计数+1
+'     1→2: |1-2|=1  ✓（=1）        计数+1
+'     2→3: |2-3|=1  ✓（=1）        计数+1
+'     3→4: |3-4|=1  ✓（=1）        计数+1
+'     4→5: |4-5|=1  ✓（=1）        计数+1
+'   结果 = 5
+' ============================================================
+
+' —— 函数：环形相邻计数
+' 参数：
+'   rng         - 单元格区域（任意矩形范围）
+'   orderByRow  - True=按行优先（默认），False=按列优先
+'   skipEmpty   - 是否跳过空单元格（默认 True）
+' 返回：Long（满足条件的相邻对数）
+Public Function 环形相邻计数( _
+    ByVal rng As Range, _
+    Optional ByVal orderByRow As Boolean = True, _
+    Optional ByVal skipEmpty As Boolean = True _
+) As Long
+    Dim vals As Variant
+    vals = CollectNumbers(rng, orderByRow, skipEmpty)
+
+    If IsEmpty(vals) Then
+        环形相邻计数 = 0
+        Exit Function
+    End If
+
+    Dim n As Long, i As Long
+    n = UBound(vals) - LBound(vals) + 1
+    If n < 2 Then
+        环形相邻计数 = 0
+        Exit Function
+    End If
+
+    ' 找最大值和最小值
+    Dim vMin As Double, vMax As Double, diff As Double
+    vMin = vals(LBound(vals))
+    vMax = vals(LBound(vals))
+    For i = LBound(vals) To UBound(vals)
+        If vals(i) < vMin Then vMin = vals(i)
+        If vals(i) > vMax Then vMax = vals(i)
+    Next i
+    diff = vMax - vMin   ' 相邻值
+
+    ' 边界：所有值相同（diff=0），没有"相邻"关系，返回 0
+    If diff = 0 Then
+        环形相邻计数 = 0
+        Exit Function
+    End If
+
+    ' 环形遍历，统计满足条件的相邻对
+    Dim count As Long, a As Double, b As Double, d As Double
+    count = 0
+    For i = LBound(vals) To UBound(vals)
+        a = vals(i)
+        If i = UBound(vals) Then
+            b = vals(LBound(vals))   ' 环形：最后一个→第一个
+        Else
+            b = vals(i + 1)
+        End If
+        d = Abs(a - b)
+        If d = 1 Or d = diff Then
+            count = count + 1
+        End If
+    Next i
+
+    环形相邻计数 = count
+End Function
+
+' —— 演示 Sub：环形相邻计数
+Public Sub 演示_环形相邻计数()
+    Dim rng As Range
+    Dim orderYN As Variant
+    Dim result As Long
+
+    On Error GoTo errH
+
+    Set rng = Application.InputBox(prompt:="请选择要计算的单元格区域：", _
+        Type:=8, Title:="环形相邻计数")
+    If rng Is Nothing Then Exit Sub
+
+    orderYN = MsgBox("读取顺序：是=按行优先，否=按列优先", _
+        vbQuestion + vbYesNo, "读取顺序")
+
+    result = 环形相邻计数(rng, (orderYN = vbYes), True)
+
+    rng.Cells(1, 1).Offset(0, rng.Columns.count + 1).Value = result
+    MsgBox "环形相邻计数 = " & result, vbInformation
+    Exit Sub
+errH:
+    MsgBox "错误：" & Err.Description, vbExclamation
+End Sub
