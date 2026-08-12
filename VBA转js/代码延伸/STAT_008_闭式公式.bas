@@ -26,7 +26,7 @@ Option Explicit
 Public Function getT_closed(ByVal N As Long) As Object
     ' --- 所有变量声明在过程顶部（VBA Dim 是过程级，不能在循环内重复声明）---
     Dim freq As Object
-    Dim C() As Long
+    Dim binom() As Long
     Dim factArr() As Variant
     Dim E() As Variant
     Dim i As Long, j As Long, k As Long, c As Long
@@ -58,13 +58,13 @@ Public Function getT_closed(ByVal N As Long) As Object
             "N=" & N & " 超出 Decimal 精度上限 (N<=27)。更大 N 请使用 JS BigInt 版本。"
     End If
 
-    ' --- 预计算二项式系数 C[n][k] (Long, 值不会太大) ---
-    ReDim C(0 To N, 0 To N)
+    ' --- 预计算二项式系数 binom[n][k] (Long, 值不会太大) ---
+    ReDim binom(0 To N, 0 To N)
     For i = 0 To N
-        C(i, 0) = 1
-        C(i, i) = 1
+        binom(i, 0) = 1
+        binom(i, i) = 1
         For j = 1 To i - 1
-            C(i, j) = C(i - 1, j - 1) + C(i - 1, j)
+            binom(i, j) = binom(i - 1, j - 1) + binom(i - 1, j)
         Next j
     Next i
 
@@ -87,7 +87,7 @@ Public Function getT_closed(ByVal N As Long) As Object
         maxC = minL(j, N - j)
         For c = 1 To maxC
             ' f(N,j,c) = N * C(j-1,c-1) * C(N-j-1,c-1) / c  (整数，精确)
-            fVal = CDec(N) * C(j - 1, c - 1) * C(N - j - 1, c - 1) / CDec(c)
+            fVal = CDec(N) * binom(j - 1, c - 1) * binom(N - j - 1, c - 1) / CDec(c)
             ' 2^c
             pow2c = CDec(2 ^ c)
             sum2c = sum2c + fVal * pow2c
@@ -103,9 +103,9 @@ Public Function getT_closed(ByVal N As Long) As Object
         t = CDec(0)
         For j = k To N
             If (j - k) Mod 2 = 0 Then
-                t = t + CDec(C(j, k)) * E(j)
+                t = t + CDec(binom(j, k)) * E(j)
             Else
-                t = t - CDec(C(j, k)) * E(j)
+                t = t - CDec(binom(j, k)) * E(j)
             End If
         Next j
         If t > 0 Then
