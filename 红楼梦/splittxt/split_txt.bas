@@ -392,10 +392,12 @@ Public Sub SplitByChapter(ByVal InputPath As String, _
     Dim titleOnlyCount As Long, writtenCount As Long, skippedCount As Long
     Dim shortBodyCount As Long, bodyLen As Long, isInsufficient As Boolean
     Dim skipDetail As String, bodyText As String, regCn As Object
+    Dim maxSkippedBodyLen As Long, extraInfo As String
     titleOnlyCount = 0
     writtenCount = 0
     skippedCount = 0
     shortBodyCount = 0
+    maxSkippedBodyLen = 0
     Set regCn = CreateObject("VBScript.RegExp")
     regCn.Global = True
     regCn.Pattern = "[" & ChrW(&H4E00) & "-" & ChrW(&H9FFF) & "]"
@@ -429,6 +431,7 @@ Public Sub SplitByChapter(ByVal InputPath As String, _
 
         If isInsufficient And Not GenerateTitleOnly Then
             skippedCount = skippedCount + 1
+            If bodyLen > maxSkippedBodyLen Then maxSkippedBodyLen = bodyLen
             GoTo NextChapter
         End If
 
@@ -469,7 +472,7 @@ NextChapter:
     t1 = Timer - t0
 
     ' --- 7. 完成报告 ---
-    ShowCompleteReport "按章节拆分完成", writtenCount, outDirFull, tRead1, tScan1, t1
+    extraInfo = ""
     If skippedCount > 0 Then
         skipDetail = ""
         If titleOnlyCount > 0 Then skipDetail = titleOnlyCount & "个仅有标题"
@@ -477,7 +480,10 @@ NextChapter:
             If Len(skipDetail) > 0 Then skipDetail = skipDetail & "、"
             skipDetail = skipDetail & shortBodyCount & "个正文不足"
         End If
-        Debug.Print "[提示] 跳过 " & skippedCount & " 个章节（" & skipDetail & "）"
+        extraInfo = "【跳过统计】" & vbCrLf & _
+                   "  跳过章节：" & skippedCount & " 个（" & skipDetail & "）" & vbCrLf & _
+                   "  最高正文字数：" & maxSkippedBodyLen & " 字"
+        Debug.Print "[提示] 跳过 " & skippedCount & " 个章节（" & skipDetail & "），最高正文" & maxSkippedBodyLen & "字"
     ElseIf titleOnlyCount > 0 Or shortBodyCount > 0 Then
         skipDetail = ""
         If titleOnlyCount > 0 Then skipDetail = titleOnlyCount & "个仅有标题"
@@ -487,6 +493,7 @@ NextChapter:
         End If
         Debug.Print "[提示] " & skipDetail & "（已生成）"
     End If
+    ShowCompleteReport "按章节拆分完成", writtenCount, outDirFull, tRead1, tScan1, t1, extraInfo
     Exit Sub
 WriteErr:
     MsgBox "写入第 " & (i + 1) & " 个文件时出错：" & vbCrLf & _
@@ -785,7 +792,7 @@ End Function
 '------------------------------------------------------------------------------
 Private Sub ShowCompleteReport(ByVal title As String, ByVal fileCount As Long, _
         ByVal outDir As String, ByVal tRead As Double, ByVal tScan As Double, _
-        ByVal tWrite As Double)
+        ByVal tWrite As Double, Optional ByVal extraInfo As String = "")
     Dim tTotal As Double, msg As String
     tTotal = Timer - g_tTotal0
 
@@ -801,6 +808,9 @@ Private Sub ShowCompleteReport(ByVal title As String, ByVal fileCount As Long, _
           "  总计耗时：" & Format(tTotal, "0.00") & " 秒"
     If tWrite > 0 Then
         msg = msg & vbCrLf & "  写入速率：" & Format(fileCount / tWrite, "0.0") & " 文件/秒"
+    End If
+    If Len(extraInfo) > 0 Then
+        msg = msg & vbCrLf & vbCrLf & extraInfo
     End If
     MsgBox msg, vbInformation, "完成"
 End Sub
