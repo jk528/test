@@ -172,13 +172,15 @@ End Function
 
 '------------------------------------------------------------------------------
 ' 读取ANSI编码TXT（系统默认编码，中文Windows=GBK）
+'   注意：不能用 Open...For Input + Input()，因为文本模式会将 0x1A(Ctrl+Z)
+'   解释为文件尾，导致 Error 62(输入超出文件尾)。改用 Binary 模式读取原始字节，
+'   再用 StrConv 按 ANSI→Unicode 转换。
 '------------------------------------------------------------------------------
 Public Function ReadTextANSI(ByVal filePath As String) As String
-    Dim fileNo As Integer
-    fileNo = FreeFile()
-    Open filePath For Input As #fileNo
-    ReadTextANSI = Input(LOF(fileNo), #fileNo)
-    Close #fileNo
+    Dim fileBytes() As Byte
+    fileBytes = ReadFileBytes(filePath)
+    If UBound(fileBytes) < 0 Then Exit Function
+    ReadTextANSI = StrConv(fileBytes, vbUnicode)
 End Function
 
 '------------------------------------------------------------------------------
