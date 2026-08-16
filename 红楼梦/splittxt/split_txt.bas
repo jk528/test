@@ -346,9 +346,9 @@ Public Sub SplitByChapter(ByVal InputPath As String, _
         serial = Format(i + 1, serialFmt)
         safeTitle = SanitizeFileName(chTitles(i))
         If Len(prefix) > 0 Then
-            fileName = prefix & "_" & serial & " " & safeTitle & ".txt"
+            fileName = prefix & "_" & serial & "_" & safeTitle & ".txt"
         Else
-            fileName = serial & " " & safeTitle & ".txt"
+            fileName = serial & "_" & safeTitle & ".txt"
         End If
         outPath = outDirFull & "\" & fileName
 
@@ -573,10 +573,7 @@ Private Sub ScanChapters(lines() As String, ByVal lineCount As Long, _
             If chCount > 0 Then chEnds(chCount - 1) = i - 1
             chStarts(chCount) = i
             Set m = reg.Execute(lines(i))
-            chTitles(chCount) = Trim(m(0).SubMatches(3))
-            If Len(chTitles(chCount)) = 0 Then
-                chTitles(chCount) = "第" & m(0).SubMatches(0) & m(0).SubMatches(1)
-            End If
+            chTitles(chCount) = Trim(m(0).Value)
             If chCount = 0 Then unit = m(0).SubMatches(1)
             chCount = chCount + 1
             If chCount > UBound(chStarts) Then

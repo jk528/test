@@ -181,9 +181,7 @@ def scan_chapters(lines):
         m = PAT.match(ln)
         if m:
             starts.append(i)
-            title = m.group(4).strip()
-            if not title:
-                title = "第%s%s" % (m.group(1), m.group(2))
+            title = m.group(0).strip()
             titles.append(title)
             if len(starts) == 1:
                 unit = m.group(2)
@@ -278,9 +276,9 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3):
         safe_title = sanitize_filename(titles[idx])
         serial = str(idx + 1).zfill(serial_width)
         if prefix:
-            fname = "%s_%s %s.txt" % (prefix, serial, safe_title)
+            fname = "%s_%s_%s.txt" % (prefix, serial, safe_title)
         else:
-            fname = "%s %s.txt" % (serial, safe_title)
+            fname = "%s_%s.txt" % (serial, safe_title)
 
         body = "\n".join(lines[start_line:end_line + 1])
         write_file(out_dir, fname, body)
