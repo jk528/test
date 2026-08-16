@@ -21,8 +21,8 @@ import sys
 DEFAULT_SRC = r"C:\Users\Administrator\Documents\这是什么\JK-temp\红楼梦\红楼梦.txt"
 DEFAULT_OUT_DIR = r"C:\Users\Administrator\Documents\这是什么\JK-temp\红楼梦\红楼梦_拆分"
 
-# 章节识别正则(与VBA一致)
-PAT = re.compile(r"^第([0-9一二三四五六七八九十百千零两]+)(章|回|节|卷)(\s*)(.*)$")
+# 章节识别正则(与VBA一致)；中文数字含"万"，支持大章节号
+PAT = re.compile(r"^第([0-9一二三四五六七八九十百千万零两]+)(章|回|节|卷)(\s*)(.*)$")
 
 
 def sanitize_title(title):
@@ -96,6 +96,8 @@ def main():
     # 4. 写每章文件
     # 命名规则(与VBA统一): [<前缀>_]<序号> <标题>.txt
     n_total = len(starts)
+    # 序号位数自适应：章节数超过当前位数容量时自动扩展（防 10000+ 章排序错乱）
+    serial_width = max(serial_width, len(str(n_total)))
     for idx in range(n_total):
         start_line = starts[idx][0]
         end_line = starts[idx + 1][0] - 1 if idx + 1 < n_total else len(lines) - 1

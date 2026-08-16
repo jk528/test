@@ -27,7 +27,48 @@ Public Sub 拆分红楼梦()
 End Sub
 
 '------------------------------------------------------------------------------
-' 对外入口 2：通用拆分过程（可处理任意按"第N章/回/节/卷"分隔的TXT）
+' 对外入口 2：通过文件选择窗体选取TXT并拆分（无需硬编码地址，灵活通用）
+'   运行后弹出文件选择对话框，筛选 .txt 文件；选中即调用 SplitTxtByChapter
+'   输出目录默认为 源文件所在目录\<文件名>_拆分\
+'   使用 Application.FileDialog(msoFileDialogFilePicker=3)，兼容 WPS文字/表格/Excel
+'------------------------------------------------------------------------------
+Public Sub 选择文件拆分()
+    Dim fd As Object
+
+    On Error Resume Next
+    Set fd = Application.FileDialog(3)   ' msoFileDialogFilePicker = 3
+    On Error GoTo 0
+
+    If fd Is Nothing Then
+        MsgBox "当前环境不支持文件选择对话框。" & vbCrLf & _
+               "请使用「拆分红楼梦」或「SplitTxtByChapter」传入路径。", _
+               vbExclamation, "提示"
+        Exit Sub
+    End If
+
+    fd.Title = "选择要拆分的TXT文件"
+    On Error Resume Next
+    fd.Filters.Clear
+    fd.Filters.Add "文本文件", "*.txt"
+    fd.Filters.Add "所有文件", "*.*"
+    On Error GoTo 0
+
+    ' fd.Show 返回 -1 表示确认，0 表示取消
+    If fd.Show <> -1 Then
+        MsgBox "未选择文件，操作取消。", vbInformation, "提示"
+        Exit Sub
+    End If
+
+    ' 调用通用拆分过程（输出目录留空 = 源目录下 <文件名>_拆分\）
+    SplitTxtByChapter _
+        InputPath:=fd.SelectedItems(1), _
+        OutputDir:="", _
+        FileNamePrefix:="", _
+        SerialWidth:=3
+End Sub
+
+'------------------------------------------------------------------------------
+' 对外入口 3：通用拆分过程（可处理任意按"第N章/回/节/卷"分隔的TXT）
 '   InputPath       源TXT完整路径
 '   OutputDir       输出目录；传空串表示 源目录\<源文件名>_拆分\
 '   FileNamePrefix  文件名前缀；传空串表示无前缀（仅 序号 标题.txt）
@@ -69,9 +110,10 @@ Public Sub SplitTxtByChapter(InputPath As String, _
         outDirFull = OutputDir
     End If
 
-    ' --- 编译章节识别正则：^第([0-9一二三四五六七八九十百千零两]+)(章|回|节|卷)(\s*)(.*)$ ---
+    ' --- 编译章节识别正则：^第([0-9一二三四五六七八九十百千万零两]+)(章|回|节|卷)(\s*)(.*)$ ---
+    '   中文数字含"万"，支持 第一万章 / 第十万章 等大章节号
     Set reg = CreateObject("VBScript.RegExp")
-    reg.Pattern = "^第([0-9一二三四五六七八九十百千零两]+)(章|回|节|卷)(\s*)(.*)$"
+    reg.Pattern = "^第([0-9一二三四五六七八九十百千万零两]+)(章|回|节|卷)(\s*)(.*)$"
     reg.IgnoreCase = False
     reg.Global = False
 
@@ -118,6 +160,9 @@ Public Sub SplitTxtByChapter(InputPath As String, _
                "请确认文件格式。", vbExclamation, "提示"
         Exit Sub
     End If
+
+    ' --- 序号位数自适应：章节数超过当前位数容量时自动扩展（防 10000+ 章排序错乱）---
+    If Len(CStr(chCount)) > SerialWidth Then SerialWidth = Len(CStr(chCount))
 
     ' --- 生成预览并请求确认 ---
     serialFmt = String(SerialWidth, "0")
