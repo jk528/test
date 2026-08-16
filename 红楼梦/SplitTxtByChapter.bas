@@ -30,7 +30,7 @@ End Sub
 ' 对外入口 2：通用拆分过程（可处理任意按"第N章/回/节/卷"分隔的TXT）
 '   InputPath       源TXT完整路径
 '   OutputDir       输出目录；传空串表示 源目录\<源文件名>_拆分\
-'   FileNamePrefix  文件名前缀；传空串表示无前缀（仅 序号-标题.txt）
+'   FileNamePrefix  文件名前缀；传空串表示无前缀（仅 序号 标题.txt）
 '   SerialWidth     序号位数；如 3 -> 001, 002, ..., 120
 '------------------------------------------------------------------------------
 Public Sub SplitTxtByChapter(InputPath As String, _
@@ -129,11 +129,11 @@ Public Sub SplitTxtByChapter(InputPath As String, _
               "识别章节：" & chCount & " 章" & vbCrLf & _
               "读取耗时：" & Format(t1, "0.00") & " 秒" & vbCrLf & _
               "输出目录：" & outDirFull & vbCrLf & _
-              "命名格式：" & serialFmt & "-标题.txt" & vbCrLf & vbCrLf & _
+              "命名格式：" & serialFmt & " 标题.txt" & vbCrLf & vbCrLf & _
               "前5章预览：" & vbCrLf
     If chCount > 5 Then previewEnd = 4 Else previewEnd = chCount - 1
     For i = 0 To previewEnd
-        preview = preview & "  " & Format(i + 1, serialFmt) & "-" & chTitles(i) & vbCrLf
+        preview = preview & "  " & Format(i + 1, serialFmt) & " " & chTitles(i) & vbCrLf
     Next i
     If chCount > 5 Then preview = preview & "  ...(共 " & chCount & " 章)" & vbCrLf
     preview = preview & vbCrLf & "确认开始生成 " & chCount & " 个文件？"
@@ -204,8 +204,10 @@ Private Function ExtractTitle(reg As Object, line As String) As String
 End Function
 
 '------------------------------------------------------------------------------
-' 清洗文件名非法字符：\ / : * ? " < > | 替换为空格并折叠连续空格
-' 限制长度<=60，避免路径过长
+' 清洗文件名(与Python sanitize_title完全一致)：
+' - 半角空格 -> 全角空格(对齐西游记章节风格)
+' - 非法字符 \ / : * ? " < > | -> 全角空格; 折叠连续全角空格
+' - 长度限制<=60，避免路径过长
 '------------------------------------------------------------------------------
 Private Function SanitizeFileName(name As String) As String
     ' 命名规则(与Python sanitize_title完全一致):
