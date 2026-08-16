@@ -290,8 +290,14 @@ Public Sub 拆分TXT()
                 MsgBox "输入无效，请输入正整数。", vbExclamation, "提示"
                 Exit Sub
             End If
+            Dim mergeMode As VbMsgBoxResult
+            mergeMode = MsgBox("是否同时生成合并文件？" & vbCrLf & vbCrLf & _
+                              "  [是] 生成合并文件（清理后的完整文本）" & vbCrLf & _
+                              "  [否] 仅生成单独章节文件", _
+                              vbYesNo + vbQuestion + vbDefaultButton1, "清理模式")
             SplitByChapter InputPath:=filePath, GenerateTitleOnly:=False, _
-                          MinBodyLen:=CLng(Trim(minBodyInput))
+                          MinBodyLen:=CLng(Trim(minBodyInput)), _
+                          MergeKept:=(mergeMode = vbYes)
         ElseIf contentMode = vbYes Then
             SplitByChapter InputPath:=filePath, GenerateTitleOnly:=True
         Else
@@ -326,13 +332,15 @@ End Sub
 '   SerialWidth     序号位数；3 -> 001, 002, ...（文件数超容量时自动扩展）
 '   GenerateTitleOnly  False=跳过仅有标题/正文不足的章节(默认), True=生成
 '   MinBodyLen       最小正文字数(0=不检测)，正文少于该值的章节也跳过
+'   MergeKept        True=额外生成合并文件(清理小于N_小说名.txt)
 '==============================================================================
 Public Sub SplitByChapter(ByVal InputPath As String, _
                           Optional ByVal OutputDir As String = "", _
                           Optional ByVal FileNamePrefix As String = "", _
                           Optional ByVal SerialWidth As Long = 3, _
                           Optional ByVal GenerateTitleOnly As Boolean = False, _
-                          Optional ByVal MinBodyLen As Long = 0)
+                          Optional ByVal MinBodyLen As Long = 0, _
+                          Optional ByVal MergeKept As Boolean = False)
     Dim fso As Object
     Dim content As String
     Dim lines() As String, lineCount As Long
@@ -393,6 +401,9 @@ Public Sub SplitByChapter(ByVal InputPath As String, _
     Dim shortBodyCount As Long, bodyLen As Long, isInsufficient As Boolean
     Dim skipDetail As String, bodyText As String, regCn As Object
     Dim top1 As Long, top2 As Long, top3 As Long, topStr As String, extraInfo As String
+    Dim keptTexts As Collection, skippedTitles As Collection, skippedBodyLens As Collection
+    Dim mergeName As String, mergePath As String, mergeBody As String, hdr As String
+    Dim srcBaseName As String, mergeParts() As String, mk As Long
     titleOnlyCount = 0
     writtenCount = 0
     skippedCount = 0
@@ -400,6 +411,9 @@ Public Sub SplitByChapter(ByVal InputPath As String, _
     top1 = 0
     top2 = 0
     top3 = 0
+    Set keptTexts = New Collection
+    Set skippedTitles = New Collection
+    Set skippedBodyLens = New Collection
     Set regCn = CreateObject("VBScript.RegExp")
     regCn.Global = True
     regCn.Pattern = "[" & ChrW(&H4E00) & "-" & ChrW(&H9FFF) & "]"
@@ -440,6 +454,10 @@ Public Sub SplitByChapter(ByVal InputPath As String, _
             ElseIf bodyLen >= top3 Then
                 top3 = bodyLen
             End If
+            If MergeKept Then
+                skippedTitles.Add chTitles(i)
+                skippedBodyLens.Add bodyLen
+            End If
             GoTo NextChapter
         End If
 
@@ -459,6 +477,7 @@ Public Sub SplitByChapter(ByVal InputPath As String, _
         body = Join(bodyLines, vbLf)
 
         WriteTextUTF8NoBOM outPath, body
+        If MergeKept Then keptTexts.Add body
 
         If writtenCount < 3 Or i >= chCount - 2 Then
             If n = 1 Then
@@ -478,6 +497,36 @@ NextChapter:
     On Error GoTo 0
     Set regCn = Nothing
     t1 = Timer - t0
+
+    ' --- 6.5 生成合并文件（清理模式）---
+    If MergeKept And keptTexts.Count > 0 Then
+        srcBaseName = fso.GetBaseName(InputPath)
+        mergeName = "清理小于" & MinBodyLen & "_" & srcBaseName & ".txt"
+        mergePath = outDirFull & "\" & mergeName
+        hdr = String(50, "=") & vbLf & _
+              "清理说明：正文中文字数小于 " & MinBodyLen & " 的章节已跳过" & vbLf & _
+              "跳过章节：" & skippedCount & " 个" & vbLf
+        If skippedTitles.Count > 0 Then
+            hdr = hdr & "跳过明细：" & vbLf
+            For mk = 1 To skippedTitles.Count
+                hdr = hdr & "  " & skippedTitles(mk) & "（" & skippedBodyLens(mk) & "字）" & vbLf
+            Next mk
+            topStr = top1 & "字"
+            If skippedCount >= 2 Then topStr = topStr & "、" & top2 & "字"
+            If skippedCount >= 3 Then topStr = topStr & "、" & top3 & "字"
+            hdr = hdr & "前三正文：" & topStr & vbLf
+        End If
+        hdr = hdr & "保留章节：" & writtenCount & " 个" & vbLf & _
+              String(50, "=")
+        ReDim mergeParts(0 To keptTexts.Count)
+        mergeParts(0) = hdr
+        For mk = 1 To keptTexts.Count
+            mergeParts(mk) = keptTexts(mk)
+        Next mk
+        mergeBody = Join(mergeParts, vbLf)
+        WriteTextUTF8NoBOM mergePath, mergeBody
+        Debug.Print "合并文件：" & mergeName & "（" & keptTexts.Count & "章合并）"
+    End If
 
     ' --- 7. 完成报告 ---
     extraInfo = ""
