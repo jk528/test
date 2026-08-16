@@ -21,6 +21,10 @@ Option Explicit
 '   - 所有Dim在过程顶部声明（WPS VBA严格性要求）
 '   - 字符串拼接使用数组收集 + Join
 '   - 写入前预览并经用户确认，显示计时与吞吐量
+'   - 行结束符统一使用 vbLf（与内容归一化一致）
+'   - CleanOutputDir 使用 fso 遍历删除，避免 Dir+Kill 循环Bug
+'   - ADODB.Stream 用后显式 Set Nothing 释放 COM 对象
+'   - 写入循环包裹 On Error，出错时报告具体文件名
 '==============================================================================
 
 ' 章节识别正则（含"万"，支持大章节号）
@@ -194,6 +198,7 @@ Public Function ReadTextUTF8(ByVal filePath As String) As String
     stm.LoadFromFile filePath
     ReadTextUTF8 = stm.ReadText(-1)   ' adReadAll
     stm.Close
+    Set stm = Nothing
 End Function
 
 '------------------------------------------------------------------------------
@@ -205,6 +210,8 @@ Public Function ReadTextUTF16(ByVal filePath As String) As String
     Set ts = fso.OpenTextFile(filePath, 1, False, -1)  ' -1 = TristateTrue(Unicode)
     ReadTextUTF16 = ts.ReadAll
     ts.Close
+    Set ts = Nothing
+    Set fso = Nothing
 End Function
 
 '------------------------------------------------------------------------------
@@ -224,6 +231,7 @@ Public Sub WriteTextUTF8NoBOM(ByVal filePath As String, ByVal text As String)
     stm.Position = 3      ' 跳过 UTF-8 BOM (EF BB BF)
     bin = stm.Read
     stm.Close
+    Set stm = Nothing
     ' 干净二进制流写出
     Set stm = CreateObject("ADODB.Stream")
     stm.Type = 1          ' adTypeBinary
@@ -231,6 +239,7 @@ Public Sub WriteTextUTF8NoBOM(ByVal filePath As String, ByVal text As String)
     stm.Write bin
     stm.SaveToFile filePath, 2    ' adSaveCreateOverWrite
     stm.Close
+    Set stm = Nothing
 End Sub
 
 '------------------------------------------------------------------------------
@@ -256,6 +265,7 @@ Public Sub WriteTextUTF8BOM(ByVal filePath As String, ByVal text As String)
     stm.WriteText text
     stm.SaveToFile filePath, 2    ' adSaveCreateOverWrite（含BOM）
     stm.Close
+    Set stm = Nothing
 End Sub
 
 
@@ -314,10 +324,10 @@ End Sub
 '   FileNamePrefix  文件名前缀；空串 = 仅 序号 标题.txt
 '   SerialWidth     序号位数；3 -> 001, 002, ...（文件数超容量时自动扩展）
 '==============================================================================
-Public Sub SplitByChapter(InputPath As String, _
-                          Optional OutputDir As String = "", _
-                          Optional FileNamePrefix As String = "", _
-                          Optional SerialWidth As Long = 3)
+Public Sub SplitByChapter(ByVal InputPath As String, _
+                          Optional ByVal OutputDir As String = "", _
+                          Optional ByVal FileNamePrefix As String = "", _
+                          Optional ByVal SerialWidth As Long = 3)
     Dim fso As Object
     Dim content As String
     Dim lines() As String, lineCount As Long
@@ -382,11 +392,12 @@ Public Sub SplitByChapter(InputPath As String, _
     If ans <> vbYes Then Exit Sub
 
     ' --- 6. 创建输出目录 + 清理旧文件 ---
-    If Not fso.FolderExists(outDirFull) Then fso.CreateFolder outDirFull
+    If Dir(outDirFull, vbDirectory) = "" Then MkDir outDirFull
     CleanOutputDir outDirFull
 
     ' --- 7. 写每章文件 ---
     t0 = Timer
+    On Error GoTo WriteErr
     For i = 0 To chCount - 1
         serial = Format(i + 1, serialFmt)
         safeTitle = SanitizeFileName(chTitles(i))
@@ -402,14 +413,20 @@ Public Sub SplitByChapter(InputPath As String, _
         For j = 0 To n - 1
             bodyLines(j) = lines(chStarts(i) + j)
         Next j
-        body = Join(bodyLines, vbCrLf)
+        body = Join(bodyLines, vbLf)
 
         WriteTextUTF8NoBOM outPath, body
     Next i
+    On Error GoTo 0
     t1 = Timer - t0
 
     ' --- 8. 完成报告 ---
     ShowCompleteReport "按章节拆分完成", chCount, outDirFull, t1
+    Exit Sub
+WriteErr:
+    MsgBox "写入第 " & (i + 1) & " 个文件时出错：" & vbCrLf & _
+           outPath & vbCrLf & _
+           "错误：" & Err.Description, vbExclamation, "写入错误"
 End Sub
 
 '==============================================================================
@@ -522,6 +539,7 @@ Public Sub SplitByGroups(ByVal InputPath As String, _
 
     ' --- 9. 写每份文件 ---
     t0 = Timer
+    On Error GoTo GroupWriteErr
     For f = 0 To fileCount - 1
         startLine = chStartLines(fileChStart(f) - 1)
         If fileChEnd(f) < chCount Then
@@ -545,9 +563,15 @@ Public Sub SplitByGroups(ByVal InputPath As String, _
 
         WriteTextUTF8NoBOM outDirFull & "\" & fname, body
     Next f
+    On Error GoTo 0
 
     ' --- 10. 完成报告 ---
     ShowCompleteReport "聚合拆分完成", fileCount, outDirFull, Timer - t0
+    Exit Sub
+GroupWriteErr:
+    MsgBox "写入第 " & (f + 1) & " 份文件时出错：" & vbCrLf & _
+           outDirFull & "\" & fname & vbCrLf & _
+           "错误：" & Err.Description, vbExclamation, "写入错误"
 End Sub
 
 
@@ -665,16 +689,20 @@ End Function
 
 '------------------------------------------------------------------------------
 ' 清理输出目录中的旧 .txt 文件
+'   使用 fso 遍历 + Delete，避免 Dir+Kill 循环中 Dir 内部状态被破坏
+'   （Dir+Kill 在文件数多时已知会跳过文件或报错）
 '------------------------------------------------------------------------------
 Private Sub CleanOutputDir(ByVal outDir As String)
-    Dim oldFile As String, oldCount As Long
-    oldCount = 0
-    oldFile = Dir(outDir & "\*.txt")
-    Do While Len(oldFile) > 0
-        Kill outDir & "\" & oldFile
-        oldCount = oldCount + 1
-        oldFile = Dir()
-    Loop
+    Dim fso As Object, folder As Object, file As Object
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    If fso.FolderExists(outDir) Then
+        Set folder = fso.GetFolder(outDir)
+        For Each file In folder.Files
+            If StrComp(fso.GetExtensionName(file.Name), "txt", vbTextCompare) = 0 Then
+                file.Delete
+            End If
+        Next file
+    End If
 End Sub
 
 '------------------------------------------------------------------------------
