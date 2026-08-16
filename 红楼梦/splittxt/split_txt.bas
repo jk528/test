@@ -273,12 +273,30 @@ Public Sub 拆分TXT()
 
     If mode = vbYes Then
         ' --- 按章节一一拆分 ---
-        Dim keepTitleOnly As VbMsgBoxResult
-        keepTitleOnly = MsgBox("是否生成仅有标题无正文的章节文件？" & vbCrLf & vbCrLf & _
-                              "  [是] 生成（含仅有标题的章节）" & vbCrLf & _
-                              "  [否] 跳过仅有标题的章节（默认）", _
-                              vbYesNo + vbQuestion + vbDefaultButton2, "仅有标题章节处理")
-        SplitByChapter InputPath:=filePath, GenerateTitleOnly:=(keepTitleOnly = vbYes)
+        Dim contentMode As VbMsgBoxResult
+        contentMode = MsgBox("选择章节内容处理方式：" & vbCrLf & vbCrLf & _
+                            "  [是] 生成所有章节（含仅有标题/正文不足）" & vbCrLf & _
+                            "  [否] 跳过仅有标题的章节（默认）" & vbCrLf & _
+                            "  [取消] 自定义最小正文字数", _
+                            vbYesNoCancel + vbQuestion + vbDefaultButton2, "章节内容处理")
+
+        If contentMode = vbCancel Then
+            Dim minBodyInput As String
+            minBodyInput = InputBox("请输入最小正文字数：" & vbCrLf & _
+                                   "正文少于指定字数的章节将被跳过（含仅有标题的章节）", _
+                                   "自定义最小正文字数", "50")
+            If StrPtr(minBodyInput) = 0 Then Exit Sub
+            If Len(Trim(minBodyInput)) = 0 Or Not IsDigits(Trim(minBodyInput)) Then
+                MsgBox "输入无效，请输入正整数。", vbExclamation, "提示"
+                Exit Sub
+            End If
+            SplitByChapter InputPath:=filePath, GenerateTitleOnly:=False, _
+                          MinBodyLen:=CLng(Trim(minBodyInput))
+        ElseIf contentMode = vbYes Then
+            SplitByChapter InputPath:=filePath, GenerateTitleOnly:=True
+        Else
+            SplitByChapter InputPath:=filePath, GenerateTitleOnly:=False
+        End If
     Else
         ' --- 聚合拆分：输入格式 ---
         Dim chunkStr As String, prompt As String
@@ -306,13 +324,15 @@ End Sub
 '   OutputDir       输出目录；空串 = 源目录下 <源文件名>_拆分\
 '   FileNamePrefix  文件名前缀；空串 = 仅 序号 标题.txt
 '   SerialWidth     序号位数；3 -> 001, 002, ...（文件数超容量时自动扩展）
-'   GenerateTitleOnly  False=跳过仅有标题无正文的章节(默认), True=生成
+'   GenerateTitleOnly  False=跳过仅有标题/正文不足的章节(默认), True=生成
+'   MinBodyLen       最小正文字数(0=不检测)，正文少于该值的章节也跳过
 '==============================================================================
 Public Sub SplitByChapter(ByVal InputPath As String, _
                           Optional ByVal OutputDir As String = "", _
                           Optional ByVal FileNamePrefix As String = "", _
                           Optional ByVal SerialWidth As Long = 3, _
-                          Optional ByVal GenerateTitleOnly As Boolean = False)
+                          Optional ByVal GenerateTitleOnly As Boolean = False, _
+                          Optional ByVal MinBodyLen As Long = 0)
     Dim fso As Object
     Dim content As String
     Dim lines() As String, lineCount As Long
@@ -370,21 +390,46 @@ Public Sub SplitByChapter(ByVal InputPath As String, _
 
     ' --- 6. 写每章文件 ---
     Dim titleOnlyCount As Long, writtenCount As Long, skippedCount As Long
+    Dim shortBodyCount As Long, bodyLen As Long, isInsufficient As Boolean
+    Dim skipDetail As String, bodyText As String, regCn As Object
     titleOnlyCount = 0
     writtenCount = 0
     skippedCount = 0
+    shortBodyCount = 0
+    Set regCn = CreateObject("VBScript.RegExp")
+    regCn.Global = True
+    regCn.Pattern = "[" & ChrW(&H4E00) & "-" & ChrW(&H9FFF) & "]"
     t0 = Timer
     On Error GoTo WriteErr
     For i = 0 To chCount - 1
         n = chEnds(i) - chStarts(i) + 1
         If n < 1 Then n = 1    ' 安全保护：chEnds < chStarts 时仅写标题行
 
+        ' 计算正文汉字数（不含标题行，仅统计汉字）
+        If n > 1 Then
+            ReDim bodyLines(0 To n - 2)
+            For j = 0 To n - 2
+                bodyLines(j) = lines(chStarts(i) + 1 + j)
+            Next j
+            bodyText = Join(bodyLines, "")
+            bodyLen = regCn.Execute(bodyText).Count
+        Else
+            bodyLen = 0
+        End If
+
+        ' 判断是否为不足章节
+        isInsufficient = False
         If n = 1 Then
             titleOnlyCount = titleOnlyCount + 1
-            If Not GenerateTitleOnly Then
-                skippedCount = skippedCount + 1
-                GoTo NextChapter
-            End If
+            isInsufficient = True
+        ElseIf MinBodyLen > 0 And bodyLen < MinBodyLen Then
+            shortBodyCount = shortBodyCount + 1
+            isInsufficient = True
+        End If
+
+        If isInsufficient And Not GenerateTitleOnly Then
+            skippedCount = skippedCount + 1
+            GoTo NextChapter
         End If
 
         serial = Format(writtenCount + 1, serialFmt)
@@ -407,6 +452,8 @@ Public Sub SplitByChapter(ByVal InputPath As String, _
         If writtenCount < 3 Or i >= chCount - 2 Then
             If n = 1 Then
                 Debug.Print "  [" & serial & "] " & fileName & "  (仅标题)"
+            ElseIf MinBodyLen > 0 And bodyLen < MinBodyLen Then
+                Debug.Print "  [" & serial & "] " & fileName & "  (" & n & "行,正文" & bodyLen & "字)"
             Else
                 Debug.Print "  [" & serial & "] " & fileName & "  (" & n & "行)"
             End If
@@ -418,14 +465,27 @@ Public Sub SplitByChapter(ByVal InputPath As String, _
 NextChapter:
     Next i
     On Error GoTo 0
+    Set regCn = Nothing
     t1 = Timer - t0
 
     ' --- 7. 完成报告 ---
     ShowCompleteReport "按章节拆分完成", writtenCount, outDirFull, tRead1, tScan1, t1
     If skippedCount > 0 Then
-        Debug.Print "[提示] " & skippedCount & " 个章节仅有标题无正文，已跳过"
-    ElseIf titleOnlyCount > 0 Then
-        Debug.Print "[提示] " & titleOnlyCount & " 个章节仅有标题无正文（已生成）"
+        skipDetail = ""
+        If titleOnlyCount > 0 Then skipDetail = titleOnlyCount & "个仅有标题"
+        If shortBodyCount > 0 Then
+            If Len(skipDetail) > 0 Then skipDetail = skipDetail & "、"
+            skipDetail = skipDetail & shortBodyCount & "个正文不足"
+        End If
+        Debug.Print "[提示] 跳过 " & skippedCount & " 个章节（" & skipDetail & "）"
+    ElseIf titleOnlyCount > 0 Or shortBodyCount > 0 Then
+        skipDetail = ""
+        If titleOnlyCount > 0 Then skipDetail = titleOnlyCount & "个仅有标题"
+        If shortBodyCount > 0 Then
+            If Len(skipDetail) > 0 Then skipDetail = skipDetail & "、"
+            skipDetail = skipDetail & shortBodyCount & "个正文不足"
+        End If
+        Debug.Print "[提示] " & skipDetail & "（已生成）"
     End If
     Exit Sub
 WriteErr:
