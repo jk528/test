@@ -11,7 +11,7 @@ Option Explicit
 ' 工程约定：
 '   - 所有Dim在过程顶部声明，循环内不重复Dim（WPS VBA严格性要求）
 '   - 字符串拼接使用数组收集 + Join
-'   - UTF-8读写使用 ADODB.Stream（VB内置I/O不支持UTF-8）
+'   - 读写依赖 ReadTxtUniversal.bas（自动检测 ANSI/UTF-8/UTF-16 编码）
 '   - 写入前预览章节清单并经用户确认，显示计时与吞吐量
 '==============================================================================
 
@@ -101,7 +101,7 @@ Public Sub SplitTxtByChapter(InputPath As String, _
 
     ' --- 读取UTF-8全文 ---
     t0 = Timer
-    content = ReadTextUTF8(InputPath)
+    content = ReadTextAuto(InputPath)
     If Len(content) = 0 Then
         MsgBox "读取失败或文件为空：" & vbCrLf & InputPath, vbExclamation, "错误"
         Exit Sub
@@ -202,7 +202,7 @@ Public Sub SplitTxtByChapter(InputPath As String, _
         Next j
         body = Join(bodyLines, vbCrLf)
 
-        WriteTextUTF8 outPath, body
+        WriteTextUTF8NoBOM outPath, body
     Next i
     t1 = Timer - t0
 
@@ -273,45 +273,7 @@ Private Function SanitizeFileName(name As String) As String
 End Function
 
 '------------------------------------------------------------------------------
-' 读取UTF-8文本（自动识别BOM；ADODB.Stream能正确处理有无BOM两种情况）
+' 读写函数已移至 ReadTxtUniversal.bas 模块：
+'   ReadTextAuto  - 自动检测编码读取（ANSI/UTF-8/UTF-16）
+'   WriteTextUTF8NoBOM - 写入UTF-8无BOM
 '------------------------------------------------------------------------------
-Private Function ReadTextUTF8(path As String) As String
-    Dim stm As Object
-    Set stm = CreateObject("ADODB.Stream")
-    stm.Type = 2          ' adTypeText
-    stm.Charset = "utf-8"
-    stm.Open
-    stm.LoadFromFile path
-    ReadTextUTF8 = stm.ReadText(-1)   ' adReadAll
-    stm.Close
-End Function
-
-'------------------------------------------------------------------------------
-' 写入UTF-8文本（无BOM）
-'   ADODB.Stream 默认会写出3字节BOM，需先以文本模式写入再用二进制模式裁掉BOM
-'------------------------------------------------------------------------------
-Private Sub WriteTextUTF8(path As String, text As String)
-    Dim stm As Object
-    Dim bin As Variant
-
-    Set stm = CreateObject("ADODB.Stream")
-    stm.Type = 2          ' adTypeText
-    stm.Charset = "utf-8"
-    stm.Open
-    stm.WriteText text
-
-    ' 切到二进制模式以剥离BOM
-    stm.Position = 0
-    stm.Type = 1          ' adTypeBinary
-    stm.Position = 3      ' 跳过 UTF-8 BOM (EF BB BF)
-    bin = stm.Read
-    stm.Close
-
-    ' 用一个干净的二进制流写出文件
-    Set stm = CreateObject("ADODB.Stream")
-    stm.Type = 1          ' adTypeBinary
-    stm.Open
-    stm.Write bin
-    stm.SaveToFile path, 2    ' adSaveCreateOverWrite
-    stm.Close
-End Sub

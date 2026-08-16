@@ -137,12 +137,14 @@ def main():
                         help="序号位数（默认3，如 001/002/...）")
     args = parser.parse_args()
 
-    # 1. 读取源文件（兼容 BOM）
+    # 1. 读取源文件（自动检测编码: ANSI/UTF-8/UTF-16）
     if not os.path.isfile(args.src):
         print("错误：源文件不存在 -> %s" % args.src)
         sys.exit(1)
-    with open(args.src, "r", encoding="utf-8-sig") as f:
-        content = f.read()
+    from readtxt_universal import read_text_auto, detect_encoding, write_text_utf8_nobom
+    enc = detect_encoding(args.src)
+    print("检测编码: %s" % enc)
+    content = read_text_auto(args.src)
     content = content.replace("\r\n", "\n").replace("\r", "\n")
     lines = content.split("\n")
 
@@ -217,8 +219,7 @@ def main():
             fname = "%s_%s" % (args.prefix, fname)
         fpath = os.path.join(out_dir, fname)
 
-        with open(fpath, "w", encoding="utf-8", newline="") as f:
-            f.write(body)
+        write_text_utf8_nobom(fpath, body)
         print("  [%s/%d] %s  (第%d-%d%s, %d行)"
               % (serial, len(files), fname, ch_s, ch_e, unit, line_end - line_start + 1))
 

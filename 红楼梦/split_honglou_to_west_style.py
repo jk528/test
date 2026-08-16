@@ -58,9 +58,11 @@ def main():
     prefix = args.prefix
     serial_width = args.serial_width
 
-    # 1. 读取源文件
-    with open(src, "r", encoding="utf-8") as f:
-        content = f.read()
+    # 1. 读取源文件（自动检测编码: ANSI/UTF-8/UTF-16）
+    from readtxt_universal import read_text_auto, detect_encoding, write_text_utf8_nobom
+    enc = detect_encoding(src)
+    print(f"检测编码: {enc}")
+    content = read_text_auto(src)
     content = content.replace("\r\n", "\n").replace("\r", "\n")
     lines = content.split("\n")
     print(f"源文件: {src}")
@@ -116,8 +118,7 @@ def main():
         body_lines = lines[start_line:end_line + 1]
         body = "\n".join(body_lines)
 
-        with open(file_path, "w", encoding="utf-8", newline="") as f:
-            f.write(body)
+        write_text_utf8_nobom(file_path, body)
 
         if idx < 3 or idx >= n_total - 2:
             print(f"  [{serial}] {file_name}  ({end_line - start_line + 1}行)")
