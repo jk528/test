@@ -273,7 +273,12 @@ Public Sub 拆分TXT()
 
     If mode = vbYes Then
         ' --- 按章节一一拆分 ---
-        SplitByChapter InputPath:=filePath
+        Dim keepTitleOnly As VbMsgBoxResult
+        keepTitleOnly = MsgBox("是否生成仅有标题无正文的章节文件？" & vbCrLf & vbCrLf & _
+                              "  [是] 生成（含仅有标题的章节）" & vbCrLf & _
+                              "  [否] 跳过仅有标题的章节（默认）", _
+                              vbYesNo + vbQuestion + vbDefaultButton2, "仅有标题章节处理")
+        SplitByChapter InputPath:=filePath, GenerateTitleOnly:=(keepTitleOnly = vbYes)
     Else
         ' --- 聚合拆分：输入格式 ---
         Dim chunkStr As String, prompt As String
@@ -301,11 +306,13 @@ End Sub
 '   OutputDir       输出目录；空串 = 源目录下 <源文件名>_拆分\
 '   FileNamePrefix  文件名前缀；空串 = 仅 序号 标题.txt
 '   SerialWidth     序号位数；3 -> 001, 002, ...（文件数超容量时自动扩展）
+'   GenerateTitleOnly  False=跳过仅有标题无正文的章节(默认), True=生成
 '==============================================================================
 Public Sub SplitByChapter(ByVal InputPath As String, _
                           Optional ByVal OutputDir As String = "", _
                           Optional ByVal FileNamePrefix As String = "", _
-                          Optional ByVal SerialWidth As Long = 3)
+                          Optional ByVal SerialWidth As Long = 3, _
+                          Optional ByVal GenerateTitleOnly As Boolean = False)
     Dim fso As Object
     Dim content As String
     Dim lines() As String, lineCount As Long
@@ -362,10 +369,25 @@ Public Sub SplitByChapter(ByVal InputPath As String, _
     CleanOutputDir outDirFull
 
     ' --- 6. 写每章文件 ---
+    Dim titleOnlyCount As Long, writtenCount As Long, skippedCount As Long
+    titleOnlyCount = 0
+    writtenCount = 0
+    skippedCount = 0
     t0 = Timer
     On Error GoTo WriteErr
     For i = 0 To chCount - 1
-        serial = Format(i + 1, serialFmt)
+        n = chEnds(i) - chStarts(i) + 1
+        If n < 1 Then n = 1    ' 安全保护：chEnds < chStarts 时仅写标题行
+
+        If n = 1 Then
+            titleOnlyCount = titleOnlyCount + 1
+            If Not GenerateTitleOnly Then
+                skippedCount = skippedCount + 1
+                GoTo NextChapter
+            End If
+        End If
+
+        serial = Format(writtenCount + 1, serialFmt)
         safeTitle = SanitizeFileName(chTitles(i))
         If Len(prefix) > 0 Then
             fileName = prefix & "_" & serial & "_" & safeTitle & ".txt"
@@ -374,7 +396,6 @@ Public Sub SplitByChapter(ByVal InputPath As String, _
         End If
         outPath = outDirFull & "\" & fileName
 
-        n = chEnds(i) - chStarts(i) + 1
         ReDim bodyLines(0 To n - 1)
         For j = 0 To n - 1
             bodyLines(j) = lines(chStarts(i) + j)
@@ -382,12 +403,30 @@ Public Sub SplitByChapter(ByVal InputPath As String, _
         body = Join(bodyLines, vbLf)
 
         WriteTextUTF8NoBOM outPath, body
+
+        If writtenCount < 3 Or i >= chCount - 2 Then
+            If n = 1 Then
+                Debug.Print "  [" & serial & "] " & fileName & "  (仅标题)"
+            Else
+                Debug.Print "  [" & serial & "] " & fileName & "  (" & n & "行)"
+            End If
+        ElseIf writtenCount = 3 Then
+            Debug.Print "  ..."
+        End If
+
+        writtenCount = writtenCount + 1
+NextChapter:
     Next i
     On Error GoTo 0
     t1 = Timer - t0
 
     ' --- 7. 完成报告 ---
-    ShowCompleteReport "按章节拆分完成", chCount, outDirFull, tRead1, tScan1, t1
+    ShowCompleteReport "按章节拆分完成", writtenCount, outDirFull, tRead1, tScan1, t1
+    If skippedCount > 0 Then
+        Debug.Print "[提示] " & skippedCount & " 个章节仅有标题无正文，已跳过"
+    ElseIf titleOnlyCount > 0 Then
+        Debug.Print "[提示] " & titleOnlyCount & " 个章节仅有标题无正文（已生成）"
+    End If
     Exit Sub
 WriteErr:
     MsgBox "写入第 " & (i + 1) & " 个文件时出错：" & vbCrLf & _

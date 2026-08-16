@@ -257,8 +257,12 @@ def write_file(out_dir, fname, body):
 # 第三部分：模式1 - 按章节一一拆分
 # ===========================================================================
 
-def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None):
-    """按章节一一拆分：每章一个文件"""
+def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
+                     generate_title_only=False):
+    """按章节一一拆分：每章一个文件
+
+    generate_title_only: False=跳过仅有标题无正文的章节(默认), True=生成
+    """
     t_total0 = time.time()
 
     # 1. 读取源文件
@@ -292,12 +296,25 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None):
     print("输出目录: %s" % out_dir)
 
     # 5. 写每章文件
+    title_only_count = 0
+    skipped_count = 0
+    written_count = 0
     t0 = time.time()
     for idx in range(n_total):
         start_line = starts[idx]
         end_line = starts[idx + 1] - 1 if idx + 1 < n_total else len(lines) - 1
+        if end_line < start_line:
+            end_line = start_line    # 安全保护
+        n_lines = end_line - start_line + 1
+
+        if n_lines == 1:
+            title_only_count += 1
+            if not generate_title_only:
+                skipped_count += 1
+                continue
+
         safe_title = sanitize_filename(titles[idx])
-        serial = str(idx + 1).zfill(serial_width)
+        serial = str(written_count + 1).zfill(serial_width)
         if prefix:
             fname = "%s_%s_%s.txt" % (prefix, serial, safe_title)
         else:
@@ -306,15 +323,23 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None):
         body = "\n".join(lines[start_line:end_line + 1])
         write_file(out_dir, fname, body)
 
-        if idx < 3 or idx >= n_total - 2:
-            print("  [%s] %s  (%d行)" % (serial, fname, end_line - start_line + 1))
-        elif idx == 3:
+        if written_count < 3 or idx >= n_total - 2:
+            tag = "  (仅标题)" if n_lines == 1 else "  (%d行)" % n_lines
+            print("  [%s] %s%s" % (serial, fname, tag))
+        elif written_count == 3:
             print("  ...")
+
+        written_count += 1
 
     t_write = time.time() - t0
     t_total = time.time() - t_total0
 
-    _print_report(n_total, out_dir, [
+    if skipped_count > 0:
+        print("[提示] %d 个章节仅有标题无正文，已跳过（--keep-title-only 可生成）" % skipped_count)
+    elif title_only_count > 0:
+        print("[提示] %d 个章节仅有标题无正文（已生成）" % title_only_count)
+
+    _print_report(written_count, out_dir, [
         ("读取文件", t_read),
         ("识别章节", t_scan),
         ("写入文件", t_write),
@@ -525,6 +550,8 @@ def main():
                         help="手动指定源文件编码(如 gbk/big5/utf-8)，跳过自动检测")
     parser.add_argument("--detect", nargs="+", default=None,
                         help="仅检测编码(不拆分): --detect 文件1 [文件2 ...]")
+    parser.add_argument("--keep-title-only", action="store_true", default=False,
+                        help="生成仅有标题无正文的章节文件（默认跳过）")
     args = parser.parse_args()
 
     # 仅检测编码模式
@@ -542,7 +569,8 @@ def main():
 
     try:
         if mode == "chapter":
-            split_by_chapter(args.src, args.out, args.prefix, args.serial_width, args.encoding)
+            split_by_chapter(args.src, args.out, args.prefix, args.serial_width,
+                             args.encoding, args.keep_title_only)
         else:
             chunk_str = args.chunk if args.chunk else "40,3"
             split_by_groups(args.src, chunk_str, args.out, args.prefix, args.serial_width, args.encoding)
