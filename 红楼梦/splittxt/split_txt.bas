@@ -33,6 +33,7 @@ Private Const CHAPTER_PATTERN As String = "^第([0-9一二三四五六七八九�
 ' 全局计时变量（由 拆分TXT 入口设置，ShowCompleteReport 读取）
 Private g_tSelect As Double    ' 文件选择耗时（秒）
 Private g_tTotal0 As Double    ' 整个过程起始时间戳
+Private g_detectedEnc As String  ' 检测到的源文件编码
 
 
 '==============================================================================
@@ -325,6 +326,7 @@ Public Sub SplitByChapter(ByVal InputPath As String, _
         Exit Sub
     End If
     tRead0 = Timer
+    g_detectedEnc = DetectEncodingFile(InputPath)
     content = ReadTextAuto(InputPath)
     If Len(content) = 0 Then
         MsgBox "读取失败或文件为空：" & vbCrLf & InputPath, vbExclamation, "错误"
@@ -431,6 +433,7 @@ Public Sub SplitByGroups(ByVal InputPath As String, _
         Exit Sub
     End If
     tRead0 = Timer
+    g_detectedEnc = DetectEncodingFile(InputPath)
     content = ReadTextAuto(InputPath)
     content = Replace(Replace(content, vbCrLf, vbLf), vbCr, vbLf)
     lines = Split(content, vbLf)
@@ -687,6 +690,7 @@ Private Sub ShowCompleteReport(ByVal title As String, ByVal fileCount As Long, _
 
     msg = title & "！" & vbCrLf & _
           "生成文件：" & fileCount & " 个" & vbCrLf & _
+          "源文件编码：" & g_detectedEnc & " → UTF-8" & vbCrLf & _
           "输出目录：" & outDir & vbCrLf & vbCrLf & _
           "【计时统计】" & vbCrLf & _
           "  文件选择：" & Format(g_tSelect, "0.00") & " 秒" & vbCrLf & _

@@ -140,27 +140,42 @@ def detect_encoding(file_path):
     return detect_encoding_bytes(raw)
 
 
-def read_text_auto(file_path):
+def read_text_auto(file_path, encoding_hint=None):
     """自动检测编码并读取TXT文件全文
 
     支持: UTF-8(含/不含BOM) / UTF-16LE / UTF-16BE / GBK / GB18030 / Big5 等
+    encoding_hint: 手动指定编码(如 "gbk")，跳过自动检测
     """
     with open(file_path, "rb") as f:
         raw = f.read()
+
+    if encoding_hint:
+        try:
+            return raw.decode(encoding_hint, errors="strict")
+        except UnicodeDecodeError as e:
+            raise ValueError(
+                "指定的编码 %s 解码失败: %s\n错误位置: 字节 %d-%d"
+                % (encoding_hint, e.reason, e.start, e.end))
+
     enc = detect_encoding_bytes(raw)
     # BOM 编码用 Python 内置 codec 自动剥离 BOM
     _BOM_CODEC = {"UTF-16LE": "utf-16", "UTF-16BE": "utf-16", "UTF-8": "utf-8-sig"}
     py_enc = _BOM_CODEC.get(enc, enc)
     try:
-        return raw.decode(py_enc)
+        return raw.decode(py_enc, errors="strict")
     except (UnicodeDecodeError, LookupError):
-        # 检测失败时尝试常见编码列表
-        for fallback in ("utf-8", "gbk", "gb18030", "big5", "latin-1"):
+        # 自动检测失败，依次尝试常见中文编码
+        for fallback in ("utf-8", "gbk", "gb18030", "big5"):
             try:
-                return raw.decode(fallback)
+                return raw.decode(fallback, errors="strict")
             except UnicodeDecodeError:
                 continue
-        return raw.decode("utf-8", errors="replace")
+        raise ValueError(
+            "无法解码文件，所有编码尝试均失败。\n"
+            "请使用 --encoding 参数手动指定编码，例如:\n"
+            "  --encoding gbk\n"
+            "  --encoding big5\n"
+            "  --encoding gb18030")
 
 
 def write_text_utf8_nobom(file_path, text):
@@ -242,15 +257,15 @@ def write_file(out_dir, fname, body):
 # 第三部分：模式1 - 按章节一一拆分
 # ===========================================================================
 
-def split_by_chapter(src, out_dir="", prefix="", serial_width=3):
+def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None):
     """按章节一一拆分：每章一个文件"""
     t_total0 = time.time()
 
     # 1. 读取源文件
     t0 = time.time()
-    enc = detect_encoding(src)
-    print("检测编码: %s" % enc)
-    content = read_text_auto(src)
+    enc = encoding.upper() if encoding else detect_encoding(src)
+    print("编码: %s%s" % (enc, " (手动指定)" if encoding else " (自动检测)"))
+    content = read_text_auto(src, encoding)
     content = content.replace("\r\n", "\n").replace("\r", "\n")
     lines = content.split("\n")
     print("源文件: %s" % src)
@@ -371,15 +386,15 @@ def expand_groups(groups, total):
     return files
 
 
-def split_by_groups(src, chunk_str="40,3", out_dir="", prefix="", serial_width=3):
+def split_by_groups(src, chunk_str="40,3", out_dir="", prefix="", serial_width=3, encoding=None):
     """聚合拆分：按聚合格式将多章合并为一份"""
     t_total0 = time.time()
 
     # 1. 读取源文件
     t0 = time.time()
-    enc = detect_encoding(src)
-    print("检测编码: %s" % enc)
-    content = read_text_auto(src)
+    enc = encoding.upper() if encoding else detect_encoding(src)
+    print("编码: %s%s" % (enc, " (手动指定)" if encoding else " (自动检测)"))
+    content = read_text_auto(src, encoding)
     content = content.replace("\r\n", "\n").replace("\r", "\n")
     lines = content.split("\n")
     t_read = time.time() - t0
@@ -506,6 +521,8 @@ def main():
     parser.add_argument("--prefix", default="", help="文件名前缀")
     parser.add_argument("--serial-width", type=int, default=3,
                         help="序号位数(默认3，文件数超容量时自动扩展)")
+    parser.add_argument("--encoding", default=None,
+                        help="手动指定源文件编码(如 gbk/big5/utf-8)，跳过自动检测")
     parser.add_argument("--detect", nargs="+", default=None,
                         help="仅检测编码(不拆分): --detect 文件1 [文件2 ...]")
     args = parser.parse_args()
@@ -523,11 +540,15 @@ def main():
     if args.chunk is not None and mode == "chapter":
         mode = "groups"
 
-    if mode == "chapter":
-        split_by_chapter(args.src, args.out, args.prefix, args.serial_width)
-    else:
-        chunk_str = args.chunk if args.chunk else "40,3"
-        split_by_groups(args.src, chunk_str, args.out, args.prefix, args.serial_width)
+    try:
+        if mode == "chapter":
+            split_by_chapter(args.src, args.out, args.prefix, args.serial_width, args.encoding)
+        else:
+            chunk_str = args.chunk if args.chunk else "40,3"
+            split_by_groups(args.src, chunk_str, args.out, args.prefix, args.serial_width, args.encoding)
+    except ValueError as e:
+        print("[错误] %s" % e)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
