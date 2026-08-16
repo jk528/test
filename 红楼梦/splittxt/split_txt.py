@@ -32,6 +32,7 @@ import re
 import os
 import sys
 import math
+import time
 import shutil
 import argparse
 
@@ -243,7 +244,10 @@ def write_file(out_dir, fname, body):
 
 def split_by_chapter(src, out_dir="", prefix="", serial_width=3):
     """按章节一一拆分：每章一个文件"""
+    t_total0 = time.time()
+
     # 1. 读取源文件
+    t0 = time.time()
     enc = detect_encoding(src)
     print("检测编码: %s" % enc)
     content = read_text_auto(src)
@@ -251,14 +255,17 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3):
     lines = content.split("\n")
     print("源文件: %s" % src)
     print("总行数: %d  总字符: %d" % (len(lines), len(content)))
+    t_read = time.time() - t0
 
     # 2. 识别章节
+    t0 = time.time()
     starts, titles, unit = scan_chapters(lines)
     n_total = len(starts)
     print("识别章节: %d  单位: %s" % (n_total, unit))
     if n_total == 0:
         print("未识别到章节，终止")
         sys.exit(1)
+    t_scan = time.time() - t0
 
     # 3. 序号位数自适应
     serial_width = max(serial_width, len(str(n_total)))
@@ -270,6 +277,7 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3):
     print("输出目录: %s" % out_dir)
 
     # 5. 写每章文件
+    t0 = time.time()
     for idx in range(n_total):
         start_line = starts[idx]
         end_line = starts[idx + 1] - 1 if idx + 1 < n_total else len(lines) - 1
@@ -288,7 +296,15 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3):
         elif idx == 3:
             print("  ...")
 
-    _print_report(n_total, out_dir)
+    t_write = time.time() - t0
+    t_total = time.time() - t_total0
+
+    _print_report(n_total, out_dir, [
+        ("读取文件", t_read),
+        ("识别章节", t_scan),
+        ("写入文件", t_write),
+        ("总计耗时", t_total),
+    ])
 
 
 # ===========================================================================
@@ -357,19 +373,25 @@ def expand_groups(groups, total):
 
 def split_by_groups(src, chunk_str="40,3", out_dir="", prefix="", serial_width=3):
     """聚合拆分：按聚合格式将多章合并为一份"""
+    t_total0 = time.time()
+
     # 1. 读取源文件
+    t0 = time.time()
     enc = detect_encoding(src)
     print("检测编码: %s" % enc)
     content = read_text_auto(src)
     content = content.replace("\r\n", "\n").replace("\r", "\n")
     lines = content.split("\n")
+    t_read = time.time() - t0
 
     # 输出目录
     out_dir = resolve_output_dir(src, out_dir, "_分组")
 
     # 2. 识别章节
+    t0 = time.time()
     starts, titles, unit = scan_chapters(lines)
     total = len(starts)
+    t_scan = time.time() - t0
     print("源文件: %s" % src)
     print("总行数: %d  识别章节: %d  单位: %s" % (len(lines), total, unit))
     print("聚合格式: %s" % chunk_str)
@@ -405,6 +427,7 @@ def split_by_groups(src, chunk_str="40,3", out_dir="", prefix="", serial_width=3
     print()
 
     # 6. 写每份文件
+    t0 = time.time()
     for (idx, ch_s, ch_e) in files:
         line_start = starts[ch_s - 1]
         if ch_e < total:
@@ -425,14 +448,22 @@ def split_by_groups(src, chunk_str="40,3", out_dir="", prefix="", serial_width=3
         print("  [%s/%d] %s  (第%d-%d%s, %d行)"
               % (serial, len(files), fname, ch_s, ch_e, unit, line_end - line_start + 1))
 
-    _print_report(len(files), out_dir)
+    t_write = time.time() - t0
+    t_total = time.time() - t_total0
+
+    _print_report(len(files), out_dir, [
+        ("读取文件", t_read),
+        ("识别章节", t_scan),
+        ("写入文件", t_write),
+        ("总计耗时", t_total),
+    ])
 
 
 # ===========================================================================
 # 第五部分：完成报告与CLI入口
 # ===========================================================================
 
-def _print_report(n_files, out_dir):
+def _print_report(n_files, out_dir, timing=None):
     print()
     print("=" * 60)
     print("拆分完成！共生成 %d 个文件" % n_files)
@@ -441,6 +472,11 @@ def _print_report(n_files, out_dir):
     if head:
         print("首文件: %s" % head[0])
         print("末文件: %s" % head[-1])
+    if timing:
+        print()
+        print("【计时统计】")
+        for label, val in timing:
+            print("  %s：%.2f 秒" % (label, val))
 
 
 def _detect_main(paths):

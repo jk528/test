@@ -30,6 +30,10 @@ Option Explicit
 ' 章节识别正则（含"万"，支持大章节号）
 Private Const CHAPTER_PATTERN As String = "^第([0-9一二三四五六七八九十百千万零两]+)(章|回|节|卷)(\s*)(.*)$"
 
+' 全局计时变量（由 拆分TXT 入口设置，ShowCompleteReport 读取）
+Private g_tSelect As Double    ' 文件选择耗时（秒）
+Private g_tTotal0 As Double    ' 整个过程起始时间戳
+
 
 '==============================================================================
 ' 第一部分：通用TXT编码检测与读写
@@ -242,9 +246,16 @@ End Sub
 '==============================================================================
 Public Sub 拆分TXT()
     Dim filePath As String
+    Dim tSel0 As Double
+
+    ' --- 初始化计时 ---
+    g_tTotal0 = Timer
+    g_tSelect = 0
 
     ' --- 步骤1：选择TXT文件 ---
+    tSel0 = Timer
     filePath = SelectTxtFile("选择要拆分的TXT文件")
+    g_tSelect = Timer - tSel0
     If Len(filePath) = 0 Then Exit Sub
 
     ' --- 步骤2：选择拆分模式 ---
@@ -302,7 +313,10 @@ Public Sub SplitByChapter(ByVal InputPath As String, _
     Dim i As Long, n As Long, j As Long
     Dim bodyLines() As String, body As String
     Dim safeTitle As String, fileName As String, outPath As String, serial As String
-    Dim t0 As Double, t1 As Double
+    Dim t0 As Double, t1 As Double, tRead0 As Double, tRead1 As Double
+    Dim tScan0 As Double, tScan1 As Double
+
+    If g_tTotal0 = 0 Then g_tTotal0 = Timer    ' 直接调用时设置总起点
 
     ' --- 1. 读取源文件 ---
     Set fso = CreateObject("Scripting.FileSystemObject")
@@ -310,6 +324,7 @@ Public Sub SplitByChapter(ByVal InputPath As String, _
         MsgBox "源文件不存在：" & vbCrLf & InputPath, vbExclamation, "错误"
         Exit Sub
     End If
+    tRead0 = Timer
     content = ReadTextAuto(InputPath)
     If Len(content) = 0 Then
         MsgBox "读取失败或文件为空：" & vbCrLf & InputPath, vbExclamation, "错误"
@@ -318,9 +333,12 @@ Public Sub SplitByChapter(ByVal InputPath As String, _
     content = Replace(Replace(content, vbCrLf, vbLf), vbCr, vbLf)
     lines = Split(content, vbLf)
     lineCount = UBound(lines) + 1
+    tRead1 = Timer - tRead0
 
     ' --- 2. 识别章节 ---
+    tScan0 = Timer
     ScanChapters lines, lineCount, chStarts, chEnds, chTitles, chCount, unit
+    tScan1 = Timer - tScan0
     If chCount = 0 Then
         MsgBox "未识别到任何章节标题（第N章/第N回/第N节/第N卷）。" & vbCrLf & _
                "请确认文件格式。", vbExclamation, "提示"
@@ -365,7 +383,7 @@ Public Sub SplitByChapter(ByVal InputPath As String, _
     t1 = Timer - t0
 
     ' --- 7. 完成报告 ---
-    ShowCompleteReport "按章节拆分完成", chCount, outDirFull, t1
+    ShowCompleteReport "按章节拆分完成", chCount, outDirFull, tRead1, tScan1, t1
     Exit Sub
 WriteErr:
     MsgBox "写入第 " & (i + 1) & " 个文件时出错：" & vbCrLf & _
@@ -397,11 +415,14 @@ Public Sub SplitByGroups(ByVal InputPath As String, _
     Dim serialFmt As String, prefix As String
     Dim outDirFull As String, segStr As String, errMsg As String
     Dim f As Long, g As Long, consumed As Long, remainder As Long
-    Dim t0 As Double
+    Dim t0 As Double, tRead0 As Double, tRead1 As Double
+    Dim tScan0 As Double, tScan1 As Double
     Dim preview As String, showN As Long, rangeStr As String
     Dim serial As String, safe As String, fname As String
     Dim startLine As Long, endLine As Long, segCount As Long
     Dim parts() As String, li As Long, body As String
+
+    If g_tTotal0 = 0 Then g_tTotal0 = Timer    ' 直接调用时设置总起点
 
     ' --- 1. 读取源文件 ---
     Set fso = CreateObject("Scripting.FileSystemObject")
@@ -409,13 +430,17 @@ Public Sub SplitByGroups(ByVal InputPath As String, _
         MsgBox "源文件不存在：" & vbCrLf & InputPath, vbExclamation, "错误"
         Exit Sub
     End If
+    tRead0 = Timer
     content = ReadTextAuto(InputPath)
     content = Replace(Replace(content, vbCrLf, vbLf), vbCr, vbLf)
     lines = Split(content, vbLf)
     lineCount = UBound(lines) + 1
+    tRead1 = Timer - tRead0
 
     ' --- 2. 识别章节 ---
+    tScan0 = Timer
     ScanChapters lines, lineCount, chStartLines, chEnds, chTitles, chCount, unit
+    tScan1 = Timer - tScan0
     If chCount = 0 Then
         MsgBox "未识别到任何章节标题（第N章/第N回/第N节/第N卷）。" & vbCrLf & _
                "请确认文件格式。", vbExclamation, "提示"
@@ -510,7 +535,7 @@ Public Sub SplitByGroups(ByVal InputPath As String, _
     On Error GoTo 0
 
     ' --- 10. 完成报告 ---
-    ShowCompleteReport "聚合拆分完成", fileCount, outDirFull, Timer - t0
+    ShowCompleteReport "聚合拆分完成", fileCount, outDirFull, tRead1, tScan1, Timer - t0
     Exit Sub
 GroupWriteErr:
     MsgBox "写入第 " & (f + 1) & " 份文件时出错：" & vbCrLf & _
@@ -652,21 +677,27 @@ Private Function FormatRange(ByVal chStart As Long, ByVal chEnd As Long, _
 End Function
 
 '------------------------------------------------------------------------------
-' 显示完成报告
+' 显示完成报告（含计时明细：选择/读取/识别/写入/总计）
 '------------------------------------------------------------------------------
 Private Sub ShowCompleteReport(ByVal title As String, ByVal fileCount As Long, _
-        ByVal outDir As String, ByVal elapsed As Double)
-    If elapsed > 0 Then
-        MsgBox title & "！" & vbCrLf & _
-               "生成文件：" & fileCount & " 个" & vbCrLf & _
-               "输出目录：" & outDir & vbCrLf & _
-               "写入耗时：" & Format(elapsed, "0.00") & " 秒" & vbCrLf & _
-               "处理速率：" & Format(fileCount / elapsed, "0.0") & " 文件/秒", _
-               vbInformation, "完成"
-    Else
-        MsgBox title & "！生成文件：" & fileCount & " 个" & vbCrLf & _
-               "输出目录：" & outDir, vbInformation, "完成"
+        ByVal outDir As String, ByVal tRead As Double, ByVal tScan As Double, _
+        ByVal tWrite As Double)
+    Dim tTotal As Double, msg As String
+    tTotal = Timer - g_tTotal0
+
+    msg = title & "！" & vbCrLf & _
+          "生成文件：" & fileCount & " 个" & vbCrLf & _
+          "输出目录：" & outDir & vbCrLf & vbCrLf & _
+          "【计时统计】" & vbCrLf & _
+          "  文件选择：" & Format(g_tSelect, "0.00") & " 秒" & vbCrLf & _
+          "  读取文件：" & Format(tRead, "0.00") & " 秒" & vbCrLf & _
+          "  识别章节：" & Format(tScan, "0.00") & " 秒" & vbCrLf & _
+          "  写入文件：" & Format(tWrite, "0.00") & " 秒" & vbCrLf & _
+          "  总计耗时：" & Format(tTotal, "0.00") & " 秒"
+    If tWrite > 0 Then
+        msg = msg & vbCrLf & "  写入速率：" & Format(fileCount / tWrite, "0.0") & " 文件/秒"
     End If
+    MsgBox msg, vbInformation, "完成"
 End Sub
 
 
