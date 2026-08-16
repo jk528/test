@@ -392,12 +392,14 @@ Public Sub SplitByChapter(ByVal InputPath As String, _
     Dim titleOnlyCount As Long, writtenCount As Long, skippedCount As Long
     Dim shortBodyCount As Long, bodyLen As Long, isInsufficient As Boolean
     Dim skipDetail As String, bodyText As String, regCn As Object
-    Dim maxSkippedBodyLen As Long, extraInfo As String
+    Dim top1 As Long, top2 As Long, top3 As Long, topStr As String, extraInfo As String
     titleOnlyCount = 0
     writtenCount = 0
     skippedCount = 0
     shortBodyCount = 0
-    maxSkippedBodyLen = 0
+    top1 = 0
+    top2 = 0
+    top3 = 0
     Set regCn = CreateObject("VBScript.RegExp")
     regCn.Global = True
     regCn.Pattern = "[" & ChrW(&H4E00) & "-" & ChrW(&H9FFF) & "]"
@@ -431,7 +433,13 @@ Public Sub SplitByChapter(ByVal InputPath As String, _
 
         If isInsufficient And Not GenerateTitleOnly Then
             skippedCount = skippedCount + 1
-            If bodyLen > maxSkippedBodyLen Then maxSkippedBodyLen = bodyLen
+            If bodyLen >= top1 Then
+                top3 = top2: top2 = top1: top1 = bodyLen
+            ElseIf bodyLen >= top2 Then
+                top3 = top2: top2 = bodyLen
+            ElseIf bodyLen >= top3 Then
+                top3 = bodyLen
+            End If
             GoTo NextChapter
         End If
 
@@ -480,10 +488,13 @@ NextChapter:
             If Len(skipDetail) > 0 Then skipDetail = skipDetail & "、"
             skipDetail = skipDetail & shortBodyCount & "个正文不足"
         End If
+        topStr = top1 & "字"
+        If skippedCount >= 2 Then topStr = topStr & "、" & top2 & "字"
+        If skippedCount >= 3 Then topStr = topStr & "、" & top3 & "字"
         extraInfo = "【跳过统计】" & vbCrLf & _
                    "  跳过章节：" & skippedCount & " 个（" & skipDetail & "）" & vbCrLf & _
-                   "  最高正文字数：" & maxSkippedBodyLen & " 字"
-        Debug.Print "[提示] 跳过 " & skippedCount & " 个章节（" & skipDetail & "），最高正文" & maxSkippedBodyLen & "字"
+                   "  前三正文：" & topStr
+        Debug.Print "[提示] 跳过 " & skippedCount & " 个章节（" & skipDetail & "），前三：" & topStr
     ElseIf titleOnlyCount > 0 Or shortBodyCount > 0 Then
         skipDetail = ""
         If titleOnlyCount > 0 Then skipDetail = titleOnlyCount & "个仅有标题"

@@ -301,7 +301,7 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
     short_body_count = 0
     skipped_count = 0
     written_count = 0
-    max_skipped_body_len = 0
+    skipped_body_lens = []
     t0 = time.time()
     for idx in range(n_total):
         start_line = starts[idx]
@@ -328,8 +328,7 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
 
         if is_insufficient and not generate_title_only:
             skipped_count += 1
-            if body_len > max_skipped_body_len:
-                max_skipped_body_len = body_len
+            skipped_body_lens.append(body_len)
             continue
 
         safe_title = sanitize_filename(titles[idx])
@@ -364,8 +363,10 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
             parts.append("%d个仅有标题" % title_only_count)
         if short_body_count > 0:
             parts.append("%d个正文不足" % short_body_count)
-        print("[提示] 跳过 %d 个章节（%s），最高正文%d字（--keep-title-only 可生成）"
-              % (skipped_count, "、".join(parts), max_skipped_body_len))
+        top3 = sorted(skipped_body_lens, reverse=True)[:3]
+        top3_str = "、".join("%d字" % x for x in top3)
+        print("[提示] 跳过 %d 个章节（%s），前三：%s（--keep-title-only 可生成）"
+              % (skipped_count, "、".join(parts), top3_str))
     elif title_only_count > 0 or short_body_count > 0:
         parts = []
         if title_only_count > 0:
