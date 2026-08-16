@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-按西游记章节结构框架拆分TXT(命名规则与VBA SplitTxtByChapter完全一致)
+按章节标题拆分TXT为每章一个文件(命名规则与VBA SplitTxtByChapter完全一致)
 
 用法:
-    python split_honglou_to_west_style.py                      # 默认拆红楼梦
-    python split_honglou_to_west_style.py --prefix HL          # 加前缀: HL_001 标题.txt
-    python split_honglou_to_west_style.py --serial-width 4     # 序号4位: 0001 标题.txt
+    python split_honglou_to_west_style.py --src 红楼梦.txt
+    python split_honglou_to_west_style.py --src 红楼梦.txt --prefix HL
+    python split_honglou_to_west_style.py --src 红楼梦.txt --serial-width 4
     python split_honglou_to_west_style.py --src D:\\a.txt --out D:\\out
 
 命名规则(与VBA统一): [<前缀>_]<序号> <标题>.txt
@@ -17,9 +17,6 @@
 import re
 import os
 import sys
-
-DEFAULT_SRC = r"C:\Users\Administrator\Documents\这是什么\JK-temp\红楼梦\红楼梦.txt"
-DEFAULT_OUT_DIR = r"C:\Users\Administrator\Documents\这是什么\JK-temp\红楼梦\红楼梦_拆分"
 
 # 章节识别正则(与VBA一致)；中文数字含"万"，支持大章节号
 PAT = re.compile(r"^第([0-9一二三四五六七八九十百千万零两]+)(章|回|节|卷)(\s*)(.*)$")
@@ -50,15 +47,14 @@ def sanitize_title(title):
 def main():
     import argparse
     parser = argparse.ArgumentParser(
-        description="按西游记章节框架拆分TXT(命名规则与VBA SplitTxtByChapter完全一致)")
-    parser.add_argument("--src", default=DEFAULT_SRC, help="源TXT路径(默认红楼梦.txt)")
-    parser.add_argument("--out", default=DEFAULT_OUT_DIR, help="输出目录(默认红楼梦_拆分)")
+        description="按章节标题拆分TXT为每章一个文件(命名规则与VBA SplitTxtByChapter完全一致)")
+    parser.add_argument("--src", required=True, help="源TXT路径")
+    parser.add_argument("--out", default="", help="输出目录(空=源目录下<文件名>_拆分)")
     parser.add_argument("--prefix", default="", help="文件名前缀(默认无)")
     parser.add_argument("--serial-width", type=int, default=3, help="序号位数(默认3)")
     args = parser.parse_args()
 
     src = args.src
-    out_dir = args.out
     prefix = args.prefix
     serial_width = args.serial_width
 
@@ -70,6 +66,12 @@ def main():
     print(f"源文件: {src}")
     print(f"总行数: {len(lines)}  总字符: {len(content)}")
     print(f"前缀: {prefix or '(无)'}  序号位数: {serial_width}")
+
+    # 输出目录：空则从源文件路径派生 <src_dir>\<basename>_拆分
+    out_dir = args.out
+    if not out_dir:
+        out_dir = os.path.join(os.path.dirname(os.path.abspath(src)),
+                               os.path.splitext(os.path.basename(src))[0] + "_拆分")
 
     # 2. 扫描章节起点
     starts = []

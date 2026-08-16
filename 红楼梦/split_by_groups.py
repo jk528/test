@@ -34,8 +34,6 @@ import sys
 import math
 import argparse
 
-DEFAULT_SRC = r"C:\Users\Administrator\Documents\这是什么\JK-temp\红楼梦\红楼梦.txt"
-DEFAULT_OUT_DIR = r"C:\Users\Administrator\Documents\这是什么\JK-temp\红楼梦\红楼梦_分组"
 DEFAULT_CHUNK = "40,3"
 
 # 章节识别正则（与 SplitTxtByChapter.bas / split_honglou_to_west_style.py 一致）
@@ -130,8 +128,8 @@ def scan_chapters(lines):
 def main():
     parser = argparse.ArgumentParser(
         description="按章节聚合分组拆分TXT（聚合格式: 每份章数,份数|每份章数,份数...）")
-    parser.add_argument("--src", default=DEFAULT_SRC, help="源TXT路径")
-    parser.add_argument("--out", default=DEFAULT_OUT_DIR, help="输出目录")
+    parser.add_argument("--src", required=True, help="源TXT路径")
+    parser.add_argument("--out", default="", help="输出目录（空=源目录下<文件名>_分组）")
     parser.add_argument("--chunk", default=DEFAULT_CHUNK,
                         help="聚合格式 每份章数,份数|... 或便捷 N（默认 %(default)s）")
     parser.add_argument("--prefix", default="", help="文件名前缀")
@@ -147,6 +145,12 @@ def main():
         content = f.read()
     content = content.replace("\r\n", "\n").replace("\r", "\n")
     lines = content.split("\n")
+
+    # 输出目录：空则从源文件路径派生 <src_dir>\<basename>_分组
+    out_dir = args.out
+    if not out_dir:
+        out_dir = os.path.join(os.path.dirname(os.path.abspath(args.src)),
+                               os.path.splitext(os.path.basename(args.src))[0] + "_分组")
 
     # 2. 识别章节
     starts, unit = scan_chapters(lines)
@@ -182,14 +186,14 @@ def main():
               % (len(files), args.serial_width, serial_width))
 
     # 5. 创建输出目录
-    if os.path.exists(args.out):
+    if os.path.exists(out_dir):
         import shutil
-        old = os.listdir(args.out)
+        old = os.listdir(out_dir)
         if old:
             print("[警告] 输出目录非空(%d项)，将清空后重建" % len(old))
-            shutil.rmtree(args.out)
-    os.makedirs(args.out, exist_ok=True)
-    print("输出目录: %s" % args.out)
+            shutil.rmtree(out_dir)
+    os.makedirs(out_dir, exist_ok=True)
+    print("输出目录: %s" % out_dir)
     print()
 
     # 6. 写每份文件
@@ -211,7 +215,7 @@ def main():
         fname = "%s_%s.txt" % (serial, safe)
         if args.prefix:
             fname = "%s_%s" % (args.prefix, fname)
-        fpath = os.path.join(args.out, fname)
+        fpath = os.path.join(out_dir, fname)
 
         with open(fpath, "w", encoding="utf-8", newline="") as f:
             f.write(body)
@@ -222,8 +226,8 @@ def main():
     print()
     print("=" * 60)
     print("拆分完成！共 %d 份" % len(files))
-    print("输出目录: %s" % args.out)
-    head = sorted(os.listdir(args.out))
+    print("输出目录: %s" % out_dir)
+    head = sorted(os.listdir(out_dir))
     if head:
         print("首文件: %s" % head[0])
         print("末文件: %s" % head[-1])

@@ -22,34 +22,23 @@ Option Explicit
 Private Const CHAPTER_PATTERN As String = "^第([0-9一二三四五六七八九十百千万零两]+)(章|回|节|卷)(\s*)(.*)$"
 
 '------------------------------------------------------------------------------
-' 对外入口 1：聚合拆分红楼梦.txt（一键运行，默认 40,3 -> 3份）
-'------------------------------------------------------------------------------
-Public Sub 聚合拆分红楼梦()
-    SplitTxtByGroups _
-        InputPath:="C:\Users\Administrator\Documents\这是什么\JK-temp\红楼梦\红楼梦.txt", _
-        OutputDir:="", _
-        ChunkStr:="40,3", _
-        FileNamePrefix:="", _
-        SerialWidth:=3
-End Sub
-
-'------------------------------------------------------------------------------
-' 对外入口 2：通过文件选择窗体选取TXT并聚合拆分（无需硬编码地址，灵活通用）
-'   运行后弹出文件选择对话框，筛选 .txt 文件；选中即调用 SplitTxtByGroups
+' 对外入口：选择TXT文件 → 输入聚合格式 → 生成文件
+'   步骤1：弹出文件选择对话框，选中 .txt 文件
+'   步骤2：弹出 InputBox，输入聚合格式（默认 40,3，支持 | 多段）
+'   步骤3：预览确认后，清理输出目录旧文件并写入新文件
 '   输出目录默认为 源文件所在目录\<文件名>_分组\
-'   使用 Application.FileDialog(msoFileDialogFilePicker=3)，兼容 WPS文字/表格/Excel
 '------------------------------------------------------------------------------
-Public Sub 选择文件聚合拆分()
-    Dim fd As Object
+Public Sub 聚合拆分()
+    Dim fd As Object, filePath As String
+    Dim chunkStr As String, prompt As String
 
+    ' --- 步骤1：选择TXT文件 ---
     On Error Resume Next
     Set fd = Application.FileDialog(3)   ' msoFileDialogFilePicker = 3
     On Error GoTo 0
 
     If fd Is Nothing Then
-        MsgBox "当前环境不支持文件选择对话框。" & vbCrLf & _
-               "请使用「聚合拆分红楼梦」或「SplitTxtByGroups」传入路径。", _
-               vbExclamation, "提示"
+        MsgBox "当前环境不支持文件选择对话框。", vbExclamation, "提示"
         Exit Sub
     End If
 
@@ -60,46 +49,27 @@ Public Sub 选择文件聚合拆分()
     fd.Filters.Add "所有文件", "*.*"
     On Error GoTo 0
 
-    If fd.Show <> -1 Then
-        MsgBox "未选择文件，操作取消。", vbInformation, "提示"
-        Exit Sub
-    End If
+    If fd.Show <> -1 Then Exit Sub
+    filePath = fd.SelectedItems(1)
 
-    SplitTxtByGroups _
-        InputPath:=fd.SelectedItems(1), _
-        OutputDir:="", _
-        ChunkStr:="40,3", _
-        FileNamePrefix:="", _
-        SerialWidth:=3
-End Sub
-
-'------------------------------------------------------------------------------
-' 对外入口 3：通过 InputBox 输入聚合格式拆分
-'   弹出输入框，默认 40,3；可输入 每份章数,份数|每份章数,份数 多段（以 | 分割）
-'   文件路径用默认红楼梦.txt；如需选择文件请用「选择文件聚合拆分」
-'------------------------------------------------------------------------------
-Public Sub 输入格式聚合拆分()
-    Dim chunkStr As String, prompt As String
+    ' --- 步骤2：输入聚合格式 ---
     prompt = "请输入聚合格式（每份章数,份数，以 | 分割多段）：" & vbCrLf & vbCrLf & _
              "示例：" & vbCrLf & _
              "  40,3              每份40章，共3份" & vbCrLf & _
-             "  40                每40章一份（便捷模式，自动3份）" & vbCrLf & _
+             "  40                每40章一份（便捷模式）" & vbCrLf & _
              "  20,1|20,1|80,1    多段：1-20、21-40、41-120" & vbCrLf & vbCrLf & _
              "（余数自动补齐，如 40,2 实际得3份）"
     chunkStr = InputBox(prompt, "聚合拆分 - 输入格式", "40,3")
 
-    ' 用户取消时 InputBox 返回空串（StrPtr=0 判断取消，区分空输入）
-    If StrPtr(chunkStr) = 0 Then
-        MsgBox "已取消。", vbInformation, "提示"
-        Exit Sub
-    End If
+    If StrPtr(chunkStr) = 0 Then Exit Sub   ' 用户取消
     If Len(Trim(chunkStr)) = 0 Then
         MsgBox "未输入格式。", vbExclamation, "提示"
         Exit Sub
     End If
 
+    ' --- 步骤3：调用核心过程 ---
     SplitTxtByGroups _
-        InputPath:="C:\Users\Administrator\Documents\这是什么\JK-temp\红楼梦\红楼梦.txt", _
+        InputPath:=filePath, _
         OutputDir:="", _
         ChunkStr:=chunkStr, _
         FileNamePrefix:="", _
@@ -107,7 +77,7 @@ Public Sub 输入格式聚合拆分()
 End Sub
 
 '------------------------------------------------------------------------------
-' 对外入口 4：通用聚合拆分过程（核心）
+' 核心过程：通用聚合拆分（可供其他模块直接调用）
 '   InputPath      源TXT完整路径
 '   OutputDir      输出目录；空串 = 源目录下 <源文件名>_分组\
 '   ChunkStr       聚合格式: 每份章数,份数|... 或便捷 N（默认 40,3）

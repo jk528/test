@@ -16,23 +16,11 @@ Option Explicit
 '==============================================================================
 
 '------------------------------------------------------------------------------
-' 对外入口 1：默认拆分红楼梦.txt（一键运行）
-'------------------------------------------------------------------------------
-Public Sub 拆分红楼梦()
-    SplitTxtByChapter _
-        InputPath:="C:\Users\Administrator\Documents\这是什么\JK-temp\红楼梦\红楼梦.txt", _
-        OutputDir:="", _
-        FileNamePrefix:="", _
-        SerialWidth:=3
-End Sub
-
-'------------------------------------------------------------------------------
-' 对外入口 2：通过文件选择窗体选取TXT并拆分（无需硬编码地址，灵活通用）
+' 对外入口：选择TXT文件 → 拆分每章一个文件
 '   运行后弹出文件选择对话框，筛选 .txt 文件；选中即调用 SplitTxtByChapter
 '   输出目录默认为 源文件所在目录\<文件名>_拆分\
-'   使用 Application.FileDialog(msoFileDialogFilePicker=3)，兼容 WPS文字/表格/Excel
 '------------------------------------------------------------------------------
-Public Sub 选择文件拆分()
+Public Sub 拆分()
     Dim fd As Object
 
     On Error Resume Next
@@ -40,9 +28,7 @@ Public Sub 选择文件拆分()
     On Error GoTo 0
 
     If fd Is Nothing Then
-        MsgBox "当前环境不支持文件选择对话框。" & vbCrLf & _
-               "请使用「拆分红楼梦」或「SplitTxtByChapter」传入路径。", _
-               vbExclamation, "提示"
+        MsgBox "当前环境不支持文件选择对话框。", vbExclamation, "提示"
         Exit Sub
     End If
 
@@ -53,13 +39,8 @@ Public Sub 选择文件拆分()
     fd.Filters.Add "所有文件", "*.*"
     On Error GoTo 0
 
-    ' fd.Show 返回 -1 表示确认，0 表示取消
-    If fd.Show <> -1 Then
-        MsgBox "未选择文件，操作取消。", vbInformation, "提示"
-        Exit Sub
-    End If
+    If fd.Show <> -1 Then Exit Sub
 
-    ' 调用通用拆分过程（输出目录留空 = 源目录下 <文件名>_拆分\）
     SplitTxtByChapter _
         InputPath:=fd.SelectedItems(1), _
         OutputDir:="", _
@@ -68,7 +49,7 @@ Public Sub 选择文件拆分()
 End Sub
 
 '------------------------------------------------------------------------------
-' 对外入口 3：通用拆分过程（可处理任意按"第N章/回/节/卷"分隔的TXT）
+' 核心过程：通用拆分（可处理任意按"第N章/回/节/卷"分隔的TXT）
 '   InputPath       源TXT完整路径
 '   OutputDir       输出目录；传空串表示 源目录\<源文件名>_拆分\
 '   FileNamePrefix  文件名前缀；传空串表示无前缀（仅 序号 标题.txt）
