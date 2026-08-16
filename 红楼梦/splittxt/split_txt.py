@@ -19,6 +19,13 @@ TXT章节拆分工具（完整合并版）—— 单文件，复制粘贴即可�
     # 便捷：传 --chunk 自动切换为 groups 模式
     python split_txt.py --src 红楼梦.txt --chunk 40,3
 
+    # 清洁模式：跳过正文<N字的章节，合并保留章节(>=N)
+    python split_txt.py --src 红楼梦.txt --clean 100
+    python split_txt.py --src 红楼梦.txt --clean 100,1
+
+    # 清洁模式：合并跳过章节(<N)，用于确认问题
+    python split_txt.py --src 红楼梦.txt --clean 100,0
+
     # 仅检测编码
     python split_txt.py --detect 红楼梦.txt
 
@@ -257,13 +264,38 @@ def write_file(out_dir, fname, body):
 # 第三部分：模式1 - 按章节一一拆分
 # ===========================================================================
 
+def _build_clean_header(min_body_len, skipped_count, skipped_chapters,
+                        skipped_body_lens, written_count, merge_flag):
+    """构建清洁模式合并文件的头部信息"""
+    header_lines = [
+        "=" * 50,
+        "清理说明：正文中文字数小于 %d 的章节已跳过" % min_body_len,
+        "跳过章节：%d 个" % skipped_count,
+    ]
+    if skipped_chapters:
+        header_lines.append("跳过明细：")
+        for title, blen in skipped_chapters:
+            header_lines.append("  %s（%d字）" % (title, blen))
+        top3 = sorted(skipped_body_lens, reverse=True)[:3]
+        top3_str = "、".join("%d字" % x for x in top3)
+        header_lines.append("前三正文：%s" % top3_str)
+    header_lines.append("保留章节：%d 个" % written_count)
+    if merge_flag == 0:
+        header_lines.append("本文件内容：跳过章节（正文汉字 < %d）" % min_body_len)
+    elif merge_flag == 1:
+        header_lines.append("本文件内容：保留章节（正文汉字 >= %d）" % min_body_len)
+    header_lines.append("=" * 50)
+    header_lines.append("")
+    return header_lines
+
+
 def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
-                     generate_title_only=False, min_body_len=0, merge_kept=False):
+                     generate_title_only=False, min_body_len=0, merge_flag=None):
     """按章节一一拆分：每章一个文件
 
     generate_title_only: False=跳过仅有标题/正文不足的章节(默认), True=生成
     min_body_len: 最小正文字数(0=不检测)，正文少于该值的章节也跳过
-    merge_kept: True=额外生成一个合并文件，包含所有保留章节，文件名"清理小于N_小说名.txt"
+    merge_flag: None=不合并, 0=合并跳过章节(<N), 1=合并保留章节(>=N)
     """
     t_total0 = time.time()
 
@@ -304,6 +336,7 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
     written_count = 0
     skipped_body_lens = []
     kept_texts = []          # 合并文件用：保留章节的文本
+    skipped_texts = []        # 合并文件用：跳过章节的文本
     skipped_chapters = []    # 合并文件用：跳过章节的(标题, 正文字数)
     t0 = time.time()
     for idx in range(n_total):
@@ -312,6 +345,9 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
         if end_line < start_line:
             end_line = start_line    # 安全保护
         n_lines = end_line - start_line + 1
+
+        # 提取完整章节文本（含标题行）
+        body = "\n".join(lines[start_line:end_line + 1])
 
         # 计算正文汉字数（不含标题行，仅统计汉字）
         if n_lines > 1:
@@ -332,8 +368,10 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
         if is_insufficient and not generate_title_only:
             skipped_count += 1
             skipped_body_lens.append(body_len)
-            if merge_kept:
+            if merge_flag is not None:
                 skipped_chapters.append((titles[idx], body_len))
+            if merge_flag == 0:
+                skipped_texts.append(body)
             continue
 
         safe_title = sanitize_filename(titles[idx])
@@ -343,9 +381,8 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
         else:
             fname = "%s_%s.txt" % (serial, safe_title)
 
-        body = "\n".join(lines[start_line:end_line + 1])
         write_file(out_dir, fname, body)
-        if merge_kept:
+        if merge_flag == 1:
             kept_texts.append(body)
 
         if written_count < 3 or idx >= n_total - 2:
@@ -364,47 +401,37 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
     t_write = time.time() - t0
     t_total = time.time() - t_total0
 
-    # 6. 生成合并文件（清理模式）
-    if merge_kept and kept_texts:
+    # 6. 生成合并文件（清洁模式）
+    if merge_flag is not None:
         src_name = os.path.splitext(os.path.basename(src))[0]
-        merge_name = "清理小于%d_%s.txt" % (min_body_len, src_name)
-        merge_path = os.path.join(out_dir, merge_name)
-        header_lines = [
-            "=" * 50,
-            "清理说明：正文中文字数小于 %d 的章节已跳过" % min_body_len,
-            "跳过章节：%d 个" % skipped_count,
-        ]
-        if skipped_chapters:
-            header_lines.append("跳过明细：")
-            for title, blen in skipped_chapters:
-                header_lines.append("  %s（%d字）" % (title, blen))
-            top3 = sorted(skipped_body_lens, reverse=True)[:3]
-            top3_str = "、".join("%d字" % x for x in top3)
-            header_lines.append("前三正文：%s" % top3_str)
-        header_lines.append("保留章节：%d 个" % written_count)
-        header_lines.append("=" * 50)
-        header_lines.append("")
-        with open(merge_path, "w", encoding="utf-8") as f:
-            f.write("\n".join(header_lines))
-            f.write("\n".join(kept_texts))
-        print("合并文件：%s（%d章合并）" % (merge_name, len(kept_texts)))
+        if merge_flag == 1 and kept_texts:
+            merge_texts = kept_texts
+            merge_name = "保留大于等于%d_%s.txt" % (min_body_len, src_name)
+        elif merge_flag == 0 and skipped_texts:
+            merge_texts = skipped_texts
+            merge_name = "清理小于%d_%s.txt" % (min_body_len, src_name)
+        else:
+            merge_texts = None
+        if merge_texts:
+            header_lines = _build_clean_header(min_body_len, skipped_count, skipped_chapters,
+                                               skipped_body_lens, written_count, merge_flag)
+            merge_path = os.path.join(out_dir, merge_name)
+            with open(merge_path, "w", encoding="utf-8") as f:
+                f.write("\n".join(header_lines))
+                f.write("\n".join(merge_texts))
+            print("合并文件：%s（%d章合并）" % (merge_name, len(merge_texts)))
 
+    parts = []
+    if title_only_count > 0:
+        parts.append("%d个仅有标题" % title_only_count)
+    if short_body_count > 0:
+        parts.append("%d个正文不足" % short_body_count)
     if skipped_count > 0:
-        parts = []
-        if title_only_count > 0:
-            parts.append("%d个仅有标题" % title_only_count)
-        if short_body_count > 0:
-            parts.append("%d个正文不足" % short_body_count)
         top3 = sorted(skipped_body_lens, reverse=True)[:3]
         top3_str = "、".join("%d字" % x for x in top3)
         print("[提示] 跳过 %d 个章节（%s），前三：%s（--keep-title-only 可生成）"
               % (skipped_count, "、".join(parts), top3_str))
-    elif title_only_count > 0 or short_body_count > 0:
-        parts = []
-        if title_only_count > 0:
-            parts.append("%d个仅有标题" % title_only_count)
-        if short_body_count > 0:
-            parts.append("%d个正文不足" % short_body_count)
+    elif parts:
         print("[提示] %s（已生成）" % "、".join(parts))
 
     _print_report(written_count, out_dir, [
@@ -623,7 +650,7 @@ def main():
     parser.add_argument("--min-body-len", type=int, default=0,
                         help="最小正文字数(0=不检测)，正文少于该值的章节跳过")
     parser.add_argument("--clean", default=None,
-                        help="清理模式: N[,flag]，跳过正文汉字<N的章节；flag=1(默认)同时生成合并文件")
+                        help="清洁模式: N[,flag]，跳过正文汉字<N的章节；flag=0合并跳过章节, flag=1(默认)合并保留章节")
     args = parser.parse_args()
 
     # 仅检测编码模式
@@ -640,19 +667,19 @@ def main():
         mode = "groups"
 
     # 解析 --clean 参数
-    merge_kept = False
+    merge_flag = None
     if args.clean is not None:
         clean_parts = args.clean.split(",")
         clean_min = int(clean_parts[0])
         clean_flag = int(clean_parts[1]) if len(clean_parts) > 1 else 1
         args.min_body_len = clean_min
-        merge_kept = bool(clean_flag)
+        merge_flag = clean_flag
         mode = "chapter"
 
     try:
         if mode == "chapter":
             split_by_chapter(args.src, args.out, args.prefix, args.serial_width,
-                             args.encoding, args.keep_title_only, args.min_body_len, merge_kept)
+                             args.encoding, args.keep_title_only, args.min_body_len, merge_flag)
         else:
             chunk_str = args.chunk if args.chunk else "40,3"
             split_by_groups(args.src, chunk_str, args.out, args.prefix, args.serial_width, args.encoding)
