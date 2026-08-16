@@ -20,7 +20,7 @@ Option Explicit
 ' 工程约定：
 '   - 所有Dim在过程顶部声明（WPS VBA严格性要求）
 '   - 字符串拼接使用数组收集 + Join
-'   - 写入前预览并经用户确认，显示计时与吞吐量
+'   - 聚合拆分写入前预览确认；完成后显示计时与吞吐量
 '   - 行结束符统一使用 vbLf（与内容归一化一致）
 '   - CleanOutputDir 使用 fso 遍历删除，避免 Dir+Kill 循环Bug
 '   - ADODB.Stream 用后显式 Set Nothing 释放 COM 对象
@@ -170,20 +170,10 @@ End Function
 '------------------------------------------------------------------------------
 Public Function ReadTextANSI(ByVal filePath As String) As String
     Dim fileNo As Integer
-    Dim lineText As String
-    Dim content As String
     fileNo = FreeFile()
     Open filePath For Input As #fileNo
-    Do While Not EOF(fileNo)
-        Line Input #fileNo, lineText
-        If Len(content) = 0 Then
-            content = lineText
-        Else
-            content = content & vbCrLf & lineText
-        End If
-    Loop
+    ReadTextANSI = Input(LOF(fileNo), #fileNo)
     Close #fileNo
-    ReadTextANSI = content
 End Function
 
 '------------------------------------------------------------------------------
@@ -238,32 +228,6 @@ Public Sub WriteTextUTF8NoBOM(ByVal filePath As String, ByVal text As String)
     stm.Open
     stm.Write bin
     stm.SaveToFile filePath, 2    ' adSaveCreateOverWrite
-    stm.Close
-    Set stm = Nothing
-End Sub
-
-'------------------------------------------------------------------------------
-' 写入ANSI编码文本（系统默认编码，中文Windows=GBK）
-'------------------------------------------------------------------------------
-Public Sub WriteTextANSI(ByVal filePath As String, ByVal text As String)
-    Dim fileNo As Integer
-    fileNo = FreeFile()
-    Open filePath For Output As #fileNo
-    Print #fileNo, text;
-    Close #fileNo
-End Sub
-
-'------------------------------------------------------------------------------
-' 写入UTF-8文本（含BOM）
-'------------------------------------------------------------------------------
-Public Sub WriteTextUTF8BOM(ByVal filePath As String, ByVal text As String)
-    Dim stm As Object
-    Set stm = CreateObject("ADODB.Stream")
-    stm.Type = 2          ' adTypeText
-    stm.Charset = "utf-8"
-    stm.Open
-    stm.WriteText text
-    stm.SaveToFile filePath, 2    ' adSaveCreateOverWrite（含BOM）
     stm.Close
     Set stm = Nothing
 End Sub
@@ -339,8 +303,6 @@ Public Sub SplitByChapter(ByVal InputPath As String, _
     Dim bodyLines() As String, body As String
     Dim safeTitle As String, fileName As String, outPath As String, serial As String
     Dim t0 As Double, t1 As Double
-    Dim preview As String, previewEnd As Long
-    Dim ans As VbMsgBoxResult
 
     ' --- 1. 读取源文件 ---
     Set fso = CreateObject("Scripting.FileSystemObject")
@@ -373,29 +335,11 @@ Public Sub SplitByChapter(ByVal InputPath As String, _
     ' --- 4. 确定输出目录 ---
     outDirFull = ResolveOutputDir(fso, InputPath, OutputDir, "_拆分")
 
-    ' --- 5. 生成预览并请求确认 ---
-    preview = "【按章节拆分预览】" & vbCrLf & _
-              "源文件：" & InputPath & vbCrLf & _
-              "总行数：" & lineCount & vbCrLf & _
-              "总字符：" & Len(content) & vbCrLf & _
-              "识别章节：" & chCount & " " & unit & vbCrLf & _
-              "输出目录：" & outDirFull & vbCrLf & _
-              "命名格式：" & serialFmt & " 标题.txt" & vbCrLf & vbCrLf & _
-              "前5章预览：" & vbCrLf
-    If chCount > 5 Then previewEnd = 4 Else previewEnd = chCount - 1
-    For i = 0 To previewEnd
-        preview = preview & "  " & Format(i + 1, serialFmt) & " " & chTitles(i) & vbCrLf
-    Next i
-    If chCount > 5 Then preview = preview & "  ...(共 " & chCount & " " & unit & ")" & vbCrLf
-    preview = preview & vbCrLf & "确认开始生成 " & chCount & " 个文件？"
-    ans = MsgBox(preview, vbYesCancel + vbQuestion, "确认拆分")
-    If ans <> vbYes Then Exit Sub
-
-    ' --- 6. 创建输出目录 + 清理旧文件 ---
+    ' --- 5. 创建输出目录 + 清理旧文件 ---
     If Dir(outDirFull, vbDirectory) = "" Then MkDir outDirFull
     CleanOutputDir outDirFull
 
-    ' --- 7. 写每章文件 ---
+    ' --- 6. 写每章文件 ---
     t0 = Timer
     On Error GoTo WriteErr
     For i = 0 To chCount - 1
@@ -420,7 +364,7 @@ Public Sub SplitByChapter(ByVal InputPath As String, _
     On Error GoTo 0
     t1 = Timer - t0
 
-    ' --- 8. 完成报告 ---
+    ' --- 7. 完成报告 ---
     ShowCompleteReport "按章节拆分完成", chCount, outDirFull, t1
     Exit Sub
 WriteErr:
@@ -598,7 +542,6 @@ Private Function SelectTxtFile(ByVal title As String) As String
     On Error Resume Next
     fd.Filters.Clear
     fd.Filters.Add "文本文件", "*.txt"
-    fd.Filters.Add "所有文件", "*.*"
     On Error GoTo 0
 
     If fd.Show <> -1 Then Exit Function
@@ -653,18 +596,12 @@ End Sub
 '   - 折叠连续全角空格；长度限制 60
 '------------------------------------------------------------------------------
 Private Function SanitizeFileName(ByVal name As String) As String
-    Dim s As String
-    s = name
-    s = Replace(s, " ", "　")
-    s = Replace(s, "\", "　")
-    s = Replace(s, "/", "　")
-    s = Replace(s, ":", "　")
-    s = Replace(s, "*", "　")
-    s = Replace(s, "?", "　")
-    s = Replace(s, """", "　")
-    s = Replace(s, "<", "　")
-    s = Replace(s, ">", "　")
-    s = Replace(s, "|", "　")
+    Dim s As String, chars As String, k As Long
+    s = Replace(name, " ", "　")
+    chars = "\/:*?""<>|"
+    For k = 1 To Len(chars)
+        s = Replace(s, Mid(chars, k, 1), "　")
+    Next k
     Do While InStr(s, "　　") > 0
         s = Replace(s, "　　", "　")
     Loop

@@ -55,7 +55,6 @@ _BOM_MAP = [
     (b"\xff\xfe", "UTF-16LE"),
     (b"\xfe\xff", "UTF-16BE"),
     (b"\xef\xbb\xbf", "UTF-8"),
-    (b"\x2b\x2f\x76", "UTF-7"),
 ]
 
 
@@ -166,18 +165,6 @@ def read_text_auto(file_path):
 def write_text_utf8_nobom(file_path, text):
     """写入UTF-8文本（无BOM）"""
     with open(file_path, "w", encoding="utf-8", newline="") as f:
-        f.write(text)
-
-
-def write_text_ansi(file_path, text):
-    """写入ANSI编码文本（GBK）"""
-    with open(file_path, "w", encoding="gbk", newline="") as f:
-        f.write(text)
-
-
-def write_text_utf8_bom(file_path, text):
-    """写入UTF-8文本（含BOM）"""
-    with open(file_path, "w", encoding="utf-8-sig", newline="") as f:
         f.write(text)
 
 
