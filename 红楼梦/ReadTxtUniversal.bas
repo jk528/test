@@ -1,4 +1,4 @@
-Attribute VB_Name = "ReadTxtUniversal"
+'Attribute VB_Name = "ReadTxtUniversal"
 Option Explicit
 
 '==============================================================================
