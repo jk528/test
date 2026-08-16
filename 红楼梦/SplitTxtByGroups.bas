@@ -4,8 +4,8 @@ Option Explicit
 '==============================================================================
 ' 模块名称：SplitTxtByGroups
 ' 功能描述：按章节标题识别TXT，按聚合格式将多章合并为一份输出
-' 聚合格式: 长度,间距|长度,间距|...  或便捷 N（每N章一份）
-'   例: 3,40 -> 3份各40章； 1,20|1,20|1,80 -> 3份(1-20,21-40,41-120)
+' 聚合格式: 每份章数,份数|每份章数,份数|...  或便捷 N（每N章一份）
+'   例: 40,3 -> 3份各40章； 20,1|20,1|80,1 -> 3份(1-20,21-40,41-120)
 '   不足总章数时余数自动追加1个文件；突破9999章时序号位数自动扩展
 ' 输出格式: [前缀_]<序号补零>_第<起>-<止><单位>.txt（UTF-8无BOM）
 '   - 命名规则与 split_by_groups.py 完全一致
@@ -22,13 +22,13 @@ Option Explicit
 Private Const CHAPTER_PATTERN As String = "^第([0-9一二三四五六七八九十百千万零两]+)(章|回|节|卷)(\s*)(.*)$"
 
 '------------------------------------------------------------------------------
-' 对外入口 1：聚合拆分红楼梦.txt（一键运行，默认 3,40 -> 3份）
+' 对外入口 1：聚合拆分红楼梦.txt（一键运行，默认 40,3 -> 3份）
 '------------------------------------------------------------------------------
 Public Sub 聚合拆分红楼梦()
     SplitTxtByGroups _
         InputPath:="C:\Users\Administrator\Documents\这是什么\JK-temp\红楼梦\红楼梦.txt", _
         OutputDir:="", _
-        ChunkStr:="3,40", _
+        ChunkStr:="40,3", _
         FileNamePrefix:="", _
         SerialWidth:=3
 End Sub
@@ -68,22 +68,55 @@ Public Sub 选择文件聚合拆分()
     SplitTxtByGroups _
         InputPath:=fd.SelectedItems(1), _
         OutputDir:="", _
-        ChunkStr:="3,40", _
+        ChunkStr:="40,3", _
         FileNamePrefix:="", _
         SerialWidth:=3
 End Sub
 
 '------------------------------------------------------------------------------
-' 对外入口 3：通用聚合拆分过程（核心）
+' 对外入口 3：通过 InputBox 输入聚合格式拆分
+'   弹出输入框，默认 40,3；可输入 每份章数,份数|每份章数,份数 多段（以 | 分割）
+'   文件路径用默认红楼梦.txt；如需选择文件请用「选择文件聚合拆分」
+'------------------------------------------------------------------------------
+Public Sub 输入格式聚合拆分()
+    Dim chunkStr As String, prompt As String
+    prompt = "请输入聚合格式（每份章数,份数，以 | 分割多段）：" & vbCrLf & vbCrLf & _
+             "示例：" & vbCrLf & _
+             "  40,3              每份40章，共3份" & vbCrLf & _
+             "  40                每40章一份（便捷模式，自动3份）" & vbCrLf & _
+             "  20,1|20,1|80,1    多段：1-20、21-40、41-120" & vbCrLf & vbCrLf & _
+             "（余数自动补齐，如 40,2 实际得3份）"
+    chunkStr = InputBox(prompt, "聚合拆分 - 输入格式", "40,3")
+
+    ' 用户取消时 InputBox 返回空串（StrPtr=0 判断取消，区分空输入）
+    If StrPtr(chunkStr) = 0 Then
+        MsgBox "已取消。", vbInformation, "提示"
+        Exit Sub
+    End If
+    If Len(Trim(chunkStr)) = 0 Then
+        MsgBox "未输入格式。", vbExclamation, "提示"
+        Exit Sub
+    End If
+
+    SplitTxtByGroups _
+        InputPath:="C:\Users\Administrator\Documents\这是什么\JK-temp\红楼梦\红楼梦.txt", _
+        OutputDir:="", _
+        ChunkStr:=chunkStr, _
+        FileNamePrefix:="", _
+        SerialWidth:=3
+End Sub
+
+'------------------------------------------------------------------------------
+' 对外入口 4：通用聚合拆分过程（核心）
 '   InputPath      源TXT完整路径
 '   OutputDir      输出目录；空串 = 源目录下 <源文件名>_分组\
-'   ChunkStr       聚合格式: 长度,间距|... 或便捷 N（默认 3,40）
+'   ChunkStr       聚合格式: 每份章数,份数|... 或便捷 N（默认 40,3）
 '   FileNamePrefix 文件名前缀；空串 = 仅 序号_范围.txt
 '   SerialWidth    序号位数；3 -> 001/002/...（文件数超容量时自动扩展）
 '------------------------------------------------------------------------------
 Public Sub SplitTxtByGroups(ByVal InputPath As String, _
     Optional ByVal OutputDir As String = "", _
-    Optional ByVal ChunkStr As String = "3,40", _
+    Optional ByVal ChunkStr As String = "40,3", _
     Optional ByVal FileNamePrefix As String = "", _
     Optional ByVal SerialWidth As Long = 3)
 
@@ -99,6 +132,7 @@ Public Sub SplitTxtByGroups(ByVal InputPath As String, _
     Dim serial As String, safe As String, fname As String
     Dim startLine As Long, endLine As Long, segCount As Long
     Dim parts() As String, li As Long, body As String
+    Dim oldFile As String, oldCount As Long
 
     ' --- 1. 读取源文件 ---
     If Dir(InputPath) = "" Then
@@ -132,11 +166,11 @@ Public Sub SplitTxtByGroups(ByVal InputPath As String, _
     Next g
     remainder = chCount - consumed
 
-    ' 生成解析段字符串（如 "3,40" 或 "1,20 | 1,20 | 1,80"）
+    ' 生成解析段字符串（如 "40,3" 或 "20,1|20,1|80,1"）
     segStr = ""
     For g = 0 To groupCount - 1
         If g > 0 Then segStr = segStr & " | "
-        segStr = segStr & groupLens(g) & "," & groupSpaces(g)
+        segStr = segStr & groupSpaces(g) & "," & groupLens(g)
     Next g
 
     ' --- 4. 展开为文件列表 ---
@@ -191,7 +225,15 @@ Public Sub SplitTxtByGroups(ByVal InputPath As String, _
         Exit Sub
     End If
 
-    ' --- 8. 写每份文件 ---
+    ' --- 8. 清理输出目录旧文件 + 写每份文件 ---
+    ' 清理旧文件（防止多次运行不同格式时残留文件混入，如两个 003 文件）
+    oldCount = 0
+    oldFile = Dir(outDirFull & "\*.txt")
+    Do While Len(oldFile) > 0
+        Kill outDirFull & "\" & oldFile
+        oldCount = oldCount + 1
+        oldFile = Dir()
+    Loop
     t0 = Timer
     For f = 0 To fileCount - 1
         ' 章号 1-based -> 行号 0-based：第n章首行 = chStartLines(n-1)
@@ -274,7 +316,7 @@ End Sub
 ' 解析聚合格式字符串
 '   格式:
 '     N            便捷模式: 每N章一份, 份数=ceil(total/N), 末份可能不足
-'     a,b          单段: a个文件每个b章
+'     a,b          单段: 每份a章, 共b份
 '     a,b|c,d|...  多段: 各段顺序聚合, 不足自动补余数段
 '   返回: 空串=成功, 非空=错误信息
 '   输出: groupLens()/groupSpaces() 并行数组, groupCount
@@ -317,7 +359,7 @@ Private Function ParseGroups(ByVal chunkStr As String, ByVal total As Long, _
         Exit Function
     End If
 
-    ' 多段格式：长度,间距|长度,间距|...
+    ' 多段格式：每份章数,份数|每份章数,份数|...
     parts = Split(s, "|")
     For p = 0 To UBound(parts)
         part = Trim(parts(p))
@@ -325,17 +367,18 @@ Private Function ParseGroups(ByVal chunkStr As String, ByVal total As Long, _
 
         detail = Split(part, ",")
         If UBound(detail) <> 1 Then
-            ParseGroups = "段格式错误: " & part & "（应为 长度,间距）"
+            ParseGroups = "段格式错误: " & part & "（应为 每份章数,份数）"
             Exit Function
         End If
         If Not IsDigits(Trim(detail(0))) Or Not IsDigits(Trim(detail(1))) Then
-            ParseGroups = "长度和间距需为正整数: " & part
+            ParseGroups = "每份章数和份数需为正整数: " & part
             Exit Function
         End If
-        length = CLng(Trim(detail(0)))
-        spacing = CLng(Trim(detail(1)))
+        ' 用户输入 detail(0)=每份章数, detail(1)=份数；内部存 length=份数, spacing=每份章数
+        spacing = CLng(Trim(detail(0)))
+        length = CLng(Trim(detail(1)))
         If length <= 0 Or spacing <= 0 Then
-            ParseGroups = "长度和间距必须为正数: " & part
+            ParseGroups = "每份章数和份数必须为正数: " & part
             Exit Function
         End If
 

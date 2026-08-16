@@ -1,27 +1,27 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-按章节聚合分组拆分TXT —— 将连续多章按"长度,间距|长度,间距"规则聚合为一个文件
+按章节聚合分组拆分TXT —— 将连续多章按"每份章数,份数|每份章数,份数"规则聚合为一个文件
 
 聚合字符串格式（参考 READ_聚合生成折线堆叠图.bas 的输入逻辑）:
-    长度,间距|长度,间距|...
-      - | 分隔多段；每段 长度,间距
-      - 长度 = 该段生成多少个文件
-      - 间距 = 每个文件包含多少章
-      - 段消耗 = 长度 * 间距，各段累计须 <= 总章数
+    每份章数,份数|每份章数,份数|...
+      - | 分隔多段；每段 每份章数,份数
+      - 每份章数 = 每个文件包含多少章
+      - 份数 = 该段生成多少个文件
+      - 段消耗 = 每份章数 * 份数，各段累计须 <= 总章数
       - 累计 < 总章数时，剩余章节自动追加一个"余数文件"
 
 便捷模式:
     N              每N章一份，份数 = ceil(总章数 / N)，末份可能不足
 
 示例（红楼梦 120 章）:
-    --chunk 3,40                -> 3份各40章: 1-40 / 41-80 / 81-120
+    --chunk 40,3                -> 每份40章共3份: 1-40 / 41-80 / 81-120
     --chunk 40                  -> 同上（便捷模式）
-    --chunk 1,20|1,20|1,80      -> 1-20 / 21-40 / 41-120
-    --chunk 2,30|1,60           -> 1-30 / 31-60 / 61-120
-    --chunk 20,1|50,2           -> 前20章每章一文件, 后100章每2章一文件
-    --chunk 1,40                -> 1-40 / 41-120（余数自动补齐）
-    --chunk 4,30                -> 1-30 / 31-60 / 61-90 / 91-120
+    --chunk 20,1|20,1|80,1      -> 1-20 / 21-40 / 41-120
+    --chunk 30,2|60,1           -> 1-30 / 31-60 / 61-120
+    --chunk 1,20|2,50           -> 前20章每章一文件, 后100章每2章一文件
+    --chunk 40,1                -> 1-40 / 41-120（余数自动补齐）
+    --chunk 30,4                -> 1-30 / 31-60 / 61-90 / 91-120
 
 输出命名: [前缀_]<序号(补零)>_第<起>-<止><单位>.txt  (如 001_第1-40章.txt)
   - 序号位数由 --serial-width 控制（默认3）
@@ -36,7 +36,7 @@ import argparse
 
 DEFAULT_SRC = r"C:\Users\Administrator\Documents\这是什么\JK-temp\红楼梦\红楼梦.txt"
 DEFAULT_OUT_DIR = r"C:\Users\Administrator\Documents\这是什么\JK-temp\红楼梦\红楼梦_分组"
-DEFAULT_CHUNK = "3,40"
+DEFAULT_CHUNK = "40,3"
 
 # 章节识别正则（与 SplitTxtByChapter.bas / split_honglou_to_west_style.py 一致）
 # 中文数字含"万"，支持 第一万章 / 第十万章 等大章节号
@@ -44,12 +44,12 @@ PAT = re.compile(r"^第([0-9一二三四五六七八九十百千万零两]+)(章
 
 
 def parse_groups(input_str, total):
-    """解析聚合格式字符串，返回 [(长度, 间距), ...]
+    """解析聚合格式字符串，返回 [(份数, 每份章数), ...]
 
     格式:
       N            便捷模式: 每N章一份, 份数=ceil(total/N), 末份可能不足
-      a,b          .bas 单段: a个文件每个b章
-      a,b|c,d|...  .bas 多段: 各段顺序聚合, 不足自动补余数段
+      a,b          单段: 每份a章, 共b份
+      a,b|c,d|...  多段: 各段顺序聚合, 不足自动补余数段
     """
     s = input_str.strip()
     if not s:
@@ -63,19 +63,19 @@ def parse_groups(input_str, total):
         count = math.ceil(total / n)
         return [(count, n)]
 
-    # .bas 多段格式：长度,间距|长度,间距|...
+    # 多段格式：每份章数,份数|每份章数,份数|...
     parts = [p.strip() for p in s.split("|") if p.strip()]
     groups = []
     consumed = 0
     for part in parts:
         detail = [d.strip() for d in part.split(",")]
         if len(detail) != 2:
-            raise ValueError("段格式错误: %r（应为 长度,间距）" % part)
-        length, spacing = int(detail[0]), int(detail[1])
-        if length <= 0 or spacing <= 0:
-            raise ValueError("长度和间距必须为正数: %r" % part)
-        groups.append((length, spacing))
-        consumed += length * spacing
+            raise ValueError("段格式错误: %r（应为 每份章数,份数）" % part)
+        per_chapter, count = int(detail[0]), int(detail[1])
+        if per_chapter <= 0 or count <= 0:
+            raise ValueError("每份章数和份数必须为正数: %r" % part)
+        groups.append((count, per_chapter))   # 内部存 (份数, 每份章数)
+        consumed += count * per_chapter
 
     if consumed > total:
         raise ValueError("消耗章节数 %d 超过总章节数 %d" % (consumed, total))
@@ -129,11 +129,11 @@ def scan_chapters(lines):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="按章节聚合分组拆分TXT（聚合格式: 长度,间距|长度,间距...）")
+        description="按章节聚合分组拆分TXT（聚合格式: 每份章数,份数|每份章数,份数...）")
     parser.add_argument("--src", default=DEFAULT_SRC, help="源TXT路径")
     parser.add_argument("--out", default=DEFAULT_OUT_DIR, help="输出目录")
     parser.add_argument("--chunk", default=DEFAULT_CHUNK,
-                        help="聚合格式 长度,间距|... 或便捷 N（默认 %(default)s）")
+                        help="聚合格式 每份章数,份数|... 或便捷 N（默认 %(default)s）")
     parser.add_argument("--prefix", default="", help="文件名前缀")
     parser.add_argument("--serial-width", type=int, default=3,
                         help="序号位数（默认3，如 001/002/...）")
@@ -167,7 +167,7 @@ def main():
 
     consumed = sum(L * S for (L, S) in groups)
     remainder = total - consumed
-    print("解析段: %s" % " | ".join("%d,%d" % (L, S) for (L, S) in groups))
+    print("解析段: %s" % " | ".join("%d,%d" % (S, L) for (L, S) in groups))
     if remainder > 0:
         print("[提示] 累计消耗 %d 章 < 总 %d 章，余数 %d 章自动追加为1个文件"
               % (consumed, total, remainder))

@@ -93,6 +93,7 @@ Public Sub SplitTxtByChapter(InputPath As String, _
     Dim serialFmt As String, serial As String
     Dim ans As VbMsgBoxResult
     Dim preview As String
+    Dim oldFile As String, oldCount As Long
 
     ' --- 校验输入文件 ---
     Set fso = CreateObject("Scripting.FileSystemObject")
@@ -188,8 +189,15 @@ Public Sub SplitTxtByChapter(InputPath As String, _
         Exit Sub
     End If
 
-    ' --- 创建输出目录 ---
+    ' --- 创建输出目录 + 清理旧文件 ---
     If Not fso.FolderExists(outDirFull) Then fso.CreateFolder outDirFull
+    oldCount = 0
+    oldFile = Dir(outDirFull & "\*.txt")
+    Do While Len(oldFile) > 0
+        Kill outDirFull & "\" & oldFile
+        oldCount = oldCount + 1
+        oldFile = Dir()
+    Loop
 
     ' --- 写每章文件 ---
     t0 = Timer
