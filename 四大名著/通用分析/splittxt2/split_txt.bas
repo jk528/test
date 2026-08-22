@@ -736,7 +736,7 @@ Public Sub SplitByChapter(ByVal InputPath As String, _
                 skippedTitles.Add chTitles(i)
                 skippedBodyLens.Add bodyLen
             End If
-            If MergeFlag = 0 Then
+            If MergeFlag = 0 Or MergeFlag = 2 Then
                 skippedTexts.Add body
             End If
             GoTo NextChapter
@@ -753,7 +753,7 @@ Public Sub SplitByChapter(ByVal InputPath As String, _
         outPath = outDirFull & "\" & fileName
 
         WriteTextUTF8NoBOM outPath, body
-        If MergeFlag = 1 Then keptTexts.Add body
+        If MergeFlag = 1 Or MergeFlag = 2 Then keptTexts.Add body
 
         If writtenCount < 3 Or i >= chCount - 2 Then
             If n = 1 Then
