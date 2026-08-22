@@ -509,11 +509,13 @@ Public Sub 拆分TXT()
         cleanInput = InputBox("请输入清理参数（N,flag）：" & vbCrLf & vbCrLf & _
                               "  N     最小正文字数（正文汉字<N的章节跳过）" & vbCrLf & _
                               "  flag  0=合并跳过章节（确定问题）" & vbCrLf & _
-                              "        1=合并保留章节（得到需要章节，默认）" & vbCrLf & vbCrLf & _
+                              "        1=合并保留章节（得到需要章节，默认）" & vbCrLf & _
+                              "        2=同时合并两者（生成两个文件）" & vbCrLf & vbCrLf & _
                               "示例：" & vbCrLf & _
                               "  100        合并>=100字的保留章节" & vbCrLf & _
                               "  100,1     合并>=100字的保留章节" & vbCrLf & _
-                              "  100,0     合并<100字的跳过章节", _
+                              "  100,0     合并<100字的跳过章节" & vbCrLf & _
+                              "  100,2     同时合并两者", _
                               "清洁模式", "100,1")
         If StrPtr(cleanInput) = 0 Then Exit Sub
         cleanParts = Split(Trim(cleanInput), ",")
@@ -529,8 +531,8 @@ Public Sub 拆分TXT()
         cleanFlag = 1
         If UBound(cleanParts) = 1 Then
             flagStr = Trim(cleanParts(1))
-            If flagStr <> "0" And flagStr <> "1" Then
-                MsgBox "flag 必须为 0 或 1。", vbExclamation, "提示"
+            If flagStr <> "0" And flagStr <> "1" And flagStr <> "2" Then
+                MsgBox "flag 必须为 0、1 或 2。", vbExclamation, "提示"
                 Exit Sub
             End If
             cleanFlag = CLng(flagStr)
@@ -668,10 +670,10 @@ Public Sub SplitByChapter(ByVal InputPath As String, _
     Dim shortBodyCount As Long, bodyLen As Long, isInsufficient As Boolean
     Dim skipDetail As String, bodyText As String, regCn As Object
     Dim top1 As Long, top2 As Long, top3 As Long, topStr As String, extraInfo As String
-    Dim keptTexts As Collection, skippedTexts As Collection, mergeCol As Collection
+    Dim keptTexts As Collection, skippedTexts As Collection
     Dim skippedTitles As Collection, skippedBodyLens As Collection
-    Dim mergeName As String, mergePath As String, mergeBody As String, hdr As String
-    Dim srcBaseName As String, mergeParts() As String, mk As Long
+    Dim mergeName As String, mergeBody As String, hdr As String
+    Dim srcBaseName As String, mk As Long
     titleOnlyCount = 0
     writtenCount = 0
     skippedCount = 0
@@ -773,9 +775,10 @@ NextChapter:
     t1 = Timer - t0
 
     ' --- 6.5 生成合并文件（清洁模式）---
-    Set mergeCol = Nothing
     If MergeFlag >= 0 Then
         srcBaseName = fso.GetBaseName(InputPath)
+
+        ' 构建公共头部
         hdr = String(50, "=") & vbLf & _
               "清理说明：正文中文字数小于 " & MinBodyLen & " 的章节已跳过" & vbLf & _
               "跳过章节：" & skippedCount & " 个" & vbLf
@@ -790,27 +793,30 @@ NextChapter:
             hdr = hdr & "前三正文：" & topStr & vbLf
         End If
         hdr = hdr & "保留章节：" & writtenCount & " 个" & vbLf
-        If MergeFlag = 0 And skippedTexts.Count > 0 Then
-            hdr = hdr & "本文件内容：跳过章节（正文汉字 < " & MinBodyLen & "）" & vbLf & _
-                  String(50, "=")
+
+        ' flag=0: 合并跳过章节；flag=1: 合并保留章节；flag=2: 两者都合并
+        Dim doSkipMerge As Boolean, doKeepMerge As Boolean
+        doSkipMerge = (MergeFlag = 0 Or MergeFlag = 2) And skippedTexts.Count > 0
+        doKeepMerge = (MergeFlag = 1 Or MergeFlag = 2) And keptTexts.Count > 0
+
+        If doSkipMerge Then
             mergeName = "清理小于" & MinBodyLen & "_" & srcBaseName & ".txt"
-            Set mergeCol = skippedTexts
-        ElseIf MergeFlag = 1 And keptTexts.Count > 0 Then
-            hdr = hdr & "本文件内容：保留章节（正文汉字 >= " & MinBodyLen & "）" & vbLf & _
-                  String(50, "=")
-            mergeName = "保留大于等于" & MinBodyLen & "_" & srcBaseName & ".txt"
-            Set mergeCol = keptTexts
+            mergeBody = hdr & _
+                        "本文件内容：跳过章节（正文汉字 < " & MinBodyLen & "）" & vbLf & _
+                        String(50, "=") & vbLf & _
+                        JoinCollection(skippedTexts)
+            WriteTextUTF8NoBOM outDirFull & "\" & mergeName, mergeBody
+            Debug.Print "合并文件：" & mergeName & "（" & skippedTexts.Count & "章合并）"
         End If
-        If Not mergeCol Is Nothing Then
-            mergePath = outDirFull & "\" & mergeName
-            ReDim mergeParts(0 To mergeCol.Count)
-            mergeParts(0) = hdr
-            For mk = 1 To mergeCol.Count
-                mergeParts(mk) = mergeCol(mk)
-            Next mk
-            mergeBody = Join(mergeParts, vbLf)
-            WriteTextUTF8NoBOM mergePath, mergeBody
-            Debug.Print "合并文件：" & mergeName & "（" & mergeCol.Count & "章合并）"
+
+        If doKeepMerge Then
+            mergeName = "保留大于等于" & MinBodyLen & "_" & srcBaseName & ".txt"
+            mergeBody = hdr & _
+                        "本文件内容：保留章节（正文汉字 >= " & MinBodyLen & "）" & vbLf & _
+                        String(50, "=") & vbLf & _
+                        JoinCollection(keptTexts)
+            WriteTextUTF8NoBOM outDirFull & "\" & mergeName, mergeBody
+            Debug.Print "合并文件：" & mergeName & "（" & keptTexts.Count & "章合并）"
         End If
     End If
 
@@ -1131,6 +1137,22 @@ Private Function SanitizeFileName(ByVal name As String) As String
     If Len(s) = 0 Then s = "untitled"
     If Len(s) > 60 Then s = Left(s, 60)
     SanitizeFileName = s
+End Function
+
+'------------------------------------------------------------------------------
+' 将 Collection 中的字符串用 vbLf 连接为单一字符串
+'------------------------------------------------------------------------------
+Private Function JoinCollection(ByRef col As Collection) As String
+    Dim parts() As String, i As Long
+    If col.Count = 0 Then
+        JoinCollection = ""
+        Exit Function
+    End If
+    ReDim parts(1 To col.Count)
+    For i = 1 To col.Count
+        parts(i) = col(i)
+    Next i
+    JoinCollection = Join(parts, vbLf)
 End Function
 
 '------------------------------------------------------------------------------
