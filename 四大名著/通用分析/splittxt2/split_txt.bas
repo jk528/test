@@ -215,16 +215,7 @@ Private Function SelectRegexPattern() As Boolean
             Exit Function
         End If
         g_regexPatterns(g_regexCount) = customPattern
-
-        Dim customUnit As String
-        customUnit = InputBox("请输入默认单位词：" & vbCrLf & vbCrLf & _
-                              "（用于聚合拆分文件名，如 章/回/节/卷/Chapter）", _
-                              "默认单位", "章")
-        If StrPtr(customUnit) = 0 Or Len(Trim(customUnit)) = 0 Then
-            g_regexDefaultUnits(g_regexCount) = "章"
-        Else
-            g_regexDefaultUnits(g_regexCount) = Trim(customUnit)
-        End If
+        ' 默认单位词保持 "章"，聚合拆分时再按需询问
     End If
 
     ' 填充选中数组 + 验证每个正则合法性
@@ -565,6 +556,21 @@ Public Sub 拆分TXT()
             MsgBox "未输入格式。", vbExclamation, "提示"
             Exit Sub
         End If
+
+        ' 若选中了自定义正则（序号8），询问聚合拆分用的单位词
+        Dim selIdx As Long
+        For selIdx = 0 To g_selCount - 1
+            If g_selUnitGroups(selIdx) = -1 Then
+                Dim unitInput As String
+                unitInput = InputBox("检测到使用了无单位组的正则，请输入聚合拆分文件名用的单位词：" & vbCrLf & vbCrLf & _
+                                      "（如 章/回/节/卷/Chapter）", "聚合拆分单位词", "章")
+                If StrPtr(unitInput) = 0 Or Len(Trim(unitInput)) = 0 Then
+                    g_selDefaultUnits(selIdx) = "章"
+                Else
+                    g_selDefaultUnits(selIdx) = Trim(unitInput)
+                End If
+            End If
+        Next selIdx
 
         SplitByGroups InputPath:=filePath, ChunkStr:=chunkStr
     End If
