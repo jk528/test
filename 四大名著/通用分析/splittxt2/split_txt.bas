@@ -58,6 +58,7 @@ Private g_regexCount As Long
 Private g_selPatterns() As String     ' 选中的正则表达式数组
 Private g_selUnitGroups() As Long     ' 选中正则的单位组索引数组
 Private g_selDefaultUnits() As String  ' 选中正则的默认单位词数组
+Private g_selOrigIndices() As Long   ' 选中正则的原始序号（1-8）
 Private g_selCount As Long            ' 选中正则个数
 
 
@@ -175,6 +176,7 @@ Private Function SelectRegexPattern() As Boolean
     ReDim g_selPatterns(0 To UBound(parts))
     ReDim g_selUnitGroups(0 To UBound(parts))
     ReDim g_selDefaultUnits(0 To UBound(parts))
+    ReDim g_selOrigIndices(0 To UBound(parts))
     ReDim nameParts(0 To UBound(parts))
     g_selCount = 0
     hasCustom = False
@@ -226,6 +228,7 @@ Private Function SelectRegexPattern() As Boolean
         g_selPatterns(g_selCount) = g_regexPatterns(idx)
         g_selUnitGroups(g_selCount) = g_regexUnitGroups(idx)
         g_selDefaultUnits(g_selCount) = g_regexDefaultUnits(idx)
+        g_selOrigIndices(g_selCount) = idx
         nameParts(g_selCount) = g_regexNames(idx)
 
         ' 验证正则合法性
@@ -558,11 +561,12 @@ Public Sub 拆分TXT()
         End If
 
         ' 若选中了自定义正则（序号8），询问聚合拆分用的单位词
+        ' 预设正则1-7的单位词已在 InitRegexPatterns 中配置，无需询问
         Dim selIdx As Long
         For selIdx = 0 To g_selCount - 1
-            If g_selUnitGroups(selIdx) = -1 Then
+            If g_selOrigIndices(selIdx) = g_regexCount Then
                 Dim unitInput As String
-                unitInput = InputBox("检测到使用了无单位组的正则，请输入聚合拆分文件名用的单位词：" & vbCrLf & vbCrLf & _
+                unitInput = InputBox("检测到使用了自定义正则，请输入聚合拆分文件名用的单位词：" & vbCrLf & vbCrLf & _
                                       "（如 章/回/节/卷/Chapter）", "聚合拆分单位词", "章")
                 If StrPtr(unitInput) = 0 Or Len(Trim(unitInput)) = 0 Then
                     g_selDefaultUnits(selIdx) = "章"
