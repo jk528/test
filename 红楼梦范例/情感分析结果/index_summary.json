@@ -1,0 +1,3242 @@
+[
+  {
+    "chapter": "021",
+    "dutir_total": 116,
+    "dutir_pos": 65,
+    "dutir_neg": 49,
+    "dutir_neu": 2,
+    "hownet_pos": 79,
+    "hownet_neg": 73,
+    "hownet_total": 152,
+    "dutir_pos_pct": 56.0,
+    "dutir_neg_pct": 42.2,
+    "hownet_pos_pct": 52.0,
+    "hownet_neg_pct": 48.0,
+    "dominant_emotion": "好(44.0%)",
+    "dutir_cats": {
+      "好": 51,
+      "乐": 14,
+      "哀": 4,
+      "怒": 2,
+      "惧": 1,
+      "恶": 42,
+      "惊": 2
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "正面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "宝玉",
+        "count": 49
+      },
+      {
+        "word": "贾琏",
+        "count": 30
+      },
+      {
+        "word": "平儿",
+        "count": 26
+      },
+      {
+        "word": "袭人",
+        "count": 23
+      },
+      {
+        "word": "凤姐",
+        "count": 22
+      }
+    ],
+    "report_file": "021_贤袭人娇嗔箴宝玉_V33_分析报告.md",
+    "word_count": 5966,
+    "title": "贤袭人娇嗔箴宝玉 俏平儿软语救贾琏",
+    "event_count": 15,
+    "char_count": 66
+  },
+  {
+    "chapter": "022",
+    "dutir_total": 165,
+    "dutir_pos": 81,
+    "dutir_neg": 83,
+    "dutir_neu": 1,
+    "hownet_pos": 100,
+    "hownet_neg": 98,
+    "hownet_total": 198,
+    "dutir_pos_pct": 49.1,
+    "dutir_neg_pct": 50.3,
+    "hownet_pos_pct": 50.5,
+    "hownet_neg_pct": 49.5,
+    "dominant_emotion": "恶(35.2%)",
+    "dutir_cats": {
+      "好": 48,
+      "乐": 33,
+      "哀": 17,
+      "怒": 2,
+      "惧": 6,
+      "恶": 58,
+      "惊": 1
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "负面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "宝玉",
+        "count": 40
+      },
+      {
+        "word": "贾母",
+        "count": 32
+      },
+      {
+        "word": "宝钗",
+        "count": 21
+      },
+      {
+        "word": "黛玉",
+        "count": 21
+      },
+      {
+        "word": "贾政",
+        "count": 15
+      }
+    ],
+    "report_file": "022_听曲文宝玉悟禅机_V33_分析报告.md",
+    "word_count": 6830,
+    "title": "听曲文宝玉悟禅机 制灯迷贾政悲谶语",
+    "event_count": 15,
+    "char_count": 75
+  },
+  {
+    "chapter": "023",
+    "dutir_total": 127,
+    "dutir_pos": 66,
+    "dutir_neg": 56,
+    "dutir_neu": 5,
+    "hownet_pos": 69,
+    "hownet_neg": 84,
+    "hownet_total": 153,
+    "dutir_pos_pct": 52.0,
+    "dutir_neg_pct": 44.1,
+    "hownet_pos_pct": 45.1,
+    "hownet_neg_pct": 54.9,
+    "dominant_emotion": "好(39.4%)",
+    "dutir_cats": {
+      "好": 50,
+      "乐": 16,
+      "哀": 10,
+      "怒": 1,
+      "惧": 1,
+      "恶": 44,
+      "惊": 5
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "正面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "宝玉",
+        "count": 53
+      },
+      {
+        "word": "林黛玉",
+        "count": 15
+      },
+      {
+        "word": "王夫人",
+        "count": 14
+      },
+      {
+        "word": "贾政",
+        "count": 12
+      },
+      {
+        "word": "贾琏",
+        "count": 12
+      }
+    ],
+    "report_file": "023_西厢记妙词通戏语_V33_分析报告.md",
+    "word_count": 5356,
+    "title": "西厢记妙词通戏语 牡丹亭艳曲警芳心",
+    "event_count": 17,
+    "char_count": 90
+  },
+  {
+    "chapter": "024",
+    "dutir_total": 160,
+    "dutir_pos": 71,
+    "dutir_neg": 80,
+    "dutir_neu": 9,
+    "hownet_pos": 89,
+    "hownet_neg": 97,
+    "hownet_total": 186,
+    "dutir_pos_pct": 44.4,
+    "dutir_neg_pct": 50.0,
+    "hownet_pos_pct": 47.8,
+    "hownet_neg_pct": 52.2,
+    "dominant_emotion": "恶(38.1%)",
+    "dutir_cats": {
+      "好": 53,
+      "乐": 18,
+      "哀": 11,
+      "怒": 5,
+      "惧": 3,
+      "恶": 61,
+      "惊": 9
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "负面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "贾芸",
+        "count": 62
+      },
+      {
+        "word": "宝玉",
+        "count": 37
+      },
+      {
+        "word": "一面",
+        "count": 20
+      },
+      {
+        "word": "银子",
+        "count": 18
+      },
+      {
+        "word": "婶子",
+        "count": 17
+      }
+    ],
+    "report_file": "024_醉金刚轻财尚义侠_V33_分析报告.md",
+    "word_count": 7775,
+    "title": "醉金刚轻财尚义侠 痴女儿遗帕惹相思",
+    "event_count": 15,
+    "char_count": 84
+  },
+  {
+    "chapter": "025",
+    "dutir_total": 202,
+    "dutir_pos": 85,
+    "dutir_neg": 113,
+    "dutir_neu": 4,
+    "hownet_pos": 94,
+    "hownet_neg": 118,
+    "hownet_total": 212,
+    "dutir_pos_pct": 42.1,
+    "dutir_neg_pct": 55.9,
+    "hownet_pos_pct": 44.3,
+    "hownet_neg_pct": 55.7,
+    "dominant_emotion": "恶(39.1%)",
+    "dutir_cats": {
+      "好": 61,
+      "乐": 24,
+      "哀": 18,
+      "怒": 2,
+      "惧": 14,
+      "恶": 79,
+      "惊": 4
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "负面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "宝玉",
+        "count": 45
+      },
+      {
+        "word": "王夫人",
+        "count": 28
+      },
+      {
+        "word": "林黛玉",
+        "count": 27
+      },
+      {
+        "word": "赵姨娘",
+        "count": 24
+      },
+      {
+        "word": "贾母",
+        "count": 23
+      }
+    ],
+    "report_file": "025_魇魔法叔嫂逢五鬼_V33_分析报告.md",
+    "word_count": 6699,
+    "title": "魇魔法叔嫂逢五鬼 通灵玉蒙蔽遇双真",
+    "event_count": 15,
+    "char_count": 84
+  },
+  {
+    "chapter": "026",
+    "dutir_total": 127,
+    "dutir_pos": 50,
+    "dutir_neg": 69,
+    "dutir_neu": 8,
+    "hownet_pos": 61,
+    "hownet_neg": 94,
+    "hownet_total": 155,
+    "dutir_pos_pct": 39.4,
+    "dutir_neg_pct": 54.3,
+    "hownet_pos_pct": 39.4,
+    "hownet_neg_pct": 60.6,
+    "dominant_emotion": "恶(33.9%)",
+    "dutir_cats": {
+      "好": 41,
+      "乐": 9,
+      "哀": 17,
+      "怒": 4,
+      "惧": 5,
+      "恶": 43,
+      "惊": 8
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "负面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "宝玉",
+        "count": 68
+      },
+      {
+        "word": "只见",
+        "count": 26
+      },
+      {
+        "word": "贾芸",
+        "count": 25
+      },
+      {
+        "word": "一面",
+        "count": 24
+      },
+      {
+        "word": "红玉",
+        "count": 22
+      }
+    ],
+    "report_file": "026_蜂腰桥设言传心事_V33_分析报告.md",
+    "word_count": 7291,
+    "title": "蜂腰桥设言传心事 潇湘馆春困发幽情",
+    "event_count": 15,
+    "char_count": 74
+  },
+  {
+    "chapter": "027",
+    "dutir_total": 138,
+    "dutir_pos": 65,
+    "dutir_neg": 63,
+    "dutir_neu": 10,
+    "hownet_pos": 60,
+    "hownet_neg": 80,
+    "hownet_total": 140,
+    "dutir_pos_pct": 47.1,
+    "dutir_neg_pct": 45.7,
+    "hownet_pos_pct": 42.9,
+    "hownet_neg_pct": 57.1,
+    "dominant_emotion": "好(37.0%)",
+    "dutir_cats": {
+      "好": 51,
+      "乐": 14,
+      "哀": 10,
+      "怒": 1,
+      "惧": 3,
+      "恶": 49,
+      "惊": 10
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "正面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "宝玉",
+        "count": 27
+      },
+      {
+        "word": "奶奶",
+        "count": 24
+      },
+      {
+        "word": "红玉",
+        "count": 21
+      },
+      {
+        "word": "宝钗",
+        "count": 20
+      },
+      {
+        "word": "凤姐",
+        "count": 15
+      }
+    ],
+    "report_file": "027_滴翠亭杨妃戏彩蝶_V33_分析报告.md",
+    "word_count": 6508,
+    "title": "滴翠亭杨妃戏彩蝶 埋香冢飞燕泣残红",
+    "event_count": 12,
+    "char_count": 72
+  },
+  {
+    "chapter": "028",
+    "dutir_total": 159,
+    "dutir_pos": 69,
+    "dutir_neg": 86,
+    "dutir_neu": 4,
+    "hownet_pos": 86,
+    "hownet_neg": 133,
+    "hownet_total": 219,
+    "dutir_pos_pct": 43.4,
+    "dutir_neg_pct": 54.1,
+    "hownet_pos_pct": 39.3,
+    "hownet_neg_pct": 60.7,
+    "dominant_emotion": "恶(35.8%)",
+    "dutir_cats": {
+      "好": 49,
+      "乐": 20,
+      "哀": 26,
+      "怒": 1,
+      "惧": 2,
+      "恶": 57,
+      "惊": 4
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "负面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "宝玉",
+        "count": 92
+      },
+      {
+        "word": "林黛玉",
+        "count": 32
+      },
+      {
+        "word": "说道",
+        "count": 32
+      },
+      {
+        "word": "薛蟠",
+        "count": 29
+      },
+      {
+        "word": "女儿",
+        "count": 24
+      }
+    ],
+    "report_file": "028_蒋玉函情赠茜香罗_V33_分析报告.md",
+    "word_count": 9500,
+    "title": "蒋玉函情赠茜香罗 薛宝钗羞笼红麝串",
+    "event_count": 16,
+    "char_count": 63
+  },
+  {
+    "chapter": "029",
+    "dutir_total": 74,
+    "dutir_pos": 44,
+    "dutir_neg": 29,
+    "dutir_neu": 1,
+    "hownet_pos": 44,
+    "hownet_neg": 39,
+    "hownet_total": 83,
+    "dutir_pos_pct": 59.5,
+    "dutir_neg_pct": 39.2,
+    "hownet_pos_pct": 53.0,
+    "hownet_neg_pct": 47.0,
+    "dominant_emotion": "好(41.9%)",
+    "dutir_cats": {
+      "好": 31,
+      "乐": 13,
+      "哀": 5,
+      "怒": 0,
+      "惧": 1,
+      "恶": 23,
+      "惊": 1
+    },
+    "emotion_richness": "6/7",
+    "base_tone": "正面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "贾母",
+        "count": 31
+      },
+      {
+        "word": "贾珍",
+        "count": 19
+      },
+      {
+        "word": "张道士",
+        "count": 18
+      },
+      {
+        "word": "哥儿",
+        "count": 15
+      },
+      {
+        "word": "丫头",
+        "count": 14
+      }
+    ],
+    "report_file": "029_享福人福深还祷福_V33_分析报告.md",
+    "word_count": 8573,
+    "title": "享福人福深还祷福 多情女情重愈斟情",
+    "event_count": 19,
+    "char_count": 87
+  },
+  {
+    "chapter": "030",
+    "dutir_total": 127,
+    "dutir_pos": 39,
+    "dutir_neg": 82,
+    "dutir_neu": 6,
+    "hownet_pos": 67,
+    "hownet_neg": 90,
+    "hownet_total": 157,
+    "dutir_pos_pct": 30.7,
+    "dutir_neg_pct": 64.6,
+    "hownet_pos_pct": 42.7,
+    "hownet_neg_pct": 57.3,
+    "dominant_emotion": "恶(44.9%)",
+    "dutir_cats": {
+      "好": 31,
+      "乐": 8,
+      "哀": 15,
+      "怒": 4,
+      "惧": 6,
+      "恶": 57,
+      "惊": 6
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "负面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "宝玉",
+        "count": 67
+      },
+      {
+        "word": "林黛玉",
+        "count": 25
+      },
+      {
+        "word": "一面",
+        "count": 18
+      },
+      {
+        "word": "只见",
+        "count": 15
+      },
+      {
+        "word": "袭人",
+        "count": 14
+      }
+    ],
+    "report_file": "030_宝钗借扇机带双敲_V33_分析报告.md",
+    "word_count": 5791,
+    "title": "宝钗借扇机带双敲 椿龄画蔷痴及局外",
+    "event_count": 14,
+    "char_count": 64
+  },
+  {
+    "chapter": "031",
+    "dutir_total": 147,
+    "dutir_pos": 55,
+    "dutir_neg": 84,
+    "dutir_neu": 8,
+    "hownet_pos": 89,
+    "hownet_neg": 109,
+    "hownet_total": 198,
+    "dutir_pos_pct": 37.4,
+    "dutir_neg_pct": 57.1,
+    "hownet_pos_pct": 44.9,
+    "hownet_neg_pct": 55.1,
+    "dominant_emotion": "恶(41.5%)",
+    "dutir_cats": {
+      "好": 42,
+      "乐": 13,
+      "哀": 13,
+      "怒": 3,
+      "惧": 7,
+      "恶": 61,
+      "惊": 8
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "负面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "宝玉",
+        "count": 58
+      },
+      {
+        "word": "袭人",
+        "count": 36
+      },
+      {
+        "word": "湘云",
+        "count": 30
+      },
+      {
+        "word": "翠缕",
+        "count": 21
+      },
+      {
+        "word": "晴雯",
+        "count": 20
+      }
+    ],
+    "report_file": "031_撕扇子作千金一笑_V33_分析报告.md",
+    "word_count": 7238,
+    "title": "撕扇子作千金一笑 因麒麟伏白首双星",
+    "event_count": 16,
+    "char_count": 70
+  },
+  {
+    "chapter": "032",
+    "dutir_total": 128,
+    "dutir_pos": 59,
+    "dutir_neg": 62,
+    "dutir_neu": 7,
+    "hownet_pos": 75,
+    "hownet_neg": 92,
+    "hownet_total": 167,
+    "dutir_pos_pct": 46.1,
+    "dutir_neg_pct": 48.4,
+    "hownet_pos_pct": 44.9,
+    "hownet_neg_pct": 55.1,
+    "dominant_emotion": "好(32.0%)",
+    "dutir_cats": {
+      "好": 41,
+      "乐": 18,
+      "哀": 11,
+      "怒": 3,
+      "惧": 11,
+      "恶": 37,
+      "惊": 7
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "负面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "袭人",
+        "count": 35
+      },
+      {
+        "word": "宝玉",
+        "count": 32
+      },
+      {
+        "word": "史湘云",
+        "count": 16
+      },
+      {
+        "word": "宝钗",
+        "count": 16
+      },
+      {
+        "word": "一面",
+        "count": 15
+      }
+    ],
+    "report_file": "032_诉肺腑心迷活宝玉_V33_分析报告.md",
+    "word_count": 5797,
+    "title": "诉肺腑心迷活宝玉 含耻辱情烈死金钏",
+    "event_count": 15,
+    "char_count": 54
+  },
+  {
+    "chapter": "033",
+    "dutir_total": 141,
+    "dutir_pos": 39,
+    "dutir_neg": 97,
+    "dutir_neu": 5,
+    "hownet_pos": 72,
+    "hownet_neg": 104,
+    "hownet_total": 176,
+    "dutir_pos_pct": 27.7,
+    "dutir_neg_pct": 68.8,
+    "hownet_pos_pct": 40.9,
+    "hownet_neg_pct": 59.1,
+    "dominant_emotion": "恶(40.4%)",
+    "dutir_cats": {
+      "好": 37,
+      "乐": 2,
+      "哀": 27,
+      "怒": 6,
+      "惧": 7,
+      "恶": 57,
+      "惊": 5
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "负面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "宝玉",
+        "count": 35
+      },
+      {
+        "word": "贾政",
+        "count": 16
+      },
+      {
+        "word": "王夫人",
+        "count": 12
+      },
+      {
+        "word": "一面",
+        "count": 12
+      },
+      {
+        "word": "小厮",
+        "count": 12
+      }
+    ],
+    "report_file": "033_手足眈眈小动唇舌_V33_分析报告.md",
+    "word_count": 4928,
+    "title": "手足眈眈小动唇舌 不肖种种大承苔挞",
+    "event_count": 14,
+    "char_count": 74
+  },
+  {
+    "chapter": "034",
+    "dutir_total": 170,
+    "dutir_pos": 68,
+    "dutir_neg": 96,
+    "dutir_neu": 6,
+    "hownet_pos": 102,
+    "hownet_neg": 126,
+    "hownet_total": 228,
+    "dutir_pos_pct": 40.0,
+    "dutir_neg_pct": 56.5,
+    "hownet_pos_pct": 44.7,
+    "hownet_neg_pct": 55.3,
+    "dominant_emotion": "恶(39.4%)",
+    "dutir_cats": {
+      "好": 48,
+      "乐": 20,
+      "哀": 17,
+      "怒": 3,
+      "惧": 9,
+      "恶": 67,
+      "惊": 6
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "负面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "袭人",
+        "count": 50
+      },
+      {
+        "word": "宝玉",
+        "count": 41
+      },
+      {
+        "word": "宝钗",
+        "count": 22
+      },
+      {
+        "word": "太太",
+        "count": 19
+      },
+      {
+        "word": "知道",
+        "count": 17
+      }
+    ],
+    "report_file": "034_情中情因情感妹妹_V33_分析报告.md",
+    "word_count": 7206,
+    "title": "情中情因情感妹妹 错里错以错劝哥哥",
+    "event_count": 17,
+    "char_count": 74
+  },
+  {
+    "chapter": "035",
+    "dutir_total": 136,
+    "dutir_pos": 59,
+    "dutir_neg": 72,
+    "dutir_neu": 5,
+    "hownet_pos": 74,
+    "hownet_neg": 92,
+    "hownet_total": 166,
+    "dutir_pos_pct": 43.4,
+    "dutir_neg_pct": 52.9,
+    "hownet_pos_pct": 44.6,
+    "hownet_neg_pct": 55.4,
+    "dominant_emotion": "恶(38.2%)",
+    "dutir_cats": {
+      "好": 49,
+      "乐": 10,
+      "哀": 12,
+      "怒": 2,
+      "惧": 6,
+      "恶": 52,
+      "惊": 5
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "负面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "宝玉",
+        "count": 67
+      },
+      {
+        "word": "莺儿",
+        "count": 36
+      },
+      {
+        "word": "一面",
+        "count": 30
+      },
+      {
+        "word": "宝钗",
+        "count": 24
+      },
+      {
+        "word": "两个",
+        "count": 21
+      }
+    ],
+    "report_file": "035_白玉钏亲尝莲叶羹_V33_分析报告.md",
+    "word_count": 7901,
+    "title": "白玉钏亲尝莲叶羹 黄金莺巧结梅花络",
+    "event_count": 17,
+    "char_count": 81
+  },
+  {
+    "chapter": "036",
+    "dutir_total": 121,
+    "dutir_pos": 53,
+    "dutir_neg": 63,
+    "dutir_neu": 5,
+    "hownet_pos": 71,
+    "hownet_neg": 77,
+    "hownet_total": 148,
+    "dutir_pos_pct": 43.8,
+    "dutir_neg_pct": 52.1,
+    "hownet_pos_pct": 48.0,
+    "hownet_neg_pct": 52.0,
+    "dominant_emotion": "恶(38.0%)",
+    "dutir_cats": {
+      "好": 38,
+      "乐": 15,
+      "哀": 10,
+      "怒": 2,
+      "惧": 5,
+      "恶": 46,
+      "惊": 5
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "负面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "宝玉",
+        "count": 45
+      },
+      {
+        "word": "袭人",
+        "count": 41
+      },
+      {
+        "word": "王夫人",
+        "count": 18
+      },
+      {
+        "word": "凤姐",
+        "count": 15
+      },
+      {
+        "word": "龄官",
+        "count": 15
+      }
+    ],
+    "report_file": "036_绣鸳鸯梦兆绛芸轩_V33_分析报告.md",
+    "word_count": 6782,
+    "title": "绣鸳鸯梦兆绛芸轩 识分定情悟梨香院",
+    "event_count": 17,
+    "char_count": 86
+  },
+  {
+    "chapter": "037",
+    "dutir_total": 158,
+    "dutir_pos": 87,
+    "dutir_neg": 68,
+    "dutir_neu": 3,
+    "hownet_pos": 79,
+    "hownet_neg": 99,
+    "hownet_total": 178,
+    "dutir_pos_pct": 55.1,
+    "dutir_neg_pct": 43.0,
+    "hownet_pos_pct": 44.4,
+    "hownet_neg_pct": 55.6,
+    "dominant_emotion": "好(42.4%)",
+    "dutir_cats": {
+      "好": 67,
+      "乐": 20,
+      "哀": 9,
+      "怒": 0,
+      "惧": 3,
+      "恶": 56,
+      "惊": 3
+    },
+    "emotion_richness": "6/7",
+    "base_tone": "正面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "宝玉",
+        "count": 38
+      },
+      {
+        "word": "姑娘",
+        "count": 20
+      },
+      {
+        "word": "众人",
+        "count": 20
+      },
+      {
+        "word": "李纨",
+        "count": 20
+      },
+      {
+        "word": "袭人",
+        "count": 19
+      }
+    ],
+    "report_file": "037_秋爽斋偶结海棠社_V33_分析报告.md",
+    "word_count": 9386,
+    "title": "秋爽斋偶结海棠社 蘅芜院夜拟菊花题",
+    "event_count": 20,
+    "char_count": 87
+  },
+  {
+    "chapter": "038",
+    "dutir_total": 118,
+    "dutir_pos": 66,
+    "dutir_neg": 50,
+    "dutir_neu": 2,
+    "hownet_pos": 51,
+    "hownet_neg": 51,
+    "hownet_total": 102,
+    "dutir_pos_pct": 55.9,
+    "dutir_neg_pct": 42.4,
+    "hownet_pos_pct": 50.0,
+    "hownet_neg_pct": 50.0,
+    "dominant_emotion": "好(38.1%)",
+    "dutir_cats": {
+      "好": 45,
+      "乐": 21,
+      "哀": 12,
+      "怒": 0,
+      "惧": 1,
+      "恶": 37,
+      "惊": 2
+    },
+    "emotion_richness": "6/7",
+    "base_tone": "正面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "凤姐",
+        "count": 17
+      },
+      {
+        "word": "贾母",
+        "count": 16
+      },
+      {
+        "word": "宝玉",
+        "count": 16
+      },
+      {
+        "word": "湘云",
+        "count": 15
+      },
+      {
+        "word": "众人",
+        "count": 13
+      }
+    ],
+    "report_file": "038_林潇湘魁夺菊花诗_V33_分析报告.md",
+    "word_count": 5835,
+    "title": "林潇湘魁夺菊花诗 薛蘅芜讽和螃蟹咏",
+    "event_count": 13,
+    "char_count": 78
+  },
+  {
+    "chapter": "039",
+    "dutir_total": 100,
+    "dutir_pos": 52,
+    "dutir_neg": 44,
+    "dutir_neu": 4,
+    "hownet_pos": 48,
+    "hownet_neg": 59,
+    "hownet_total": 107,
+    "dutir_pos_pct": 52.0,
+    "dutir_neg_pct": 44.0,
+    "hownet_pos_pct": 44.9,
+    "hownet_neg_pct": 55.1,
+    "dominant_emotion": "好(42.0%)",
+    "dutir_cats": {
+      "好": 42,
+      "乐": 10,
+      "哀": 9,
+      "怒": 1,
+      "惧": 5,
+      "恶": 29,
+      "惊": 4
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "正面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "刘姥姥",
+        "count": 36
+      },
+      {
+        "word": "平儿",
+        "count": 30
+      },
+      {
+        "word": "贾母",
+        "count": 24
+      },
+      {
+        "word": "老太太",
+        "count": 23
+      },
+      {
+        "word": "宝玉",
+        "count": 23
+      }
+    ],
+    "report_file": "039_村老老是信口开河_V33_分析报告.md",
+    "word_count": 6481,
+    "title": "村老老是信口开河 情哥哥偏寻根究底",
+    "event_count": 15,
+    "char_count": 72
+  },
+  {
+    "chapter": "040",
+    "dutir_total": 144,
+    "dutir_pos": 91,
+    "dutir_neg": 52,
+    "dutir_neu": 1,
+    "hownet_pos": 78,
+    "hownet_neg": 67,
+    "hownet_total": 145,
+    "dutir_pos_pct": 63.2,
+    "dutir_neg_pct": 36.1,
+    "hownet_pos_pct": 53.8,
+    "hownet_neg_pct": 46.2,
+    "dominant_emotion": "好(46.5%)",
+    "dutir_cats": {
+      "好": 67,
+      "乐": 24,
+      "哀": 9,
+      "怒": 0,
+      "惧": 4,
+      "恶": 39,
+      "惊": 1
+    },
+    "emotion_richness": "6/7",
+    "base_tone": "正面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "鸳鸯",
+        "count": 62
+      },
+      {
+        "word": "刘姥姥",
+        "count": 60
+      },
+      {
+        "word": "贾母",
+        "count": 44
+      },
+      {
+        "word": "众人",
+        "count": 27
+      },
+      {
+        "word": "凤姐儿",
+        "count": 24
+      }
+    ],
+    "report_file": "040_史太君两宴大观园_V33_分析报告.md",
+    "word_count": 9438,
+    "title": "史太君两宴大观园 金鸳鸯三宣牙牌令",
+    "event_count": 17,
+    "char_count": 80
+  },
+  {
+    "chapter": "041",
+    "dutir_total": 87,
+    "dutir_pos": 52,
+    "dutir_neg": 29,
+    "dutir_neu": 6,
+    "hownet_pos": 66,
+    "hownet_neg": 49,
+    "hownet_total": 115,
+    "dutir_pos_pct": 59.8,
+    "dutir_neg_pct": 33.3,
+    "hownet_pos_pct": 57.4,
+    "hownet_neg_pct": 42.6,
+    "dominant_emotion": "好(42.5%)",
+    "dutir_cats": {
+      "好": 37,
+      "乐": 15,
+      "哀": 6,
+      "怒": 1,
+      "惧": 2,
+      "恶": 20,
+      "惊": 6
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "正面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "刘姥姥",
+        "count": 48
+      },
+      {
+        "word": "妙玉",
+        "count": 26
+      },
+      {
+        "word": "众人",
+        "count": 22
+      },
+      {
+        "word": "宝玉",
+        "count": 22
+      },
+      {
+        "word": "贾母",
+        "count": 20
+      }
+    ],
+    "report_file": "041_贾宝玉品茶栊翠庵_V33_分析报告.md",
+    "word_count": 6602,
+    "title": "贾宝玉品茶栊翠庵 刘老老醉卧怡红院",
+    "event_count": 15,
+    "char_count": 64
+  },
+  {
+    "chapter": "042",
+    "dutir_total": 137,
+    "dutir_pos": 87,
+    "dutir_neg": 48,
+    "dutir_neu": 2,
+    "hownet_pos": 92,
+    "hownet_neg": 62,
+    "hownet_total": 154,
+    "dutir_pos_pct": 63.5,
+    "dutir_neg_pct": 35.0,
+    "hownet_pos_pct": 59.7,
+    "hownet_neg_pct": 40.3,
+    "dominant_emotion": "好(47.4%)",
+    "dutir_cats": {
+      "好": 65,
+      "乐": 22,
+      "哀": 7,
+      "怒": 0,
+      "惧": 3,
+      "恶": 38,
+      "惊": 2
+    },
+    "emotion_richness": "6/7",
+    "base_tone": "正面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "黛玉",
+        "count": 23
+      },
+      {
+        "word": "刘姥姥",
+        "count": 22
+      },
+      {
+        "word": "宝钗",
+        "count": 19
+      },
+      {
+        "word": "贾母",
+        "count": 14
+      },
+      {
+        "word": "众人",
+        "count": 14
+      }
+    ],
+    "report_file": "042_蘅芜君兰言解疑癖_V33_分析报告.md",
+    "word_count": 7590,
+    "title": "蘅芜君兰言解疑癖 潇湘子雅谑补馀音",
+    "event_count": 15,
+    "char_count": 72
+  },
+  {
+    "chapter": "043",
+    "dutir_total": 144,
+    "dutir_pos": 82,
+    "dutir_neg": 57,
+    "dutir_neu": 5,
+    "hownet_pos": 92,
+    "hownet_neg": 81,
+    "hownet_total": 173,
+    "dutir_pos_pct": 56.9,
+    "dutir_neg_pct": 39.6,
+    "hownet_pos_pct": 53.2,
+    "hownet_neg_pct": 46.8,
+    "dominant_emotion": "好(34.7%)",
+    "dutir_cats": {
+      "好": 50,
+      "乐": 32,
+      "哀": 7,
+      "怒": 0,
+      "惧": 6,
+      "恶": 44,
+      "惊": 5
+    },
+    "emotion_richness": "6/7",
+    "base_tone": "正面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "宝玉",
+        "count": 34
+      },
+      {
+        "word": "贾母",
+        "count": 23
+      },
+      {
+        "word": "茗烟",
+        "count": 23
+      },
+      {
+        "word": "老太太",
+        "count": 18
+      },
+      {
+        "word": "二爷",
+        "count": 18
+      }
+    ],
+    "report_file": "043_闲取乐偶攒金庆寿_V33_分析报告.md",
+    "word_count": 6880,
+    "title": "闲取乐偶攒金庆寿 不了情暂撮土为香",
+    "event_count": 17,
+    "char_count": 75
+  },
+  {
+    "chapter": "044",
+    "dutir_total": 161,
+    "dutir_pos": 70,
+    "dutir_neg": 85,
+    "dutir_neu": 6,
+    "hownet_pos": 71,
+    "hownet_neg": 93,
+    "hownet_total": 164,
+    "dutir_pos_pct": 43.5,
+    "dutir_neg_pct": 52.8,
+    "hownet_pos_pct": 43.3,
+    "hownet_neg_pct": 56.7,
+    "dominant_emotion": "好(34.2%)",
+    "dutir_cats": {
+      "好": 55,
+      "乐": 15,
+      "哀": 20,
+      "怒": 5,
+      "惧": 7,
+      "恶": 53,
+      "惊": 6
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "负面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "平儿",
+        "count": 51
+      },
+      {
+        "word": "凤姐儿",
+        "count": 40
+      },
+      {
+        "word": "贾琏",
+        "count": 34
+      },
+      {
+        "word": "贾母",
+        "count": 22
+      },
+      {
+        "word": "奶奶",
+        "count": 20
+      }
+    ],
+    "report_file": "044_变生不测凤姐泼醋_V33_分析报告.md",
+    "word_count": 6622,
+    "title": "变生不测凤姐泼醋 喜出望外平儿理妆",
+    "event_count": 18,
+    "char_count": 74
+  },
+  {
+    "chapter": "045",
+    "dutir_total": 190,
+    "dutir_pos": 99,
+    "dutir_neg": 89,
+    "dutir_neu": 2,
+    "hownet_pos": 98,
+    "hownet_neg": 89,
+    "hownet_total": 187,
+    "dutir_pos_pct": 52.1,
+    "dutir_neg_pct": 46.8,
+    "hownet_pos_pct": 52.4,
+    "hownet_neg_pct": 47.6,
+    "dominant_emotion": "好(43.2%)",
+    "dutir_cats": {
+      "好": 82,
+      "乐": 17,
+      "哀": 11,
+      "怒": 3,
+      "惧": 2,
+      "恶": 73,
+      "惊": 2
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "正面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "黛玉",
+        "count": 25
+      },
+      {
+        "word": "宝玉",
+        "count": 20
+      },
+      {
+        "word": "凤姐儿",
+        "count": 19
+      },
+      {
+        "word": "老太太",
+        "count": 19
+      },
+      {
+        "word": "知道",
+        "count": 14
+      }
+    ],
+    "report_file": "045_金兰契互剖金兰语_V33_分析报告.md",
+    "word_count": 7774,
+    "title": "金兰契互剖金兰语 风雨夕闷制风雨词",
+    "event_count": 19,
+    "char_count": 62
+  },
+  {
+    "chapter": "046",
+    "dutir_total": 200,
+    "dutir_pos": 97,
+    "dutir_neg": 100,
+    "dutir_neu": 3,
+    "hownet_pos": 107,
+    "hownet_neg": 94,
+    "hownet_total": 201,
+    "dutir_pos_pct": 48.5,
+    "dutir_neg_pct": 50.0,
+    "hownet_pos_pct": 53.2,
+    "hownet_neg_pct": 46.8,
+    "dominant_emotion": "恶(42.0%)",
+    "dutir_cats": {
+      "好": 63,
+      "乐": 34,
+      "哀": 10,
+      "怒": 2,
+      "惧": 4,
+      "恶": 84,
+      "惊": 3
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "负面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "鸳鸯",
+        "count": 51
+      },
+      {
+        "word": "老太太",
+        "count": 41
+      },
+      {
+        "word": "太太",
+        "count": 29
+      },
+      {
+        "word": "邢夫人",
+        "count": 23
+      },
+      {
+        "word": "平儿",
+        "count": 19
+      }
+    ],
+    "report_file": "046_尴尬人难免尴尬事_V33_分析报告.md",
+    "word_count": 8229,
+    "title": "尴尬人难免尴尬事 鸳鸯女誓绝鸳鸯偶",
+    "event_count": 20,
+    "char_count": 68
+  },
+  {
+    "chapter": "047",
+    "dutir_total": 130,
+    "dutir_pos": 47,
+    "dutir_neg": 80,
+    "dutir_neu": 3,
+    "hownet_pos": 83,
+    "hownet_neg": 101,
+    "hownet_total": 184,
+    "dutir_pos_pct": 36.2,
+    "dutir_neg_pct": 61.5,
+    "hownet_pos_pct": 45.1,
+    "hownet_neg_pct": 54.9,
+    "dominant_emotion": "恶(42.3%)",
+    "dutir_cats": {
+      "好": 34,
+      "乐": 13,
+      "哀": 17,
+      "怒": 4,
+      "惧": 4,
+      "恶": 55,
+      "惊": 3
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "负面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "薛蟠",
+        "count": 31
+      },
+      {
+        "word": "湘莲",
+        "count": 31
+      },
+      {
+        "word": "贾母",
+        "count": 22
+      },
+      {
+        "word": "薛姨妈",
+        "count": 18
+      },
+      {
+        "word": "凤姐儿",
+        "count": 17
+      }
+    ],
+    "report_file": "047_呆霸王调情遭苦打_V33_分析报告.md",
+    "word_count": 7316,
+    "title": "呆霸王调情遭苦打 冷郎君惧祸走他乡",
+    "event_count": 12,
+    "char_count": 50
+  },
+  {
+    "chapter": "048",
+    "dutir_total": 130,
+    "dutir_pos": 78,
+    "dutir_neg": 46,
+    "dutir_neu": 6,
+    "hownet_pos": 82,
+    "hownet_neg": 72,
+    "hownet_total": 154,
+    "dutir_pos_pct": 60.0,
+    "dutir_neg_pct": 35.4,
+    "hownet_pos_pct": 53.2,
+    "hownet_neg_pct": 46.8,
+    "dominant_emotion": "好(44.6%)",
+    "dutir_cats": {
+      "好": 58,
+      "乐": 20,
+      "哀": 6,
+      "怒": 1,
+      "惧": 2,
+      "恶": 37,
+      "惊": 6
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "正面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "香菱",
+        "count": 39
+      },
+      {
+        "word": "黛玉",
+        "count": 25
+      },
+      {
+        "word": "宝钗",
+        "count": 20
+      },
+      {
+        "word": "姑娘",
+        "count": 15
+      },
+      {
+        "word": "不知",
+        "count": 13
+      }
+    ],
+    "report_file": "048_滥情人情误思游艺_V33_分析报告.md",
+    "word_count": 6649,
+    "title": "滥情人情误思游艺 慕雅女雅集苦吟诗",
+    "event_count": 14,
+    "char_count": 76
+  },
+  {
+    "chapter": "049",
+    "dutir_total": 155,
+    "dutir_pos": 88,
+    "dutir_neg": 57,
+    "dutir_neu": 10,
+    "hownet_pos": 75,
+    "hownet_neg": 75,
+    "hownet_total": 150,
+    "dutir_pos_pct": 56.8,
+    "dutir_neg_pct": 36.8,
+    "hownet_pos_pct": 50.0,
+    "hownet_neg_pct": 50.0,
+    "dominant_emotion": "好(43.9%)",
+    "dutir_cats": {
+      "好": 68,
+      "乐": 20,
+      "哀": 10,
+      "怒": 0,
+      "惧": 2,
+      "恶": 45,
+      "惊": 10
+    },
+    "emotion_richness": "6/7",
+    "base_tone": "正面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "宝玉",
+        "count": 36
+      },
+      {
+        "word": "黛玉",
+        "count": 22
+      },
+      {
+        "word": "湘云",
+        "count": 22
+      },
+      {
+        "word": "李纨",
+        "count": 21
+      },
+      {
+        "word": "只见",
+        "count": 19
+      }
+    ],
+    "report_file": "049_琉璃世界白雪红梅_V33_分析报告.md",
+    "word_count": 7305,
+    "title": "琉璃世界白雪红梅 脂粉香娃割腥啖膻",
+    "event_count": 14,
+    "char_count": 82
+  },
+  {
+    "chapter": "050",
+    "dutir_total": 113,
+    "dutir_pos": 63,
+    "dutir_neg": 48,
+    "dutir_neu": 2,
+    "hownet_pos": 61,
+    "hownet_neg": 60,
+    "hownet_total": 121,
+    "dutir_pos_pct": 55.8,
+    "dutir_neg_pct": 42.5,
+    "hownet_pos_pct": 50.4,
+    "hownet_neg_pct": 49.6,
+    "dominant_emotion": "好(43.4%)",
+    "dutir_cats": {
+      "好": 49,
+      "乐": 14,
+      "哀": 7,
+      "怒": 0,
+      "惧": 1,
+      "恶": 40,
+      "惊": 2
+    },
+    "emotion_richness": "6/7",
+    "base_tone": "正面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "众人",
+        "count": 44
+      },
+      {
+        "word": "湘云",
+        "count": 36
+      },
+      {
+        "word": "李纨",
+        "count": 26
+      },
+      {
+        "word": "宝玉",
+        "count": 26
+      },
+      {
+        "word": "黛玉",
+        "count": 22
+      }
+    ],
+    "report_file": "050_芦雪庭争联即景诗_V33_分析报告.md",
+    "word_count": 7304,
+    "title": "芦雪庭争联即景诗 暖香坞雅制春灯谜",
+    "event_count": 14,
+    "char_count": 68
+  },
+  {
+    "chapter": "051",
+    "dutir_total": 105,
+    "dutir_pos": 53,
+    "dutir_neg": 51,
+    "dutir_neu": 1,
+    "hownet_pos": 63,
+    "hownet_neg": 77,
+    "hownet_total": 140,
+    "dutir_pos_pct": 50.5,
+    "dutir_neg_pct": 48.6,
+    "hownet_pos_pct": 45.0,
+    "hownet_neg_pct": 55.0,
+    "dominant_emotion": "好(41.9%)",
+    "dutir_cats": {
+      "好": 44,
+      "乐": 9,
+      "哀": 3,
+      "怒": 1,
+      "惧": 6,
+      "恶": 41,
+      "惊": 1
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "正面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "宝玉",
+        "count": 40
+      },
+      {
+        "word": "晴雯",
+        "count": 30
+      },
+      {
+        "word": "麝月",
+        "count": 30
+      },
+      {
+        "word": "袭人",
+        "count": 19
+      },
+      {
+        "word": "凤姐儿",
+        "count": 16
+      }
+    ],
+    "report_file": "051_薛小妹新编怀古诗_V33_分析报告.md",
+    "word_count": 6926,
+    "title": "薛小妹新编怀古诗 胡庸医乱用虎狼药",
+    "event_count": 12,
+    "char_count": 66
+  },
+  {
+    "chapter": "052",
+    "dutir_total": 122,
+    "dutir_pos": 57,
+    "dutir_neg": 64,
+    "dutir_neu": 1,
+    "hownet_pos": 95,
+    "hownet_neg": 83,
+    "hownet_total": 178,
+    "dutir_pos_pct": 46.7,
+    "dutir_neg_pct": 52.5,
+    "hownet_pos_pct": 53.4,
+    "hownet_neg_pct": 46.6,
+    "dominant_emotion": "好(41.8%)",
+    "dutir_cats": {
+      "好": 51,
+      "乐": 6,
+      "哀": 8,
+      "怒": 1,
+      "惧": 6,
+      "恶": 49,
+      "惊": 1
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "负面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "宝玉",
+        "count": 70
+      },
+      {
+        "word": "晴雯",
+        "count": 43
+      },
+      {
+        "word": "麝月",
+        "count": 28
+      },
+      {
+        "word": "老太太",
+        "count": 12
+      },
+      {
+        "word": "黛玉",
+        "count": 12
+      }
+    ],
+    "report_file": "052_俏平儿情掩虾须镯_V33_分析报告.md",
+    "word_count": 8264,
+    "title": "俏平儿情掩虾须镯 勇晴雯病补孔雀裘",
+    "event_count": 15,
+    "char_count": 94
+  },
+  {
+    "chapter": "053",
+    "dutir_total": 134,
+    "dutir_pos": 88,
+    "dutir_neg": 44,
+    "dutir_neu": 2,
+    "hownet_pos": 75,
+    "hownet_neg": 65,
+    "hownet_total": 140,
+    "dutir_pos_pct": 65.7,
+    "dutir_neg_pct": 32.8,
+    "hownet_pos_pct": 53.6,
+    "hownet_neg_pct": 46.4,
+    "dominant_emotion": "好(48.5%)",
+    "dutir_cats": {
+      "好": 65,
+      "乐": 23,
+      "哀": 5,
+      "怒": 4,
+      "惧": 4,
+      "恶": 31,
+      "惊": 2
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "正面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "贾母",
+        "count": 31
+      },
+      {
+        "word": "贾珍",
+        "count": 25
+      },
+      {
+        "word": "贾蓉",
+        "count": 18
+      },
+      {
+        "word": "尤氏",
+        "count": 14
+      },
+      {
+        "word": "银子",
+        "count": 13
+      }
+    ],
+    "report_file": "053_宁国府除夕祭宗祠_V33_分析报告.md",
+    "word_count": 7592,
+    "title": "宁国府除夕祭宗祠 荣国府元宵开夜宴",
+    "event_count": 15,
+    "char_count": 90
+  },
+  {
+    "chapter": "054",
+    "dutir_total": 87,
+    "dutir_pos": 56,
+    "dutir_neg": 30,
+    "dutir_neu": 1,
+    "hownet_pos": 50,
+    "hownet_neg": 43,
+    "hownet_total": 93,
+    "dutir_pos_pct": 64.4,
+    "dutir_neg_pct": 34.5,
+    "hownet_pos_pct": 53.8,
+    "hownet_neg_pct": 46.2,
+    "dominant_emotion": "好(49.4%)",
+    "dutir_cats": {
+      "好": 43,
+      "乐": 13,
+      "哀": 4,
+      "怒": 1,
+      "惧": 0,
+      "恶": 25,
+      "惊": 1
+    },
+    "emotion_richness": "6/7",
+    "base_tone": "正面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "宝玉",
+        "count": 32
+      },
+      {
+        "word": "贾母",
+        "count": 21
+      },
+      {
+        "word": "二人",
+        "count": 15
+      },
+      {
+        "word": "两个",
+        "count": 14
+      },
+      {
+        "word": "麝月",
+        "count": 9
+      }
+    ],
+    "report_file": "054_史太君破陈腐旧套_V33_分析报告.md",
+    "word_count": 8647,
+    "title": "史太君破陈腐旧套 王熙凤效戏彩斑衣",
+    "event_count": 17,
+    "char_count": 92
+  },
+  {
+    "chapter": "055",
+    "dutir_total": 203,
+    "dutir_pos": 100,
+    "dutir_neg": 99,
+    "dutir_neu": 4,
+    "hownet_pos": 108,
+    "hownet_neg": 88,
+    "hownet_total": 196,
+    "dutir_pos_pct": 49.3,
+    "dutir_neg_pct": 48.8,
+    "hownet_pos_pct": 55.1,
+    "hownet_neg_pct": 44.9,
+    "dominant_emotion": "好(40.4%)",
+    "dutir_cats": {
+      "好": 82,
+      "乐": 18,
+      "哀": 18,
+      "怒": 5,
+      "惧": 8,
+      "恶": 68,
+      "惊": 4
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "正面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "探春",
+        "count": 38
+      },
+      {
+        "word": "姑娘",
+        "count": 32
+      },
+      {
+        "word": "太太",
+        "count": 25
+      },
+      {
+        "word": "奶奶",
+        "count": 25
+      },
+      {
+        "word": "媳妇",
+        "count": 21
+      }
+    ],
+    "report_file": "055_辱亲女愚妾争闲气_V33_分析报告.md",
+    "word_count": 8128,
+    "title": "辱亲女愚妾争闲气 欺幼主刁奴蓄险心",
+    "event_count": 16,
+    "char_count": 70
+  },
+  {
+    "chapter": "056",
+    "dutir_total": 208,
+    "dutir_pos": 98,
+    "dutir_neg": 102,
+    "dutir_neu": 8,
+    "hownet_pos": 96,
+    "hownet_neg": 124,
+    "hownet_total": 220,
+    "dutir_pos_pct": 47.1,
+    "dutir_neg_pct": 49.0,
+    "hownet_pos_pct": 43.6,
+    "hownet_neg_pct": 56.4,
+    "dominant_emotion": "恶(43.3%)",
+    "dutir_cats": {
+      "好": 79,
+      "乐": 19,
+      "哀": 8,
+      "怒": 2,
+      "惧": 2,
+      "恶": 90,
+      "惊": 8
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "负面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "宝玉",
+        "count": 43
+      },
+      {
+        "word": "姑娘",
+        "count": 32
+      },
+      {
+        "word": "探春",
+        "count": 24
+      },
+      {
+        "word": "李纨",
+        "count": 16
+      },
+      {
+        "word": "一年",
+        "count": 15
+      }
+    ],
+    "report_file": "056_敏探春兴利除宿弊_V33_分析报告.md",
+    "word_count": 8598,
+    "title": "敏探春兴利除宿弊 贤宝钗小惠全大体",
+    "event_count": 15,
+    "char_count": 65
+  },
+  {
+    "chapter": "057",
+    "dutir_total": 212,
+    "dutir_pos": 86,
+    "dutir_neg": 113,
+    "dutir_neu": 13,
+    "hownet_pos": 127,
+    "hownet_neg": 136,
+    "hownet_total": 263,
+    "dutir_pos_pct": 40.6,
+    "dutir_neg_pct": 53.3,
+    "hownet_pos_pct": 48.3,
+    "hownet_neg_pct": 51.7,
+    "dominant_emotion": "恶(37.3%)",
+    "dutir_cats": {
+      "好": 62,
+      "乐": 24,
+      "哀": 22,
+      "怒": 6,
+      "惧": 6,
+      "恶": 79,
+      "惊": 13
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "负面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "紫鹃",
+        "count": 59
+      },
+      {
+        "word": "宝玉",
+        "count": 58
+      },
+      {
+        "word": "黛玉",
+        "count": 34
+      },
+      {
+        "word": "薛姨妈",
+        "count": 27
+      },
+      {
+        "word": "老太太",
+        "count": 26
+      }
+    ],
+    "report_file": "057_慧紫鹃情辞试莽玉_V33_分析报告.md",
+    "word_count": 10740,
+    "title": "慧紫鹃情辞试莽玉 慈姨妈爱语慰痴颦",
+    "event_count": 23,
+    "char_count": 87
+  },
+  {
+    "chapter": "058",
+    "dutir_total": 164,
+    "dutir_pos": 85,
+    "dutir_neg": 78,
+    "dutir_neu": 1,
+    "hownet_pos": 84,
+    "hownet_neg": 108,
+    "hownet_total": 192,
+    "dutir_pos_pct": 51.8,
+    "dutir_neg_pct": 47.6,
+    "hownet_pos_pct": 43.8,
+    "hownet_neg_pct": 56.2,
+    "dominant_emotion": "好(41.5%)",
+    "dutir_cats": {
+      "好": 68,
+      "乐": 17,
+      "哀": 8,
+      "怒": 0,
+      "惧": 6,
+      "恶": 64,
+      "惊": 1
+    },
+    "emotion_richness": "6/7",
+    "base_tone": "正面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "宝玉",
+        "count": 42
+      },
+      {
+        "word": "芳官",
+        "count": 31
+      },
+      {
+        "word": "袭人",
+        "count": 15
+      },
+      {
+        "word": "藕官",
+        "count": 13
+      },
+      {
+        "word": "婆子",
+        "count": 13
+      }
+    ],
+    "report_file": "058_杏子阴假凤泣虚凰_V33_分析报告.md",
+    "word_count": 6427,
+    "title": "杏子阴假凤泣虚凰 茜纱窗真情揆痴理",
+    "event_count": 18,
+    "char_count": 114
+  },
+  {
+    "chapter": "059",
+    "dutir_total": 100,
+    "dutir_pos": 44,
+    "dutir_neg": 52,
+    "dutir_neu": 4,
+    "hownet_pos": 53,
+    "hownet_neg": 58,
+    "hownet_total": 111,
+    "dutir_pos_pct": 44.0,
+    "dutir_neg_pct": 52.0,
+    "hownet_pos_pct": 47.7,
+    "hownet_neg_pct": 52.3,
+    "dominant_emotion": "恶(38.0%)",
+    "dutir_cats": {
+      "好": 37,
+      "乐": 7,
+      "哀": 7,
+      "怒": 5,
+      "惧": 2,
+      "恶": 38,
+      "惊": 4
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "负面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "莺儿",
+        "count": 25
+      },
+      {
+        "word": "姑娘",
+        "count": 20
+      },
+      {
+        "word": "春燕",
+        "count": 20
+      },
+      {
+        "word": "一面",
+        "count": 13
+      },
+      {
+        "word": "袭人",
+        "count": 11
+      }
+    ],
+    "report_file": "059_柳叶渚边嗔莺叱燕_V33_分析报告.md",
+    "word_count": 4693,
+    "title": "柳叶渚边嗔莺叱燕 绛芸轩里召将飞符",
+    "event_count": 12,
+    "char_count": 92
+  },
+  {
+    "chapter": "060",
+    "dutir_total": 142,
+    "dutir_pos": 55,
+    "dutir_neg": 82,
+    "dutir_neu": 5,
+    "hownet_pos": 63,
+    "hownet_neg": 89,
+    "hownet_total": 152,
+    "dutir_pos_pct": 38.7,
+    "dutir_neg_pct": 57.7,
+    "hownet_pos_pct": 41.4,
+    "hownet_neg_pct": 58.6,
+    "dominant_emotion": "恶(50.0%)",
+    "dutir_cats": {
+      "好": 38,
+      "乐": 17,
+      "哀": 5,
+      "怒": 4,
+      "惧": 2,
+      "恶": 71,
+      "惊": 5
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "负面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "芳官",
+        "count": 42
+      },
+      {
+        "word": "宝玉",
+        "count": 23
+      },
+      {
+        "word": "赵姨娘",
+        "count": 22
+      },
+      {
+        "word": "柳家的",
+        "count": 18
+      },
+      {
+        "word": "春燕",
+        "count": 13
+      }
+    ],
+    "report_file": "060_茉莉粉替去蔷薇硝_V33_分析报告.md",
+    "word_count": 7525,
+    "title": "茉莉粉替去蔷薇硝 玫瑰露引出茯苓霜",
+    "event_count": 17,
+    "char_count": 92
+  },
+  {
+    "chapter": "061",
+    "dutir_total": 114,
+    "dutir_pos": 49,
+    "dutir_neg": 64,
+    "dutir_neu": 1,
+    "hownet_pos": 67,
+    "hownet_neg": 73,
+    "hownet_total": 140,
+    "dutir_pos_pct": 43.0,
+    "dutir_neg_pct": 56.1,
+    "hownet_pos_pct": 47.9,
+    "hownet_neg_pct": 52.1,
+    "dominant_emotion": "恶(43.0%)",
+    "dutir_cats": {
+      "好": 44,
+      "乐": 5,
+      "哀": 4,
+      "怒": 4,
+      "惧": 7,
+      "恶": 49,
+      "惊": 1
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "负面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "平儿",
+        "count": 24
+      },
+      {
+        "word": "姑娘",
+        "count": 17
+      },
+      {
+        "word": "芳官",
+        "count": 16
+      },
+      {
+        "word": "五儿",
+        "count": 15
+      },
+      {
+        "word": "林之孝家的",
+        "count": 13
+      }
+    ],
+    "report_file": "061_投鼠忌器宝玉瞒赃_V33_分析报告.md",
+    "word_count": 6435,
+    "title": "投鼠忌器宝玉瞒赃 判冤决狱平儿行权",
+    "event_count": 16,
+    "char_count": 78
+  },
+  {
+    "chapter": "062",
+    "dutir_total": 138,
+    "dutir_pos": 60,
+    "dutir_neg": 66,
+    "dutir_neu": 12,
+    "hownet_pos": 80,
+    "hownet_neg": 79,
+    "hownet_total": 159,
+    "dutir_pos_pct": 43.5,
+    "dutir_neg_pct": 47.8,
+    "hownet_pos_pct": 50.3,
+    "hownet_neg_pct": 49.7,
+    "dominant_emotion": "好(32.6%)",
+    "dutir_cats": {
+      "好": 45,
+      "乐": 15,
+      "哀": 10,
+      "怒": 2,
+      "惧": 9,
+      "恶": 45,
+      "惊": 12
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "负面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "宝玉",
+        "count": 59
+      },
+      {
+        "word": "探春",
+        "count": 36
+      },
+      {
+        "word": "袭人",
+        "count": 28
+      },
+      {
+        "word": "湘云",
+        "count": 22
+      },
+      {
+        "word": "众人",
+        "count": 20
+      }
+    ],
+    "report_file": "062_憨湘云醉眠芍药裀_V33_分析报告.md",
+    "word_count": 11977,
+    "title": "憨湘云醉眠芍药裀 呆香菱情解石榴裙",
+    "event_count": 18,
+    "char_count": 94
+  },
+  {
+    "chapter": "063",
+    "dutir_total": 205,
+    "dutir_pos": 114,
+    "dutir_neg": 81,
+    "dutir_neu": 10,
+    "hownet_pos": 103,
+    "hownet_neg": 112,
+    "hownet_total": 215,
+    "dutir_pos_pct": 55.6,
+    "dutir_neg_pct": 39.5,
+    "hownet_pos_pct": 47.9,
+    "hownet_neg_pct": 52.1,
+    "dominant_emotion": "好(41.5%)",
+    "dutir_cats": {
+      "好": 85,
+      "乐": 29,
+      "哀": 12,
+      "怒": 1,
+      "惧": 4,
+      "恶": 64,
+      "惊": 10
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "正面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "宝玉",
+        "count": 56
+      },
+      {
+        "word": "袭人",
+        "count": 36
+      },
+      {
+        "word": "众人",
+        "count": 34
+      },
+      {
+        "word": "芳官",
+        "count": 23
+      },
+      {
+        "word": "晴雯",
+        "count": 22
+      }
+    ],
+    "report_file": "063_寿怡红群芳开夜宴_V33_分析报告.md",
+    "word_count": 9981,
+    "title": "寿怡红群芳开夜宴 死金丹独艳理亲丧",
+    "event_count": 20,
+    "char_count": 94
+  },
+  {
+    "chapter": "064",
+    "dutir_total": 174,
+    "dutir_pos": 75,
+    "dutir_neg": 95,
+    "dutir_neu": 4,
+    "hownet_pos": 90,
+    "hownet_neg": 114,
+    "hownet_total": 204,
+    "dutir_pos_pct": 43.1,
+    "dutir_neg_pct": 54.6,
+    "hownet_pos_pct": 44.1,
+    "hownet_neg_pct": 55.9,
+    "dominant_emotion": "恶(33.9%)",
+    "dutir_cats": {
+      "好": 56,
+      "乐": 19,
+      "哀": 32,
+      "怒": 0,
+      "惧": 4,
+      "恶": 59,
+      "惊": 4
+    },
+    "emotion_richness": "6/7",
+    "base_tone": "负面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "贾琏",
+        "count": 53
+      },
+      {
+        "word": "宝玉",
+        "count": 37
+      },
+      {
+        "word": "二姐",
+        "count": 27
+      },
+      {
+        "word": "贾蓉",
+        "count": 24
+      },
+      {
+        "word": "贾珍",
+        "count": 21
+      }
+    ],
+    "report_file": "064_幽淑女悲题五美吟_V33_分析报告.md",
+    "word_count": 9816,
+    "title": "幽淑女悲题五美吟 浪荡子情遗九龙佩",
+    "event_count": 17,
+    "char_count": 82
+  },
+  {
+    "chapter": "065",
+    "dutir_total": 198,
+    "dutir_pos": 111,
+    "dutir_neg": 83,
+    "dutir_neu": 4,
+    "hownet_pos": 98,
+    "hownet_neg": 83,
+    "hownet_total": 181,
+    "dutir_pos_pct": 56.1,
+    "dutir_neg_pct": 41.9,
+    "hownet_pos_pct": 54.1,
+    "hownet_neg_pct": 45.9,
+    "dominant_emotion": "好(41.4%)",
+    "dutir_cats": {
+      "好": 82,
+      "乐": 29,
+      "哀": 8,
+      "怒": 2,
+      "惧": 8,
+      "恶": 65,
+      "惊": 4
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "正面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "贾琏",
+        "count": 36
+      },
+      {
+        "word": "奶奶",
+        "count": 27
+      },
+      {
+        "word": "两个",
+        "count": 22
+      },
+      {
+        "word": "贾珍",
+        "count": 16
+      },
+      {
+        "word": "尤三姐",
+        "count": 15
+      }
+    ],
+    "report_file": "065_贾二舍偷娶尤二姨_V33_分析报告.md",
+    "word_count": 7066,
+    "title": "贾二舍偷娶尤二姨 尤三姐思嫁柳二郎",
+    "event_count": 12,
+    "char_count": 74
+  },
+  {
+    "chapter": "066",
+    "dutir_total": 147,
+    "dutir_pos": 83,
+    "dutir_neg": 57,
+    "dutir_neu": 7,
+    "hownet_pos": 67,
+    "hownet_neg": 82,
+    "hownet_total": 149,
+    "dutir_pos_pct": 56.5,
+    "dutir_neg_pct": 38.8,
+    "hownet_pos_pct": 45.0,
+    "hownet_neg_pct": 55.0,
+    "dominant_emotion": "好(40.8%)",
+    "dutir_cats": {
+      "好": 60,
+      "乐": 23,
+      "哀": 13,
+      "怒": 0,
+      "惧": 3,
+      "恶": 41,
+      "惊": 7
+    },
+    "emotion_richness": "6/7",
+    "base_tone": "正面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "湘莲",
+        "count": 31
+      },
+      {
+        "word": "贾琏",
+        "count": 28
+      },
+      {
+        "word": "不知",
+        "count": 12
+      },
+      {
+        "word": "宝玉",
+        "count": 11
+      },
+      {
+        "word": "尤二姐",
+        "count": 11
+      }
+    ],
+    "report_file": "066_情小妹耻情归地府_V33_分析报告.md",
+    "word_count": 5211,
+    "title": "情小妹耻情归地府 冷二郎一冷入空门",
+    "event_count": 12,
+    "char_count": 60
+  },
+  {
+    "chapter": "067",
+    "dutir_total": 201,
+    "dutir_pos": 77,
+    "dutir_neg": 119,
+    "dutir_neu": 5,
+    "hownet_pos": 124,
+    "hownet_neg": 125,
+    "hownet_total": 249,
+    "dutir_pos_pct": 38.3,
+    "dutir_neg_pct": 59.2,
+    "hownet_pos_pct": 49.8,
+    "hownet_neg_pct": 50.2,
+    "dominant_emotion": "恶(44.3%)",
+    "dutir_cats": {
+      "好": 61,
+      "乐": 16,
+      "哀": 20,
+      "怒": 3,
+      "惧": 7,
+      "恶": 89,
+      "惊": 5
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "负面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "凤姐",
+        "count": 41
+      },
+      {
+        "word": "兴儿",
+        "count": 38
+      },
+      {
+        "word": "东西",
+        "count": 30
+      },
+      {
+        "word": "姑娘",
+        "count": 28
+      },
+      {
+        "word": "知道",
+        "count": 28
+      }
+    ],
+    "report_file": "067_见土仪颦卿思故里_V33_分析报告.md",
+    "word_count": 9399,
+    "title": "见土仪颦卿思故里 闻秘事凤姐讯家童",
+    "event_count": 15,
+    "char_count": 96
+  },
+  {
+    "chapter": "068",
+    "dutir_total": 223,
+    "dutir_pos": 123,
+    "dutir_neg": 93,
+    "dutir_neu": 7,
+    "hownet_pos": 105,
+    "hownet_neg": 96,
+    "hownet_total": 201,
+    "dutir_pos_pct": 55.2,
+    "dutir_neg_pct": 41.7,
+    "hownet_pos_pct": 52.2,
+    "hownet_neg_pct": 47.8,
+    "dominant_emotion": "好(43.9%)",
+    "dutir_cats": {
+      "好": 98,
+      "乐": 25,
+      "哀": 6,
+      "怒": 1,
+      "惧": 7,
+      "恶": 79,
+      "惊": 7
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "正面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "凤姐",
+        "count": 33
+      },
+      {
+        "word": "姐姐",
+        "count": 21
+      },
+      {
+        "word": "尤二姐",
+        "count": 19
+      },
+      {
+        "word": "贾蓉",
+        "count": 18
+      },
+      {
+        "word": "婶子",
+        "count": 17
+      }
+    ],
+    "report_file": "068_苦尤娘赚入大观园_V33_分析报告.md",
+    "word_count": 8096,
+    "title": "苦尤娘赚入大观园 酸凤姐大闹宁国府",
+    "event_count": 15,
+    "char_count": 70
+  },
+  {
+    "chapter": "069",
+    "dutir_total": 166,
+    "dutir_pos": 72,
+    "dutir_neg": 92,
+    "dutir_neu": 2,
+    "hownet_pos": 75,
+    "hownet_neg": 104,
+    "hownet_total": 179,
+    "dutir_pos_pct": 43.4,
+    "dutir_neg_pct": 55.4,
+    "hownet_pos_pct": 41.9,
+    "hownet_neg_pct": 58.1,
+    "dominant_emotion": "恶(39.8%)",
+    "dutir_cats": {
+      "好": 59,
+      "乐": 13,
+      "哀": 17,
+      "怒": 3,
+      "惧": 6,
+      "恶": 66,
+      "惊": 2
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "负面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "凤姐",
+        "count": 39
+      },
+      {
+        "word": "贾琏",
+        "count": 37
+      },
+      {
+        "word": "尤二姐",
+        "count": 28
+      },
+      {
+        "word": "贾母",
+        "count": 22
+      },
+      {
+        "word": "秋桐",
+        "count": 22
+      }
+    ],
+    "report_file": "069_弄小巧用借剑杀人_V33_分析报告.md",
+    "word_count": 6309,
+    "title": "弄小巧用借剑杀人 觉大限吞生金自逝",
+    "event_count": 14,
+    "char_count": 68
+  },
+  {
+    "chapter": "070",
+    "dutir_total": 60,
+    "dutir_pos": 31,
+    "dutir_neg": 27,
+    "dutir_neu": 2,
+    "hownet_pos": 30,
+    "hownet_neg": 45,
+    "hownet_total": 75,
+    "dutir_pos_pct": 51.7,
+    "dutir_neg_pct": 45.0,
+    "hownet_pos_pct": 40.0,
+    "hownet_neg_pct": 60.0,
+    "dominant_emotion": "好(45.0%)",
+    "dutir_cats": {
+      "好": 27,
+      "乐": 4,
+      "哀": 12,
+      "怒": 0,
+      "惧": 1,
+      "恶": 14,
+      "惊": 2
+    },
+    "emotion_richness": "6/7",
+    "base_tone": "正面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "宝玉",
+        "count": 30
+      },
+      {
+        "word": "桃花",
+        "count": 16
+      },
+      {
+        "word": "贾母",
+        "count": 9
+      },
+      {
+        "word": "众人",
+        "count": 8
+      },
+      {
+        "word": "探春",
+        "count": 7
+      }
+    ],
+    "report_file": "070_林黛玉重建桃花社_V33_分析报告.md",
+    "word_count": 5834,
+    "title": "林黛玉重建桃花社 史湘云偶填柳絮词",
+    "event_count": 15,
+    "char_count": 78
+  },
+  {
+    "chapter": "071",
+    "dutir_total": 187,
+    "dutir_pos": 82,
+    "dutir_neg": 102,
+    "dutir_neu": 3,
+    "hownet_pos": 85,
+    "hownet_neg": 106,
+    "hownet_total": 191,
+    "dutir_pos_pct": 43.9,
+    "dutir_neg_pct": 54.5,
+    "hownet_pos_pct": 44.5,
+    "hownet_neg_pct": 55.5,
+    "dominant_emotion": "恶(41.2%)",
+    "dutir_cats": {
+      "好": 63,
+      "乐": 19,
+      "哀": 16,
+      "怒": 4,
+      "惧": 5,
+      "恶": 77,
+      "惊": 3
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "负面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "奶奶",
+        "count": 33
+      },
+      {
+        "word": "两个",
+        "count": 28
+      },
+      {
+        "word": "贾母",
+        "count": 27
+      },
+      {
+        "word": "鸳鸯",
+        "count": 26
+      },
+      {
+        "word": "尤氏",
+        "count": 26
+      }
+    ],
+    "report_file": "071_嫌隙人有心生嫌隙_V33_分析报告.md",
+    "word_count": 8474,
+    "title": "嫌隙人有心生嫌隙 鸳鸯女无意遇鸳鸯",
+    "event_count": 17,
+    "char_count": 88
+  },
+  {
+    "chapter": "072",
+    "dutir_total": 150,
+    "dutir_pos": 66,
+    "dutir_neg": 82,
+    "dutir_neu": 2,
+    "hownet_pos": 81,
+    "hownet_neg": 92,
+    "hownet_total": 173,
+    "dutir_pos_pct": 44.0,
+    "dutir_neg_pct": 54.7,
+    "hownet_pos_pct": 46.8,
+    "hownet_neg_pct": 53.2,
+    "dominant_emotion": "恶(42.7%)",
+    "dutir_cats": {
+      "好": 36,
+      "乐": 30,
+      "哀": 10,
+      "怒": 3,
+      "惧": 5,
+      "恶": 64,
+      "惊": 2
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "负面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "贾琏",
+        "count": 38
+      },
+      {
+        "word": "凤姐",
+        "count": 31
+      },
+      {
+        "word": "鸳鸯",
+        "count": 27
+      },
+      {
+        "word": "银子",
+        "count": 19
+      },
+      {
+        "word": "姐姐",
+        "count": 16
+      }
+    ],
+    "report_file": "072_王熙凤恃强羞说病_V33_分析报告.md",
+    "word_count": 7161,
+    "title": "王熙凤恃强羞说病 来旺妇倚势霸成亲",
+    "event_count": 15,
+    "char_count": 64
+  },
+  {
+    "chapter": "073",
+    "dutir_total": 183,
+    "dutir_pos": 68,
+    "dutir_neg": 110,
+    "dutir_neu": 5,
+    "hownet_pos": 66,
+    "hownet_neg": 112,
+    "hownet_total": 178,
+    "dutir_pos_pct": 37.2,
+    "dutir_neg_pct": 60.1,
+    "hownet_pos_pct": 37.1,
+    "hownet_neg_pct": 62.9,
+    "dominant_emotion": "恶(51.4%)",
+    "dutir_cats": {
+      "好": 51,
+      "乐": 17,
+      "哀": 8,
+      "怒": 1,
+      "惧": 7,
+      "恶": 94,
+      "惊": 5
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "负面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "姑娘",
+        "count": 37
+      },
+      {
+        "word": "迎春",
+        "count": 27
+      },
+      {
+        "word": "探春",
+        "count": 21
+      },
+      {
+        "word": "贾母",
+        "count": 17
+      },
+      {
+        "word": "姐姐",
+        "count": 16
+      }
+    ],
+    "report_file": "073_痴丫头误拾绣春囊_V33_分析报告.md",
+    "word_count": 6877,
+    "title": "痴丫头误拾绣春囊 懦小姐不问累金凤",
+    "event_count": 14,
+    "char_count": 72
+  },
+  {
+    "chapter": "074",
+    "dutir_total": 252,
+    "dutir_pos": 104,
+    "dutir_neg": 142,
+    "dutir_neu": 6,
+    "hownet_pos": 131,
+    "hownet_neg": 176,
+    "hownet_total": 307,
+    "dutir_pos_pct": 41.3,
+    "dutir_neg_pct": 56.3,
+    "hownet_pos_pct": 42.7,
+    "hownet_neg_pct": 57.3,
+    "dominant_emotion": "恶(46.8%)",
+    "dutir_cats": {
+      "好": 77,
+      "乐": 27,
+      "哀": 14,
+      "怒": 2,
+      "惧": 8,
+      "恶": 118,
+      "惊": 6
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "负面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "凤姐",
+        "count": 58
+      },
+      {
+        "word": "太太",
+        "count": 33
+      },
+      {
+        "word": "东西",
+        "count": 30
+      },
+      {
+        "word": "丫头",
+        "count": 27
+      },
+      {
+        "word": "王夫人",
+        "count": 24
+      }
+    ],
+    "report_file": "074_惑奸谗抄检大观园_V33_分析报告.md",
+    "word_count": 10836,
+    "title": "惑奸谗抄检大观园 避嫌隙杜绝宁国府",
+    "event_count": 18,
+    "char_count": 74
+  },
+  {
+    "chapter": "075",
+    "dutir_total": 193,
+    "dutir_pos": 101,
+    "dutir_neg": 88,
+    "dutir_neu": 4,
+    "hownet_pos": 92,
+    "hownet_neg": 112,
+    "hownet_total": 204,
+    "dutir_pos_pct": 52.3,
+    "dutir_neg_pct": 45.6,
+    "hownet_pos_pct": 45.1,
+    "hownet_neg_pct": 54.9,
+    "dominant_emotion": "好(37.3%)",
+    "dutir_cats": {
+      "好": 72,
+      "乐": 29,
+      "哀": 10,
+      "怒": 6,
+      "惧": 4,
+      "恶": 68,
+      "惊": 4
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "正面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "尤氏",
+        "count": 43
+      },
+      {
+        "word": "贾母",
+        "count": 36
+      },
+      {
+        "word": "贾珍",
+        "count": 17
+      },
+      {
+        "word": "奶奶",
+        "count": 15
+      },
+      {
+        "word": "今日",
+        "count": 15
+      }
+    ],
+    "report_file": "075_开夜宴异兆发悲音_V33_分析报告.md",
+    "word_count": 8584,
+    "title": "开夜宴异兆发悲音 赏中秋新词得佳谶",
+    "event_count": 17,
+    "char_count": 73
+  },
+  {
+    "chapter": "076",
+    "dutir_total": 154,
+    "dutir_pos": 89,
+    "dutir_neg": 60,
+    "dutir_neu": 5,
+    "hownet_pos": 74,
+    "hownet_neg": 76,
+    "hownet_total": 150,
+    "dutir_pos_pct": 57.8,
+    "dutir_neg_pct": 39.0,
+    "hownet_pos_pct": 49.3,
+    "hownet_neg_pct": 50.7,
+    "dominant_emotion": "好(38.3%)",
+    "dutir_cats": {
+      "好": 59,
+      "乐": 30,
+      "哀": 14,
+      "怒": 0,
+      "惧": 0,
+      "恶": 46,
+      "惊": 5
+    },
+    "emotion_richness": "5/7",
+    "base_tone": "正面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "湘云",
+        "count": 38
+      },
+      {
+        "word": "黛玉",
+        "count": 35
+      },
+      {
+        "word": "贾母",
+        "count": 23
+      },
+      {
+        "word": "二人",
+        "count": 18
+      },
+      {
+        "word": "两个",
+        "count": 15
+      }
+    ],
+    "report_file": "076_凸碧堂品笛感凄清_V33_分析报告.md",
+    "word_count": 6987,
+    "title": "凸碧堂品笛感凄清 凹晶馆联诗悲寂寞",
+    "event_count": 14,
+    "char_count": 58
+  },
+  {
+    "chapter": "077",
+    "dutir_total": 235,
+    "dutir_pos": 93,
+    "dutir_neg": 137,
+    "dutir_neu": 5,
+    "hownet_pos": 141,
+    "hownet_neg": 159,
+    "hownet_total": 300,
+    "dutir_pos_pct": 39.6,
+    "dutir_neg_pct": 58.3,
+    "hownet_pos_pct": 47.0,
+    "hownet_neg_pct": 53.0,
+    "dominant_emotion": "恶(42.1%)",
+    "dutir_cats": {
+      "好": 74,
+      "乐": 19,
+      "哀": 29,
+      "怒": 3,
+      "惧": 6,
+      "恶": 99,
+      "惊": 5
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "负面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "宝玉",
+        "count": 78
+      },
+      {
+        "word": "王夫人",
+        "count": 45
+      },
+      {
+        "word": "晴雯",
+        "count": 37
+      },
+      {
+        "word": "袭人",
+        "count": 29
+      },
+      {
+        "word": "太太",
+        "count": 28
+      }
+    ],
+    "report_file": "077_俏丫鬟抱屈夭风流_V33_分析报告.md",
+    "word_count": 10283,
+    "title": "俏丫鬟抱屈夭风流 美优伶斩情归水月",
+    "event_count": 19,
+    "char_count": 76
+  },
+  {
+    "chapter": "078",
+    "dutir_total": 227,
+    "dutir_pos": 113,
+    "dutir_neg": 111,
+    "dutir_neu": 3,
+    "hownet_pos": 126,
+    "hownet_neg": 125,
+    "hownet_total": 251,
+    "dutir_pos_pct": 49.8,
+    "dutir_neg_pct": 48.9,
+    "hownet_pos_pct": 50.2,
+    "hownet_neg_pct": 49.8,
+    "dominant_emotion": "好(41.0%)",
+    "dutir_cats": {
+      "好": 93,
+      "乐": 20,
+      "哀": 28,
+      "怒": 0,
+      "惧": 7,
+      "恶": 76,
+      "惊": 3
+    },
+    "emotion_richness": "6/7",
+    "base_tone": "正面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "宝玉",
+        "count": 55
+      },
+      {
+        "word": "王夫人",
+        "count": 17
+      },
+      {
+        "word": "众人",
+        "count": 17
+      },
+      {
+        "word": "芙蓉",
+        "count": 13
+      },
+      {
+        "word": "晴雯",
+        "count": 12
+      }
+    ],
+    "report_file": "078_老学士闲征姽婳词_V33_分析报告.md",
+    "word_count": 9240,
+    "title": "老学士闲征姽婳词 痴公子杜撰芙蓉诔",
+    "event_count": 15,
+    "char_count": 68
+  },
+  {
+    "chapter": "079",
+    "dutir_total": 168,
+    "dutir_pos": 79,
+    "dutir_neg": 84,
+    "dutir_neu": 5,
+    "hownet_pos": 66,
+    "hownet_neg": 85,
+    "hownet_total": 151,
+    "dutir_pos_pct": 47.0,
+    "dutir_neg_pct": 50.0,
+    "hownet_pos_pct": 43.7,
+    "hownet_neg_pct": 56.3,
+    "dominant_emotion": "好(36.9%)",
+    "dutir_cats": {
+      "好": 62,
+      "乐": 17,
+      "哀": 18,
+      "怒": 4,
+      "惧": 6,
+      "恶": 56,
+      "惊": 5
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "负面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "宝玉",
+        "count": 26
+      },
+      {
+        "word": "香菱",
+        "count": 18
+      },
+      {
+        "word": "薛蟠",
+        "count": 12
+      },
+      {
+        "word": "黛玉",
+        "count": 10
+      },
+      {
+        "word": "姑娘",
+        "count": 10
+      }
+    ],
+    "report_file": "079_薛文起悔娶河东吼_V33_分析报告.md",
+    "word_count": 4704,
+    "title": "薛文起悔娶河东吼 贾迎春误嫁中山狼",
+    "event_count": 16,
+    "char_count": 66
+  },
+  {
+    "chapter": "080",
+    "dutir_total": 208,
+    "dutir_pos": 76,
+    "dutir_neg": 131,
+    "dutir_neu": 1,
+    "hownet_pos": 90,
+    "hownet_neg": 130,
+    "hownet_total": 220,
+    "dutir_pos_pct": 36.5,
+    "dutir_neg_pct": 63.0,
+    "hownet_pos_pct": 40.9,
+    "hownet_neg_pct": 59.1,
+    "dominant_emotion": "恶(46.2%)",
+    "dutir_cats": {
+      "好": 46,
+      "乐": 30,
+      "哀": 22,
+      "怒": 7,
+      "惧": 6,
+      "恶": 96,
+      "惊": 1
+    },
+    "emotion_richness": "7/7",
+    "base_tone": "负面主导",
+    "cross_valid": "✅",
+    "top_words": [
+      {
+        "word": "香菱",
+        "count": 39
+      },
+      {
+        "word": "薛蟠",
+        "count": 32
+      },
+      {
+        "word": "金桂",
+        "count": 31
+      },
+      {
+        "word": "宝蟾",
+        "count": 24
+      },
+      {
+        "word": "宝玉",
+        "count": 23
+      }
+    ],
+    "report_file": "080_美香菱屈受贪夫棒_V33_分析报告.md",
+    "word_count": 6448,
+    "title": "美香菱屈受贪夫棒 王道士胡诌妒妇方",
+    "event_count": 14,
+    "char_count": 62
+  }
+]

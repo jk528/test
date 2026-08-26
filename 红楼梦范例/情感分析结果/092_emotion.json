@@ -1,0 +1,172 @@
+{
+  "chapter": "092",
+  "raw": "=== Chapter 092 ===\nTotal words: 183\n\n--- DUTIR 7 categories ---\n好: 3 (33.3%) words=['正经', '天才', '讲究']\n乐: 0 (0.0%) words=[]\n哀: 1 (11.1%) words=['生疏']\n怒: 0 (0.0%) words=[]\n惧: 0 (0.0%) words=[]\n恶: 5 (55.6%) words=['不好', '假撇清', '闲话', '偷懒', '生气']\n惊: 0 (0.0%) words=[]\nDUTIR_TOTAL: 9\nPOS: 3 NEG: 6 NEU: 0\n\n--- Hownet ---\npos: 12 neg: 8\npos%: 60.0 neg%: 40.0\ntotal: 20\npos_words: ['讲究', '不肯', '知道', '天才', '偷懒', '有说有笑', '点头', '巴不得', '正经', '留神']\nneg_words: ['不好', '知道', '生疏', '生气', '忘记', '计较', '孩子气', '显见']\n\n--- Top 30 words ---\n  袭人: 11\n  宝玉: 8\n  老太太: 5\n  二爷: 4\n  麝月: 4\n  知道: 3\n  念书: 3\n  明儿: 3\n  房里: 3\n  一天: 3\n  老爷: 2\n  问道: 2\n  说些: 2\n  禅语: 2\n  年纪: 2\n  留神: 2\n  这么着: 2\n  已经: 2\n  回来: 2\n  评女: 1\n  巧姐: 1\n  慕贤良: 1\n  母珠贾: 1\n  政参: 1\n  聚散: 1\n  潇湘馆: 1\n  连忙: 1\n  秋纹: 1\n  我作: 1\n  秋纹笑: 1\n",
+  "dutir_好": {
+    "count": 3,
+    "pct": 33.3,
+    "words": "'正经', '天才', '讲究'"
+  },
+  "dutir_乐": {
+    "count": 0,
+    "pct": 0.0,
+    "words": ""
+  },
+  "dutir_哀": {
+    "count": 1,
+    "pct": 11.1,
+    "words": "'生疏'"
+  },
+  "dutir_怒": {
+    "count": 0,
+    "pct": 0.0,
+    "words": ""
+  },
+  "dutir_惧": {
+    "count": 0,
+    "pct": 0.0,
+    "words": ""
+  },
+  "dutir_恶": {
+    "count": 5,
+    "pct": 55.6,
+    "words": "'不好', '假撇清', '闲话', '偷懒', '生气'"
+  },
+  "dutir_惊": {
+    "count": 0,
+    "pct": 0.0,
+    "words": ""
+  },
+  "dutir_total": 9,
+  "dutir_pos": 3,
+  "dutir_neg": 6,
+  "dutir_neu": 0,
+  "hownet_pos": 12,
+  "hownet_neg": 8,
+  "hownet_pos_pct": 60.0,
+  "hownet_neg_pct": 40.0,
+  "hownet_total": 20,
+  "hownet_pos_words": "'讲究', '不肯', '知道', '天才', '偷懒', '有说有笑', '点头', '巴不得', '正经', '留神'",
+  "hownet_neg_words": "'不好', '知道', '生疏', '生气', '忘记', '计较', '孩子气', '显见'",
+  "top_words": [
+    {
+      "word": "袭人",
+      "count": 11
+    },
+    {
+      "word": "宝玉",
+      "count": 8
+    },
+    {
+      "word": "老太太",
+      "count": 5
+    },
+    {
+      "word": "二爷",
+      "count": 4
+    },
+    {
+      "word": "麝月",
+      "count": 4
+    },
+    {
+      "word": "知道",
+      "count": 3
+    },
+    {
+      "word": "念书",
+      "count": 3
+    },
+    {
+      "word": "明儿",
+      "count": 3
+    },
+    {
+      "word": "房里",
+      "count": 3
+    },
+    {
+      "word": "一天",
+      "count": 3
+    },
+    {
+      "word": "老爷",
+      "count": 2
+    },
+    {
+      "word": "问道",
+      "count": 2
+    },
+    {
+      "word": "说些",
+      "count": 2
+    },
+    {
+      "word": "禅语",
+      "count": 2
+    },
+    {
+      "word": "年纪",
+      "count": 2
+    },
+    {
+      "word": "留神",
+      "count": 2
+    },
+    {
+      "word": "这么着",
+      "count": 2
+    },
+    {
+      "word": "已经",
+      "count": 2
+    },
+    {
+      "word": "回来",
+      "count": 2
+    },
+    {
+      "word": "评女",
+      "count": 1
+    },
+    {
+      "word": "巧姐",
+      "count": 1
+    },
+    {
+      "word": "慕贤良",
+      "count": 1
+    },
+    {
+      "word": "母珠贾",
+      "count": 1
+    },
+    {
+      "word": "政参",
+      "count": 1
+    },
+    {
+      "word": "聚散",
+      "count": 1
+    },
+    {
+      "word": "潇湘馆",
+      "count": 1
+    },
+    {
+      "word": "连忙",
+      "count": 1
+    },
+    {
+      "word": "秋纹",
+      "count": 1
+    },
+    {
+      "word": "我作",
+      "count": 1
+    },
+    {
+      "word": "秋纹笑",
+      "count": 1
+    }
+  ]
+}
