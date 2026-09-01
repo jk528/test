@@ -19,7 +19,8 @@ Option Explicit
 '   5. 数字+标题（无"第"字，如 1章 标题）
 '   6. 精简中文（仅章节，含〇，限1-7字）—— 参考清洁工具正则
 '   7. 宽松匹配（第+任意内容+章/回/节/卷）—— 适配非标准格式
-'   8. 自定义正则（手动输入正则 + 默认单位词）
+'   8. 纯数字起始（3-4位数字开头，如 001 标题）
+'   9. 自定义正则（手动输入正则 + 默认单位词）
 '
 ' 聚合格式: 每份章数,份数|每份章数,份数|...  或便捷 N（每N章一份）
 '   例: 40,3 -> 3份各40章； 20,1|20,1|80,1 -> 3份(1-20,21-40,41-120)
@@ -121,7 +122,14 @@ Private Sub InitRegexPatterns()
     g_regexUnitGroups(g_regexCount) = 1
     g_regexDefaultUnits(g_regexCount) = "章"
 
-    ' 8. 自定义正则（手动输入）
+    ' 8. 纯数字起始（3-4位数字开头，如 001 标题）
+    g_regexCount = g_regexCount + 1
+    g_regexNames(g_regexCount) = "纯数字起始（3-4位数字开头，如 001 标题）"
+    g_regexPatterns(g_regexCount) = "^\d{3,4}.*"
+    g_regexUnitGroups(g_regexCount) = -1   ' 无单位组
+    g_regexDefaultUnits(g_regexCount) = "章"
+
+    ' 9. 自定义正则（手动输入）
     g_regexCount = g_regexCount + 1
     g_regexNames(g_regexCount) = "自定义正则（手动输入）"
     g_regexPatterns(g_regexCount) = ""     ' 用户输入时填充
@@ -198,7 +206,7 @@ Private Function SelectRegexPattern() As Boolean
         End If
     Next p
 
-    ' 处理自定义正则（序号8）
+    ' 处理自定义正则（序号9）
     If hasCustom Then
         Dim customPattern As String
         customPattern = InputBox("请输入自定义正则表达式：" & vbCrLf & vbCrLf & _
@@ -560,8 +568,8 @@ Public Sub 拆分TXT()
             Exit Sub
         End If
 
-        ' 若选中了自定义正则（序号8），询问聚合拆分用的单位词
-        ' 预设正则1-7的单位词已在 InitRegexPatterns 中配置，无需询问
+        ' 若选中了自定义正则（序号9），询问聚合拆分用的单位词
+        ' 预设正则1-8的单位词已在 InitRegexPatterns 中配置，无需询问
         Dim selIdx As Long
         For selIdx = 0 To g_selCount - 1
             If g_selOrigIndices(selIdx) = g_regexCount Then
