@@ -305,16 +305,24 @@ End Function
 '------------------------------------------------------------------------------
 ' 检测编码（传入字节数组）
 '   1. BOM 检测：FF FE = UTF-16LE; FE FF = UTF-16BE; EF BB BF = UTF-8 BOM
-'   2. 无BOM时扫描前100字节，检查高位字节模式判断 UTF-8 vs ANSI
-'   3. 全ASCII（无高位字节）→ ANSI
+'   2. 无BOM时分三段采样（头部/中部/尾部），检查高位字节模式判断 UTF-8 vs ANSI
+'      - 每段 scanLen 字节，默认 100
+'      - 任一段命中有效 UTF-8 序列 → UTF-8
+'      - 任一段遇到非法高位字节 → ANSI
+'      - 三段全为 ASCII → ANSI（纯英文文件两者兼容）
 '------------------------------------------------------------------------------
 Public Function DetectEncodingBytes(fileBytes() As Byte) As String
-    Dim i As Long, scanLen As Long, b1 As Byte
+    Dim totalLen As Long, scanLen As Long
+    Dim headEnd As Long, midStart As Long, midEnd As Long
+    Dim tailStart As Long, tailEnd As Long
+    Dim result As String
 
     If UBound(fileBytes) < 0 Then
         DetectEncodingBytes = "ANSI"
         Exit Function
     End If
+
+    totalLen = UBound(fileBytes) + 1   ' 总字节数
 
     ' --- BOM 检测 ---
     If UBound(fileBytes) >= 1 Then
@@ -334,57 +342,132 @@ Public Function DetectEncodingBytes(fileBytes() As Byte) As String
         End If
     End If
 
-    ' --- 无BOM：扫描字节模式判断 UTF-8 vs ANSI ---
-    scanLen = UBound(fileBytes)
-    If scanLen > 100 Then scanLen = 100
+    ' --- 无BOM：三段采样（头部 / 中部 / 尾部）判断 UTF-8 vs ANSI ---
+    scanLen = 100
+    If totalLen < scanLen * 3 Then
+        ' 文件太小，直接全量扫描一次
+        result = ScanBytesForEncoding(fileBytes, 0, UBound(fileBytes))
+        If Len(result) > 0 Then
+            DetectEncodingBytes = result
+        Else
+            DetectEncodingBytes = "ANSI"
+        End If
+        Exit Function
+    End If
 
-    For i = 0 To scanLen
+    ' 头部：0 ~ scanLen-1
+    headEnd = scanLen - 1
+    result = ScanBytesForEncoding(fileBytes, 0, headEnd)
+    If Len(result) > 0 Then
+        DetectEncodingBytes = result
+        Exit Function
+    End If
+
+    ' 中部：以文件中点为中心，向前后各延伸 scanLen/2
+    midStart = (totalLen \ 2) - (scanLen \ 2)
+    If midStart < headEnd + 1 Then midStart = headEnd + 1
+    midEnd = midStart + scanLen - 1
+    If midEnd >= totalLen Then midEnd = totalLen - 1
+    result = ScanBytesForEncoding(fileBytes, midStart, midEnd)
+    If Len(result) > 0 Then
+        DetectEncodingBytes = result
+        Exit Function
+    End If
+
+    ' 尾部：最后 scanLen 字节
+    tailEnd = UBound(fileBytes)
+    tailStart = tailEnd - scanLen + 1
+    If tailStart <= midEnd Then tailStart = midEnd + 1
+    If tailStart > tailEnd Then
+        ' 尾部与中部重叠（文件不够大），跳过
+    Else
+        result = ScanBytesForEncoding(fileBytes, tailStart, tailEnd)
+        If Len(result) > 0 Then
+            DetectEncodingBytes = result
+            Exit Function
+        End If
+    End If
+
+    ' 三段全为 ASCII → 视为ANSI（纯英文文件两者兼容）
+    DetectEncodingBytes = "ANSI"
+End Function
+
+'------------------------------------------------------------------------------
+' 在指定字节范围内扫描，判断 UTF-8 vs ANSI
+'   返回值："UTF-8" / "ANSI" / ""  （空串 = 全ASCII，无结论）
+'   段边界处理：
+'     - 段起点若切在 UTF-8 延续字节(0x80~0xBF)上，跳过直到找到前导字节
+'       （避免段起点切在多字节序列中间导致误判）
+'     - 段尾不做截断保护：验证UTF-8序列时可跨段读取后续字节（最多3字节）
+'       只检查 ub 边界（文件末尾），与原版行为一致，代价极小
+'   验证核心逻辑（前导字节模式匹配）与原版完全一致
+'------------------------------------------------------------------------------
+Private Function ScanBytesForEncoding(fileBytes() As Byte, _
+        ByVal startIdx As Long, ByVal endIdx As Long) As String
+    Dim i As Long, b1 As Byte
+    Dim ub As Long
+    ub = UBound(fileBytes)
+
+    If startIdx < 0 Then startIdx = 0
+    If endIdx > ub Then endIdx = ub
+    If startIdx > endIdx Then
+        ScanBytesForEncoding = ""
+        Exit Function
+    End If
+
+    For i = startIdx To endIdx
         If fileBytes(i) > &H7F Then
             b1 = fileBytes(i)
+            ' 跳过 UTF-8 延续字节（0x80~0xBF）：段起点可能切在多字节序列中间
+            ' 继续往后寻找真正的前导字节再判断
+            If (b1 And &HC0) = &H80 Then
+                GoTo NextByte
+            End If
             Select Case True
                 ' 3字节UTF-8序列: E0~EF + 80~BF + 80~BF
                 Case (b1 And &HF0) = &HE0
-                    If i + 2 <= UBound(fileBytes) Then
+                    If i + 2 <= ub Then
                         If (fileBytes(i + 1) And &HC0) = &H80 And _
                            (fileBytes(i + 2) And &HC0) = &H80 Then
-                            DetectEncodingBytes = "UTF-8"
+                            ScanBytesForEncoding = "UTF-8"
                             Exit Function
                         End If
                     End If
-                    DetectEncodingBytes = "ANSI"
+                    ScanBytesForEncoding = "ANSI"
                     Exit Function
                 ' 4字节UTF-8序列: F0~F7 + 80~BF + 80~BF + 80~BF
                 Case (b1 And &HF8) = &HF0
-                    If i + 3 <= UBound(fileBytes) Then
+                    If i + 3 <= ub Then
                         If (fileBytes(i + 1) And &HC0) = &H80 And _
                            (fileBytes(i + 2) And &HC0) = &H80 And _
                            (fileBytes(i + 3) And &HC0) = &H80 Then
-                            DetectEncodingBytes = "UTF-8"
+                            ScanBytesForEncoding = "UTF-8"
                             Exit Function
                         End If
                     End If
-                    DetectEncodingBytes = "ANSI"
+                    ScanBytesForEncoding = "ANSI"
                     Exit Function
                 ' 2字节UTF-8序列: C0~DF + 80~BF
                 Case (b1 And &HE0) = &HC0
-                    If i + 1 <= UBound(fileBytes) Then
+                    If i + 1 <= ub Then
                         If (fileBytes(i + 1) And &HC0) = &H80 Then
-                            DetectEncodingBytes = "UTF-8"
+                            ScanBytesForEncoding = "UTF-8"
                             Exit Function
                         End If
                     End If
-                    DetectEncodingBytes = "ANSI"
+                    ScanBytesForEncoding = "ANSI"
                     Exit Function
                 Case Else
                     ' 高位字节不符合UTF-8前导字节模式 → ANSI
-                    DetectEncodingBytes = "ANSI"
+                    ScanBytesForEncoding = "ANSI"
                     Exit Function
             End Select
         End If
+NextByte:
     Next i
 
-    ' 全ASCII（无高位字节）→ 视为ANSI（纯英文文件两者兼容）
-    DetectEncodingBytes = "ANSI"
+    ' 本段全为 ASCII → 无结论，由调用方决定是否继续扫描下一段
+    ScanBytesForEncoding = ""
 End Function
 
 '------------------------------------------------------------------------------
