@@ -24,9 +24,9 @@ Sub 四方镜子()
     Dim 窗体名 As String
     窗体名 = "SFJ" & Format(Now, "hhmmss")
     
-    ' 1. 生成frm临时文件
+    ' 1. 生成frm临时文件（放在工作簿同目录，用完即删）
     Dim 临时路径 As String
-    临时路径 = Environ("TEMP") & "\" & 窗体名 & ".frm"
+    临时路径 = ThisWorkbook.Path & "\" & 窗体名 & ".frm"
     
     Open 临时路径 For Output As #1
     Print #1, 生成窗体代码(窗体名)
@@ -37,18 +37,20 @@ Sub 四方镜子()
     Set VBP = ThisWorkbook.VBProject
     VBP.VBComponents.Import 临时路径
     
-    ' 3. 显示
+    ' 3. 导入后立即删除frm文件（不等到最后，避免异常残留）
+    Kill 临时路径
+    
+    ' 4. 显示窗体
     VBA.UserForms.Add(窗体名).Show
     
-    ' 4. 清理
+    ' 5. 清理窗体组件
     VBP.VBComponents.Remove VBP.VBComponents(窗体名)
-    Kill 临时路径
     
     Exit Sub
 
 错误处理:
     MsgBox "错误 " & Err.Number & ": " & Err.Description, vbCritical, "四方镜子"
-    ' 清理残留
+    ' 确保清理干净（窗体组件 + 临时文件）
     On Error Resume Next
     Dim VBP2 As Object
     Set VBP2 = ThisWorkbook.VBProject
@@ -74,7 +76,6 @@ Private Function 生成窗体代码(窗体名 As String) As String
     s = s & "   ClientLeft      =   120" & vbCrLf
     s = s & "   ClientTop       =   465" & vbCrLf
     s = s & "   ClientWidth     =   6000" & vbCrLf
-    s = s & "   OleObjectBlob   =   """ & 窗体名 & ".frx"":0000" & vbCrLf
     s = s & "   StartUpPosition =   1" & vbCrLf
     
     ' ---- 控件：标签 ----
