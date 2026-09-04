@@ -1,8 +1,8 @@
 '============================================================
-' 四方镜子 - 单模块版 v5（基于范例111模式）
-' 模式：Designer.Controls.Add + CodeModule 注入事件代码
-' 原理：用Designer添加设计时控件（事件原生支持）
-'       用CodeModule.InsertLines逐行注入事件处理代码
+' 四方镜子 - 单模块版 v5（模态 + 可反复操作）
+' 基于范例111模式：Designer.Controls.Add + CodeModule 注入事件代码
+' 与v6区别：按钮执行后不关闭窗体，可反复点击不同操作
+'           增加"关闭窗体"按钮用于退出
 ' 使用方法：运行 四方镜子()
 ' 注意：需启用"信任对VBA工程对象模型的访问"
 '============================================================
@@ -12,7 +12,6 @@ Option Explicit
 ' 全局变量
 Public 连接符 As String
 Public 是否合并 As Boolean
-Public 当前窗体名 As String  ' 记录动态窗体名，用于清理
 
 ' ============================================================
 '  主入口
@@ -27,28 +26,24 @@ Sub 四方镜子()
     Dim VBP As Object
     Set VBP = ThisWorkbook.VBProject
 
-    ' 0. 清理上次残留的动态窗体
-    清理旧窗体 VBP
-
     ' 1. 创建窗体
     Dim 窗体组件 As Object
     Set 窗体组件 = VBP.VBComponents.Add(3) ' 3 = vbext_ct_MSForm
     Dim 窗体名 As String
     窗体名 = 窗体组件.Name
-    当前窗体名 = 窗体名
-    
+
     ' 2. 设置窗体属性
     With 窗体组件.Properties
         .Item("Caption") = "四方镜"
         .Item("Width") = 300
-        .Item("Height") = 320
+        .Item("Height") = 330
         .Item("StartUpPosition") = 1 ' 居中
     End With
-    
+
     ' 3. 用 Designer 添加控件（设计时控件，事件原生支持）
     Dim 设计器 As Object
     Set 设计器 = 窗体组件.Designer
-    
+
     ' --- 标签 ---
     Dim lbl As Object
     Set lbl = 设计器.Controls.Add("Forms.Label.1", "Label1")
@@ -57,7 +52,7 @@ Sub 四方镜子()
         .Left = 10: .Top = 12: .Width = 60: .Height = 18
         .Font.Size = 10
     End With
-    
+
     ' --- 文本框 ---
     Dim txt As Object
     Set txt = 设计器.Controls.Add("Forms.TextBox.1", "TextBox1")
@@ -66,7 +61,7 @@ Sub 四方镜子()
         .Left = 75: .Top = 10: .Width = 80: .Height = 22
         .Font.Size = 10
     End With
-    
+
     ' --- 复选框 ---
     Dim chk As Object
     Set chk = 设计器.Controls.Add("Forms.CheckBox.1", "CheckBox1")
@@ -76,7 +71,7 @@ Sub 四方镜子()
         .Value = True
         .Font.Size = 10
     End With
-    
+
     ' --- 框架1 ---
     Dim fra1 As Object
     Set fra1 = 设计器.Controls.Add("Forms.Frame.1", "Frame1")
@@ -85,8 +80,8 @@ Sub 四方镜子()
         .Left = 10: .Top = 65: .Width = 275: .Height = 120
         .Font.Size = 10: .Font.Bold = True
     End With
-    
-    ' --- 按钮1：反向竖向（放入Frame1内，坐标相对于框架） ---
+
+    ' --- 按钮1：反向竖向 ---
     Dim btn1 As Object
     Set btn1 = fra1.Controls.Add("Forms.CommandButton.1", "CommandButton1")
     With btn1
@@ -121,7 +116,7 @@ Sub 四方镜子()
         .Left = 150: .Top = 90: .Width = 95: .Height = 25
         .Font.Size = 9
     End With
-    
+
     ' --- 框架2 ---
     Dim fra2 As Object
     Set fra2 = 设计器.Controls.Add("Forms.Frame.1", "Frame2")
@@ -130,8 +125,8 @@ Sub 四方镜子()
         .Left = 10: .Top = 195: .Width = 275: .Height = 60
         .Font.Size = 10: .Font.Bold = True
     End With
-    
-    ' --- 按钮5：双边循环_竖（放入Frame2内） ---
+
+    ' --- 按钮5：双边循环_竖 ---
     Dim btn5 As Object
     Set btn5 = fra2.Controls.Add("Forms.CommandButton.1", "CommandButton5")
     With btn5
@@ -150,22 +145,23 @@ Sub 四方镜子()
     End With
 
     ' --- 关闭按钮 ---
-    Dim btnClose As Object
-    Set btnClose = 设计器.Controls.Add("Forms.CommandButton.1", "CommandButton7")
-    With btnClose
+    Dim btn7 As Object
+    Set btn7 = 设计器.Controls.Add("Forms.CommandButton.1", "CommandButton7")
+    With btn7
         .Caption = "关闭窗体"
-        .Left = 100: .Top = 265: .Width = 95: .Height = 25
+        .Left = 100: .Top = 270: .Width = 95: .Height = 28
         .Font.Size = 10: .Font.Bold = True
         .BackColor = RGB(220, 80, 80)
     End With
-    
-    ' 4. 用 CodeModule 注入事件代码（逐行写入，范例111模式）
+
+    ' 4. 用 CodeModule 注入事件代码
     注入事件代码 窗体组件
-    
-    ' 5. 显示窗体（vbModeless 允许同时操作工作表，不关闭窗体）
-    '    注意：modeless下 Show 立即返回，不能在此删除窗体组件
-    '    清理在下一次运行四方镜子()时自动执行，或点击"关闭窗体"按钮时执行
-    VBA.UserForms.Add(窗体名).Show vbModeless
+
+    ' 5. 显示窗体（模态，阻塞直到用户点"关闭窗体"或X）
+    VBA.UserForms.Add(窗体名).Show
+
+    ' 6. Show 返回说明窗体已关闭，安全删除组件
+    VBP.VBComponents.Remove 窗体组件
 
     Exit Sub
 
@@ -178,36 +174,7 @@ Sub 四方镜子()
 End Sub
 
 ' ============================================================
-'  清理旧窗体（在下次创建前执行）
-' ============================================================
-
-Private Sub 清理旧窗体(VBP As Object)
-    On Error Resume Next
-    Dim comp As Object
-    For Each comp In VBP.VBComponents
-        ' 删除之前动态创建的窗体（名称以 "SFJ" 或系统默认 "UserForm" 开头的）
-        If comp.Type = 3 Then ' vbext_ct_MSForm
-            Dim n As String
-            n = comp.Name
-            ' 排除手动画的窗体（假设用户手动窗体不以"SFJ"开头）
-            If Left(n, 3) = "SFJ" Then
-                VBP.VBComponents.Remove comp
-            End If
-        End If
-    Next comp
-End Sub
-
-' 关闭窗体时通过 OnTime 延迟调用（窗体已卸载，安全删除组件）
-Sub 清理窗体()
-    On Error Resume Next
-    If Len(当前窗体名) > 0 Then
-        ThisWorkbook.VBProject.VBComponents.Remove ThisWorkbook.VBProject.VBComponents(当前窗体名)
-        当前窗体名 = ""
-    End If
-End Sub
-
-' ============================================================
-'  注入事件代码（范例111模式：CodeModule.InsertLines 逐行写入）
+'  注入事件代码（CodeModule.InsertLines 逐行写入）
 ' ============================================================
 
 Private Sub 注入事件代码(窗体组件 As Object)
@@ -215,23 +182,23 @@ Private Sub 注入事件代码(窗体组件 As Object)
     Set CM = 窗体组件.CodeModule
     Dim i As Long
     i = CM.CountOfLines
-    
+
     ' ---- Option Explicit ----
     i = i + 1: CM.InsertLines i, "Option Explicit"
     i = i + 1: CM.InsertLines i, ""
-    
-    ' ---- Initialize 事件 ----
+
+    ' ---- Initialize ----
     i = i + 1: CM.InsertLines i, "Private Sub UserForm_Initialize()"
     i = i + 1: CM.InsertLines i, "    CommandButton1.SetFocus"
     i = i + 1: CM.InsertLines i, "End Sub"
     i = i + 1: CM.InsertLines i, ""
-    
+
     ' ---- TextBox1_Change ----
     i = i + 1: CM.InsertLines i, "Private Sub TextBox1_Change()"
     i = i + 1: CM.InsertLines i, "    连接符 = TextBox1.Text"
     i = i + 1: CM.InsertLines i, "End Sub"
     i = i + 1: CM.InsertLines i, ""
-    
+
     ' ---- CheckBox1_Click ----
     i = i + 1: CM.InsertLines i, "Private Sub CheckBox1_Click()"
     i = i + 1: CM.InsertLines i, "    是否合并 = CheckBox1.Value"
@@ -253,47 +220,41 @@ Private Sub 注入事件代码(窗体组件 As Object)
     i = i + 1: CM.InsertLines i, "    CommandButton1.SetFocus"
     i = i + 1: CM.InsertLines i, "End Sub"
     i = i + 1: CM.InsertLines i, ""
-    
-    ' ---- 按钮点击事件（不关闭窗体，可反复操作） ----
+
+    ' ---- 按钮点击事件（执行后不关闭窗体，可反复操作） ----
     i = i + 1: CM.InsertLines i, "Private Sub CommandButton1_Click()"
     i = i + 1: CM.InsertLines i, "    四方循环_执行 False, False"
     i = i + 1: CM.InsertLines i, "End Sub"
     i = i + 1: CM.InsertLines i, ""
-    
+
     i = i + 1: CM.InsertLines i, "Private Sub CommandButton2_Click()"
     i = i + 1: CM.InsertLines i, "    四方循环_执行 True, True"
     i = i + 1: CM.InsertLines i, "End Sub"
     i = i + 1: CM.InsertLines i, ""
-    
+
     i = i + 1: CM.InsertLines i, "Private Sub CommandButton3_Click()"
     i = i + 1: CM.InsertLines i, "    四方循环_执行 True, False"
     i = i + 1: CM.InsertLines i, "End Sub"
     i = i + 1: CM.InsertLines i, ""
-    
+
     i = i + 1: CM.InsertLines i, "Private Sub CommandButton4_Click()"
     i = i + 1: CM.InsertLines i, "    四方循环_执行 False, True"
     i = i + 1: CM.InsertLines i, "End Sub"
     i = i + 1: CM.InsertLines i, ""
-    
+
     i = i + 1: CM.InsertLines i, "Private Sub CommandButton5_Click()"
     i = i + 1: CM.InsertLines i, "    双边循环_执行 True"
     i = i + 1: CM.InsertLines i, "End Sub"
     i = i + 1: CM.InsertLines i, ""
-    
+
     i = i + 1: CM.InsertLines i, "Private Sub CommandButton6_Click()"
     i = i + 1: CM.InsertLines i, "    双边循环_执行 False"
     i = i + 1: CM.InsertLines i, "End Sub"
     i = i + 1: CM.InsertLines i, ""
 
-    ' ---- 关闭按钮：卸载窗体 + 延迟清理组件 ----
+    ' ---- 关闭按钮：卸载窗体 ----
     i = i + 1: CM.InsertLines i, "Private Sub CommandButton7_Click()"
     i = i + 1: CM.InsertLines i, "    Unload Me"
-    i = i + 1: CM.InsertLines i, "End Sub"
-    i = i + 1: CM.InsertLines i, ""
-
-    ' ---- QueryClose：点X关闭时也延迟清理 ----
-    i = i + 1: CM.InsertLines i, "Private Sub UserForm_QueryClose(Cancel As Integer, CloseMode As Integer)"
-    i = i + 1: CM.InsertLines i, "    Application.OnTime Now + TimeValue(""00:00:01""), ""清理窗体"""
     i = i + 1: CM.InsertLines i, "End Sub"
 End Sub
 
@@ -325,11 +286,9 @@ Private Function 数组乘积(数组 As Variant) As Long
     Next i
 End Function
 
-' 新建结果表（统一创建逻辑和命名规则）
 Private Function 新建结果表(名称前缀 As String) As Worksheet
     Dim ws As Worksheet
     Set ws = Worksheets.Add(After:=ActiveSheet)
-    ' 表名最多31字符，截断超长名称
     Dim 表名 As String
     表名 = 名称前缀 & "_" & Sheets.Count
     If Len(表名) > 31 Then 表名 = Left(名称前缀, 31 - Len(CStr(Sheets.Count)) - 1) & "_" & Sheets.Count
