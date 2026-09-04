@@ -35,7 +35,7 @@ Sub 四方镜子()
     With 窗体组件.Properties
         .Item("Caption") = "四方镜"
         .Item("Width") = 300
-        .Item("Height") = 330
+        .Item("Height") = 360
         .Item("StartUpPosition") = 1 ' 居中
     End With
 
@@ -76,25 +76,25 @@ Sub 四方镜子()
     Set fra1 = 设计器.Controls.Add("Forms.Frame.1", "Frame1")
     With fra1
         .Caption = "四方循环（笛卡尔积）"
-        .Left = 10: .Top = 65: .Width = 275: .Height = 120
+        .Left = 10: .Top = 65: .Width = 275: .Height = 185
         .Font.Size = 10: .Font.Bold = True
     End With
 
-    ' --- 按钮1：反向竖向 ---
+    ' --- 按钮1：反向竖向（左快右慢） ---
     Dim btn1 As Object
     Set btn1 = fra1.Controls.Add("Forms.CommandButton.1", "CommandButton1")
     With btn1
-        .Caption = "A1B1" & Chr(10) & "A1B2" & Chr(10) & "A2B1" & Chr(10) & "A2B2"
-        .Left = 10: .Top = 25: .Width = 95: .Height = 55
+        .Caption = "反向竖向"
+        .Left = 10: .Top = 25: .Width = 125: .Height = 55
         .Font.Size = 9
     End With
 
-    ' --- 按钮3：正向竖向 ---
+    ' --- 按钮3：正向竖向（左慢右快） ---
     Dim btn3 As Object
     Set btn3 = fra1.Controls.Add("Forms.CommandButton.1", "CommandButton3")
     With btn3
-        .Caption = "A1B1" & Chr(10) & "A2B1" & Chr(10) & "A1B2" & Chr(10) & "A2B2"
-        .Left = 150: .Top = 25: .Width = 95: .Height = 55
+        .Caption = "正向竖向"
+        .Left = 145: .Top = 25: .Width = 125: .Height = 55
         .Font.Size = 9
     End With
 
@@ -102,8 +102,8 @@ Sub 四方镜子()
     Dim btn2 As Object
     Set btn2 = fra1.Controls.Add("Forms.CommandButton.1", "CommandButton2")
     With btn2
-        .Caption = "A1B1 A2B1 A1B2 A2B2"
-        .Left = 10: .Top = 90: .Width = 95: .Height = 25
+        .Caption = "正向横向"
+        .Left = 10: .Top = 90: .Width = 255: .Height = 45
         .Font.Size = 9
     End With
 
@@ -111,8 +111,8 @@ Sub 四方镜子()
     Dim btn4 As Object
     Set btn4 = fra1.Controls.Add("Forms.CommandButton.1", "CommandButton4")
     With btn4
-        .Caption = "A1B1 A1B2 A2B1 A2B2"
-        .Left = 150: .Top = 90: .Width = 95: .Height = 25
+        .Caption = "反向横向"
+        .Left = 10: .Top = 140: .Width = 255: .Height = 45
         .Font.Size = 9
     End With
 
@@ -121,7 +121,7 @@ Sub 四方镜子()
     Set fra2 = 设计器.Controls.Add("Forms.Frame.1", "Frame2")
     With fra2
         .Caption = "双边循环（LCM独立循环）"
-        .Left = 10: .Top = 195: .Width = 275: .Height = 60
+        .Left = 10: .Top = 255: .Width = 275: .Height = 60
         .Font.Size = 10: .Font.Bold = True
     End With
 
@@ -129,8 +129,8 @@ Sub 四方镜子()
     Dim btn5 As Object
     Set btn5 = fra2.Controls.Add("Forms.CommandButton.1", "CommandButton5")
     With btn5
-        .Caption = "双边循环_合并_竖"
-        .Left = 10: .Top = 20: .Width = 110: .Height = 25
+        .Caption = "双边循环_竖"
+        .Left = 10: .Top = 20: .Width = 125: .Height = 25
         .Font.Size = 9
     End With
 
@@ -138,8 +138,8 @@ Sub 四方镜子()
     Dim btn6 As Object
     Set btn6 = fra2.Controls.Add("Forms.CommandButton.1", "CommandButton6")
     With btn6
-        .Caption = "双边循环_合并_横"
-        .Left = 150: .Top = 20: .Width = 110: .Height = 25
+        .Caption = "双边循环_横"
+        .Left = 145: .Top = 20: .Width = 125: .Height = 25
         .Font.Size = 9
     End With
 
@@ -148,7 +148,7 @@ Sub 四方镜子()
     Set btn7 = 设计器.Controls.Add("Forms.CommandButton.1", "CommandButton7")
     With btn7
         .Caption = "关闭窗体"
-        .Left = 100: .Top = 270: .Width = 95: .Height = 28
+        .Left = 100: .Top = 320: .Width = 95: .Height = 28
         .Font.Size = 10: .Font.Bold = True
         .BackColor = RGB(220, 80, 80)
     End With
@@ -199,6 +199,7 @@ Private Sub 注入事件代码(窗体组件 As Object)
 
     ' ---- Initialize ----
     i = i + 1: CM.InsertLines i, "Private Sub UserForm_Initialize()"
+    i = i + 1: CM.InsertLines i, "    更新按钮图示 Me"
     i = i + 1: CM.InsertLines i, "    CommandButton1.SetFocus"
     i = i + 1: CM.InsertLines i, "End Sub"
     i = i + 1: CM.InsertLines i, ""
@@ -206,27 +207,14 @@ Private Sub 注入事件代码(窗体组件 As Object)
     ' ---- TextBox1_Change ----
     i = i + 1: CM.InsertLines i, "Private Sub TextBox1_Change()"
     i = i + 1: CM.InsertLines i, "    连接符 = TextBox1.Text"
+    i = i + 1: CM.InsertLines i, "    更新按钮图示 Me"
     i = i + 1: CM.InsertLines i, "End Sub"
     i = i + 1: CM.InsertLines i, ""
 
     ' ---- CheckBox1_Click ----
     i = i + 1: CM.InsertLines i, "Private Sub CheckBox1_Click()"
     i = i + 1: CM.InsertLines i, "    是否合并 = CheckBox1.Value"
-    i = i + 1: CM.InsertLines i, "    If 是否合并 Then"
-    i = i + 1: CM.InsertLines i, "        CommandButton1.Caption = ""A1B1"" & Chr(10) & ""A1B2"" & Chr(10) & ""A2B1"" & Chr(10) & ""A2B2"""
-    i = i + 1: CM.InsertLines i, "        CommandButton3.Caption = ""A1B1"" & Chr(10) & ""A2B1"" & Chr(10) & ""A1B2"" & Chr(10) & ""A2B2"""
-    i = i + 1: CM.InsertLines i, "        CommandButton2.Caption = ""A1B1 A2B1 A1B2 A2B2"""
-    i = i + 1: CM.InsertLines i, "        CommandButton4.Caption = ""A1B1 A1B2 A2B1 A2B2"""
-    i = i + 1: CM.InsertLines i, "        CommandButton5.Caption = ""双边循环_合并_竖"""
-    i = i + 1: CM.InsertLines i, "        CommandButton6.Caption = ""双边循环_合并_横"""
-    i = i + 1: CM.InsertLines i, "    Else"
-    i = i + 1: CM.InsertLines i, "        CommandButton1.Caption = ""A1  B1"" & Chr(10) & ""A1  B2"" & Chr(10) & ""A2  B1"" & Chr(10) & ""A2  B2"""
-    i = i + 1: CM.InsertLines i, "        CommandButton3.Caption = ""A1  B1"" & Chr(10) & ""A2  B1"" & Chr(10) & ""A1  B2"" & Chr(10) & ""A2  B2"""
-    i = i + 1: CM.InsertLines i, "        CommandButton2.Caption = ""A1  B1  A2  B1  A1  B2  A2  B2"""
-    i = i + 1: CM.InsertLines i, "        CommandButton4.Caption = ""A1  B1  A1  B2  A2  B1  A2  B2"""
-    i = i + 1: CM.InsertLines i, "        CommandButton5.Caption = ""双边循环_分_竖"""
-    i = i + 1: CM.InsertLines i, "        CommandButton6.Caption = ""双边循环_分_横"""
-    i = i + 1: CM.InsertLines i, "    End If"
+    i = i + 1: CM.InsertLines i, "    更新按钮图示 Me"
     i = i + 1: CM.InsertLines i, "    CommandButton1.SetFocus"
     i = i + 1: CM.InsertLines i, "End Sub"
     i = i + 1: CM.InsertLines i, ""
@@ -313,6 +301,74 @@ Private Function 新建结果表(名称前缀 As String) As Worksheet
     On Error GoTo 0
     Set 新建结果表 = ws
 End Function
+
+' ============================================================
+'  按钮图示生成（读取活动工作表真实数据，生成按钮预览）
+'  被窗体的 Initialize / TextBox_Change / CheckBox_Click 调用
+' ============================================================
+
+Public Sub 更新按钮图示(frm As Object)
+    On Error Resume Next
+    Dim ws As Worksheet
+    Set ws = ActiveSheet
+
+    ' 读取前2列每列前2行的真实数据（按钮空间有限，预览2x2）
+    Dim d1a As String, d1b As String, d2a As String, d2b As String
+    d1a = "A1": d1b = "B1": d2a = "A2": d2b = "B2"
+    If ws.Cells(1, 1).Value <> "" Then d1a = CStr(ws.Cells(1, 1).Value)
+    If ws.Cells(1, 2).Value <> "" Then d1b = CStr(ws.Cells(1, 2).Value)
+    If ws.Cells(2, 1).Value <> "" Then d2a = CStr(ws.Cells(2, 1).Value)
+    If ws.Cells(2, 2).Value <> "" Then d2b = CStr(ws.Cells(2, 2).Value)
+
+    ' 连接符：合并模式用用户输入的连接符，分开模式用双空格
+    Dim 连 As String
+    连 = 连接符
+    If 连 = "" Then 连 = " "
+    Dim 空 As String
+    If 是否合并 Then 空 = 连 Else 空 = "  "
+
+    ' 4个基本组合
+    Dim m1 As String, m2 As String, m3 As String, m4 As String
+    m1 = d1a & 空 & d1b   ' 第1行组合
+    m2 = d2a & 空 & d1b   ' 第2列A + 第1列B
+    m3 = d1a & 空 & d2b   ' 第1列A + 第2列B
+    m4 = d2a & 空 & d2b   ' 第2行组合
+
+    ' 按钮1：反向竖向（左快右慢：A每行变，B每2行变）
+    ' 顺序：a1b1, a1b2, a2b1, a2b2
+    frm.Controls("CommandButton1").Caption = _
+        m1 & Chr(10) & m3 & Chr(10) & m2 & Chr(10) & m4
+
+    ' 按钮3：正向竖向（左慢右快：A每2行变，B每行变）
+    ' 顺序：a1b1, a2b1, a1b2, a2b2
+    frm.Controls("CommandButton3").Caption = _
+        m1 & Chr(10) & m2 & Chr(10) & m3 & Chr(10) & m4
+
+    If 是否合并 Then
+        ' 按钮2：正向横向（一行4个组合）
+        frm.Controls("CommandButton2").Caption = _
+            m1 & "   " & m2 & "   " & m3 & "   " & m4
+        ' 按钮4：反向横向（一行4个组合）
+        frm.Controls("CommandButton4").Caption = _
+            m1 & "   " & m3 & "   " & m2 & "   " & m4
+    Else
+        ' 按钮2：正向横向 分开（矩阵：每列一行）
+        frm.Controls("CommandButton2").Caption = _
+            d1a & "   " & d2a & "   " & d1a & "   " & d2a & Chr(10) & _
+            d1b & "   " & d1b & "   " & d2b & "   " & d2b
+        ' 按钮4：反向横向 分开（矩阵：每列一行）
+        frm.Controls("CommandButton4").Caption = _
+            d1a & "   " & d1a & "   " & d2a & "   " & d2a & Chr(10) & _
+            d1b & "   " & d2b & "   " & d1b & "   " & d2b
+    End If
+
+    ' 按钮5：双边循环_竖（每列独立循环，同行同下标）
+    frm.Controls("CommandButton5").Caption = _
+        "双边_竖" & Chr(10) & m1 & Chr(10) & m4
+    ' 按钮6：双边循环_横
+    frm.Controls("CommandButton6").Caption = _
+        "双边_横" & Chr(10) & m1 & "   " & m4
+End Sub
 
 ' ============================================================
 '  核心算法一：四方循环（笛卡尔积）
