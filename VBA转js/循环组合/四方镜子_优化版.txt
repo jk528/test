@@ -1,0 +1,374 @@
+'============================================================
+' 四方镜子 - 优化版（单文件，复制粘贴即用）
+' 使用方法：
+'   1. VBA编辑器中插入UserForm，命名为 PC_003_组合
+'   2. 添加以下控件：Label1, TextBox1, CheckBox1
+'                   CommandButton1~6, Frame1, Frame2
+'   3. 把本文件全部代码复制到窗体代码中
+'   4. 运行窗体即可
+'============================================================
+
+Option Explicit
+
+' 全局变量
+Public 连接符 As String
+
+' ============================================================
+'  一、窗体事件
+' ============================================================
+
+Private Sub UserForm_Initialize()
+    Me.Caption = "四方镜"
+    Label1.Caption = "连接符号:"
+    TextBox1.Text = "-"
+    CheckBox1.Caption = "合并"
+    CheckBox1.Value = True
+    连接符 = "-"
+    Frame1.Caption = "四方循环（笛卡尔积）"
+    Frame2.Caption = "双边循环（LCM独立循环）"
+    CommandButton5.Caption = "双边循环_合并_竖"
+    CommandButton6.Caption = "双边循环_合并_横"
+    CommandButton1.SetFocus
+End Sub
+
+Private Sub TextBox1_Change()
+    连接符 = TextBox1.Text
+End Sub
+
+Private Sub CheckBox1_Click()
+    If CheckBox1.Value Then
+        ' 合并模式
+        CommandButton1.Caption = "A1B1" & Chr(10) & "A1B2" & Chr(10) & "A2B1" & Chr(10) & "A2B2"
+        CommandButton3.Caption = "A1B1" & Chr(10) & "A2B1" & Chr(10) & "A1B2" & Chr(10) & "A2B2"
+        CommandButton2.Caption = "A1B1 A2B1 A1B2 A2B2"
+        CommandButton4.Caption = "A1B1 A1B2 A2B1 A2B2"
+        CommandButton5.Caption = "双边循环_合并_竖"
+        CommandButton6.Caption = "双边循环_合并_横"
+    Else
+        ' 分开模式
+        CommandButton1.Caption = "A1  B1" & Chr(10) & "A1  B2" & Chr(10) & "A2  B1" & Chr(10) & "A2  B2"
+        CommandButton3.Caption = "A1  B1" & Chr(10) & "A2  B1" & Chr(10) & "A1  B2" & Chr(10) & "A2  B2"
+        CommandButton2.Caption = "A1  B1  A2  B1  A1  B2  A2  B2"
+        CommandButton4.Caption = "A1  B1  A1  B2  A2  B1  A2  B2"
+        CommandButton5.Caption = "双边循环_分_竖"
+        CommandButton6.Caption = "双边循环_分_横"
+    End If
+    CommandButton1.SetFocus
+End Sub
+
+' ---- 四方循环按钮 ----
+
+Private Sub CommandButton1_Click()
+    四方循环 False, False: Unload Me   ' 反向 竖向
+End Sub
+
+Private Sub CommandButton2_Click()
+    四方循环 True, True: Unload Me     ' 正向 横向
+End Sub
+
+Private Sub CommandButton3_Click()
+    四方循环 True, False: Unload Me    ' 正向 竖向
+End Sub
+
+Private Sub CommandButton4_Click()
+    四方循环 False, True: Unload Me    ' 反向 横向
+End Sub
+
+' ---- 双边循环按钮 ----
+
+Private Sub CommandButton5_Click()
+    双边循环 True: Unload Me   ' 竖向
+End Sub
+
+Private Sub CommandButton6_Click()
+    双边循环 False: Unload Me  ' 横向
+End Sub
+
+' ============================================================
+'  二、工具函数
+' ============================================================
+
+' 循环索引：n=序号, Y=周期长度，返回 1~Y 之间循环
+Private Function ys(n As Long, Y As Long) As Long
+    ys = ((n + Y - 1) Mod Y) + 1
+End Function
+
+' 向上取整除法
+Private Function cd(c As Long, d As Long) As Long
+    cd = WorksheetFunction.RoundUp(c / d, 0)
+End Function
+
+' 获取最后一列
+Private Function 最后列(ws As Worksheet) As Long
+    最后列 = ws.Cells(1, ws.Columns.Count).End(xlToLeft).Column
+End Function
+
+' 获取最后一行
+Private Function 最后行(ws As Worksheet, 列 As Long) As Long
+    最后行 = ws.Cells(ws.Rows.Count, 列).End(xlUp).Row
+End Function
+
+' 数组乘积
+Private Function 乘积(数组 As Variant) As Long
+    Dim i As Long
+    乘积 = 1
+    For i = LBound(数组) To UBound(数组)
+        乘积 = 乘积 * 数组(i)
+    Next i
+End Function
+
+' 连接字符串数组（去掉末尾多余连接符）
+Private Function 拼接(片段 As Variant, 分隔符 As String) As String
+    If 分隔符 = "" Then
+        拼接 = Join(片段, "")
+    Else
+        拼接 = Join(片段, 分隔符)
+    End If
+End Function
+
+' ============================================================
+'  三、核心算法：四方循环（笛卡尔积）
+'  参数：
+'    是否正向 = True(左慢右快) / False(左快右慢)
+'    是否横向 = True(横向输出) / False(竖向输出)
+' ============================================================
+
+Private Sub 四方循环(是否正向 As Boolean, 是否横向 As Boolean)
+    On Error GoTo 错误处理
+    Dim 原刷新 As Boolean, 原计算 As XlCalculation
+    原刷新 = Application.ScreenUpdating
+    原计算 = Application.Calculation
+    Application.ScreenUpdating = False
+    Application.Calculation = xlCalculationManual
+
+    Dim ws As Worksheet
+    Set ws = ActiveSheet
+
+    ' 1. 读取数据
+    Dim 总列数 As Long, 列 As Long
+    总列数 = 最后列(ws)
+    If 总列数 = 0 Then MsgBox "无有效数据": GoTo 退出
+
+    Dim 每列行数() As Long
+    ReDim 每列行数(1 To 总列数)
+    For 列 = 1 To 总列数
+        每列行数(列) = 最后行(ws, 列)
+    Next 列
+
+    Dim 总行数 As Long
+    总行数 = 乘积(每列行数)
+    If 总行数 > 1048576 Then MsgBox "已超出表格限制": GoTo 退出
+
+    Dim 源数据 As Variant
+    源数据 = ws.Range(ws.Cells(1, 1), ws.Cells(总行数, 总列数)).Value2
+
+    ' 2. 计算步长
+    Dim 步长() As Long
+    ReDim 步长(1 To 总列数)
+    If 是否正向 Then
+        步长(1) = 1
+        For 列 = 2 To 总列数
+            步长(列) = 步长(列 - 1) * 每列行数(列 - 1)
+        Next 列
+    Else
+        Dim 累计 As Long
+        累计 = 1
+        For 列 = 1 To 总列数
+            累计 = 累计 * 每列行数(列)
+            步长(列) = 总行数 / 累计
+        Next 列
+    End If
+
+    ' 3. 构建结果矩阵（列优先：结果(列, 行)）
+    Dim 结果() As Variant
+    ReDim 结果(1 To 总列数, 1 To 总行数)
+    Dim 行 As Long, 源行 As Long
+    For 列 = 1 To 总列数
+        For 行 = 1 To 总行数
+            源行 = ys(cd(行, 步长(列)), 每列行数(列))
+            结果(列, 行) = 源数据(源行, 列)
+        Next 行
+    Next 列
+
+    ' 4. 输出
+    Dim 是否合并 As Boolean
+    是否合并 = CheckBox1.Value
+
+    If 是否横向 Then
+        If 是否合并 Then
+            Dim 横合并() As String
+            ReDim 横合并(1 To 总行数)
+            Dim 片段() As String
+            ReDim 片段(1 To 总列数)
+            For 行 = 1 To 总行数
+                For 列 = 1 To 总列数
+                    片段(列) = 结果(列, 行)
+                Next 列
+                横合并(行) = Join(片段, 连接符)
+            Next 行
+            ws.Range("F2").Resize(1, 总行数) = 横合并
+        Else
+            ws.Range("F2").Resize(总列数, 总行数) = 结果
+        End If
+    Else
+        If 是否合并 Then
+            Dim 竖合并() As String
+            ReDim 竖合并(1 To 总行数)
+            Dim 片段2() As String
+            ReDim 片段2(1 To 总列数)
+            For 行 = 1 To 总行数
+                For 列 = 1 To 总列数
+                    片段2(列) = 结果(列, 行)
+                Next 列
+                竖合并(行) = Join(片段2, 连接符)
+            Next 行
+            ' 转成二维数组写入
+            Dim 竖写入() As String
+            ReDim 竖写入(1 To 总行数, 1 To 1)
+            For 行 = 1 To 总行数
+                竖写入(行, 1) = 竖合并(行)
+            Next 行
+            ws.Range("F2").Resize(总行数, 1) = 竖写入
+        Else
+            ' 转置后写入
+            Dim 竖结果() As Variant
+            ReDim 竖结果(1 To 总行数, 1 To 总列数)
+            For 行 = 1 To 总行数
+                For 列 = 1 To 总列数
+                    竖结果(行, 列) = 结果(列, 行)
+                Next 列
+            Next 行
+            ws.Range("F2").Resize(总行数, 总列数) = 竖结果
+        End If
+    End If
+
+退出:
+    Application.ScreenUpdating = 原刷新
+    Application.Calculation = 原计算
+    Exit Sub
+错误处理:
+    MsgBox "错误: " & Err.Description, vbCritical
+    Resume 退出
+End Sub
+
+' ============================================================
+'  四、核心算法：双边循环（LCM独立循环）
+'  参数：
+'    是否竖向 = True(竖向输出) / False(横向输出)
+' ============================================================
+
+Private Sub 双边循环(是否竖向 As Boolean)
+    On Error GoTo 错误处理
+    Dim 原刷新 As Boolean, 原计算 As XlCalculation
+    原刷新 = Application.ScreenUpdating
+    原计算 = Application.Calculation
+    Application.ScreenUpdating = False
+    Application.Calculation = xlCalculationManual
+
+    Dim ws As Worksheet
+    Set ws = ActiveSheet
+
+    ' 1. 读取数据
+    Dim 总列数 As Long, 列 As Long
+    总列数 = 最后列(ws)
+    If 总列数 = 0 Then MsgBox "无有效数据": GoTo 退出
+
+    Dim 每列行数() As Long
+    ReDim 每列行数(1 To 总列数)
+    For 列 = 1 To 总列数
+        每列行数(列) = 最后行(ws, 列)
+    Next 列
+
+    Dim 列乘积 As Long, 最小公倍数 As Long
+    列乘积 = 乘积(每列行数)
+    最小公倍数 = WorksheetFunction.Lcm(每列行数)
+    If 最小公倍数 > 1048576 Then MsgBox "已超出表格限制": GoTo 退出
+
+    Dim 是否完整 As Boolean
+    是否完整 = (列乘积 = 最小公倍数)
+
+    Dim 源数据 As Variant
+    源数据 = ws.Range(ws.Cells(1, 1), ws.Cells(最小公倍数, 总列数)).Value2
+
+    ' 2. 构建结果矩阵（列优先：结果(列, 行)）
+    Dim 结果() As Variant
+    ReDim 结果(1 To 总列数, 1 To 最小公倍数)
+    Dim 行 As Long, 源行 As Long
+    For 列 = 1 To 总列数
+        For 行 = 1 To 最小公倍数
+            源行 = ys(行, 每列行数(列))
+            结果(列, 行) = 源数据(源行, 列)
+        Next 行
+    Next 列
+
+    ' 3. 新建工作表
+    Dim 新表 As Worksheet
+    On Error Resume Next
+    Set 新表 = Worksheets.Add(After:=Worksheets("重复字"))
+    If Err.Number <> 0 Then Set 新表 = Worksheets.Add
+    On Error GoTo 错误处理
+
+    If 是否完整 Then
+        新表.Name = "完整_" & 最小公倍数 & "sheet" & Sheets.Count
+    Else
+        新表.Name = "残缺_" & 列乘积 & "|" & 最小公倍数 & "sheet" & Sheets.Count
+    End If
+
+    ' 4. 输出
+    Dim 是否合并 As Boolean
+    是否合并 = CheckBox1.Value
+
+    If 是否竖向 Then
+        If 是否合并 Then
+            Dim 竖合并() As String
+            ReDim 竖合并(1 To 最小公倍数)
+            Dim 片段() As String
+            ReDim 片段(1 To 总列数)
+            For 行 = 1 To 最小公倍数
+                For 列 = 1 To 总列数
+                    片段(列) = 结果(列, 行)
+                Next 列
+                竖合并(行) = Join(片段, 连接符)
+            Next 行
+            Dim 竖写入() As String
+            ReDim 竖写入(1 To 最小公倍数, 1 To 1)
+            For 行 = 1 To 最小公倍数
+                竖写入(行, 1) = 竖合并(行)
+            Next 行
+            新表.Range("A1").Resize(最小公倍数, 1) = 竖写入
+        Else
+            Dim 竖结果() As Variant
+            ReDim 竖结果(1 To 最小公倍数, 1 To 总列数)
+            For 行 = 1 To 最小公倍数
+                For 列 = 1 To 总列数
+                    竖结果(行, 列) = 结果(列, 行)
+                Next 列
+            Next 行
+            新表.Range("A1").Resize(最小公倍数, 总列数) = 竖结果
+        End If
+    Else
+        If 是否合并 Then
+            Dim 横合并() As String
+            ReDim 横合并(1 To 最小公倍数)
+            Dim 片段2() As String
+            ReDim 片段2(1 To 总列数)
+            For 行 = 1 To 最小公倍数
+                For 列 = 1 To 总列数
+                    片段2(列) = 结果(列, 行)
+                Next 列
+                横合并(行) = Join(片段2, 连接符)
+            Next 行
+            新表.Range("A1").Resize(1, 最小公倍数) = 横合并
+        Else
+            新表.Range("A1").Resize(总列数, 最小公倍数) = 结果
+        End If
+    End If
+
+退出:
+    Application.ScreenUpdating = 原刷新
+    Application.Calculation = 原计算
+    Exit Sub
+错误处理:
+    MsgBox "错误: " & Err.Description, vbCritical
+    Resume 退出
+End Sub
