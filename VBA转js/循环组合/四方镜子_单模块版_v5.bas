@@ -312,13 +312,13 @@ Public Sub 更新按钮图示(frm As Object)
     Dim ws As Worksheet
     Set ws = ActiveSheet
 
-    ' 读取前2列每列前2行的真实数据（按钮空间有限，预览2x2）
+    ' 读取前2列每列前2行的真实数据（超长截断，避免按钮显示不全）
     Dim d1a As String, d1b As String, d2a As String, d2b As String
     d1a = "A1": d1b = "B1": d2a = "A2": d2b = "B2"
-    If ws.Cells(1, 1).Value <> "" Then d1a = CStr(ws.Cells(1, 1).Value)
-    If ws.Cells(1, 2).Value <> "" Then d1b = CStr(ws.Cells(1, 2).Value)
-    If ws.Cells(2, 1).Value <> "" Then d2a = CStr(ws.Cells(2, 1).Value)
-    If ws.Cells(2, 2).Value <> "" Then d2b = CStr(ws.Cells(2, 2).Value)
+    If ws.Cells(1, 1).Value <> "" Then d1a = 截断文本(CStr(ws.Cells(1, 1).Value), 4)
+    If ws.Cells(1, 2).Value <> "" Then d1b = 截断文本(CStr(ws.Cells(1, 2).Value), 4)
+    If ws.Cells(2, 1).Value <> "" Then d2a = 截断文本(CStr(ws.Cells(2, 1).Value), 4)
+    If ws.Cells(2, 2).Value <> "" Then d2b = 截断文本(CStr(ws.Cells(2, 2).Value), 4)
 
     ' 连接符：合并模式用用户输入的连接符，分开模式用双空格
     Dim 连 As String
@@ -368,7 +368,42 @@ Public Sub 更新按钮图示(frm As Object)
     ' 按钮6：双边循环_横
     frm.Controls("CommandButton6").Caption = _
         "双边_横" & Chr(10) & m1 & "   " & m4
+
+    ' ---- 字号自适应：按 Caption 最长行长度自动缩放 ----
+    frm.Controls("CommandButton1").Font.Size = 自动字号(frm.Controls("CommandButton1").Caption, 9)
+    frm.Controls("CommandButton2").Font.Size = 自动字号(frm.Controls("CommandButton2").Caption, 9)
+    frm.Controls("CommandButton3").Font.Size = 自动字号(frm.Controls("CommandButton3").Caption, 9)
+    frm.Controls("CommandButton4").Font.Size = 自动字号(frm.Controls("CommandButton4").Caption, 9)
+    frm.Controls("CommandButton5").Font.Size = 自动字号(frm.Controls("CommandButton5").Caption, 9)
+    frm.Controls("CommandButton6").Font.Size = 自动字号(frm.Controls("CommandButton6").Caption, 9)
 End Sub
+
+' 截断超长文本（避免按钮显示不全）
+Private Function 截断文本(t As String, 最大长度 As Long) As String
+    If Len(t) > 最大长度 Then
+        截断文本 = Left(t, 最大长度) & "…"
+    Else
+        截断文本 = t
+    End If
+End Function
+
+' 字号自适应：按 Caption 最长行字符数调整字号
+Private Function 自动字号(Caption文本 As String, 参考字号 As Single) As Single
+    Dim 行数组 As Variant
+    行数组 = Split(Caption文本, Chr(10))
+    Dim i As Long, 最长 As Long
+    最长 = 0
+    For i = 0 To UBound(行数组)
+        If Len(行数组(i)) > 最长 Then 最长 = Len(行数组(i))
+    Next i
+    If 最长 > 24 Then
+        自动字号 = 参考字号 - 2
+    ElseIf 最长 > 16 Then
+        自动字号 = 参考字号 - 1
+    Else
+        自动字号 = 参考字号
+    End If
+End Function
 
 ' ============================================================
 '  核心算法一：四方循环（笛卡尔积）
