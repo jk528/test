@@ -345,14 +345,12 @@ Public Sub 更新按钮图示(frm As Object)
         m4 & Chr(10) & m5 & Chr(10) & m6
 
     If 是否合并 Then
-        ' 按钮2：正向横向（250宽，两行显示，每行3个组合）
+        ' 按钮2：正向横向（一行6个组合，自动缩小字号适配250宽）
         frm.Controls("CommandButton2").Caption = _
-            m1 & "   " & m2 & "   " & m3 & Chr(10) & _
-            m4 & "   " & m5 & "   " & m6
-        ' 按钮4：反向横向（两行显示，每行3个组合）
+            m1 & "   " & m2 & "   " & m3 & "   " & m4 & "   " & m5 & "   " & m6
+        ' 按钮4：反向横向（一行6个组合）
         frm.Controls("CommandButton4").Caption = _
-            m1 & "   " & m3 & "   " & m5 & Chr(10) & _
-            m2 & "   " & m4 & "   " & m6
+            m1 & "   " & m3 & "   " & m5 & "   " & m2 & "   " & m4 & "   " & m6
     Else
         ' 按钮2：正向横向 分开（完整矩阵2行各6列：A每行变/B每2行变）
         frm.Controls("CommandButton2").Caption = _
