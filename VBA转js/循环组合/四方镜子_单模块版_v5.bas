@@ -81,39 +81,39 @@ Sub 四方镜子()
         .Font.Size = 10: .Font.Bold = True
     End With
     
-    ' --- 按钮1：反向竖向 ---
+    ' --- 按钮1：反向竖向（放入Frame1内，坐标相对于框架） ---
     Dim btn1 As Object
-    Set btn1 = 设计器.Controls.Add("Forms.CommandButton.1", "CommandButton1")
+    Set btn1 = fra1.Controls.Add("Forms.CommandButton.1", "CommandButton1")
     With btn1
         .Caption = "A1B1" & Chr(10) & "A1B2" & Chr(10) & "A2B1" & Chr(10) & "A2B2"
-        .Left = 20: .Top = 90: .Width = 95: .Height = 55
+        .Left = 10: .Top = 25: .Width = 95: .Height = 55
         .Font.Size = 9
     End With
-    
+
     ' --- 按钮3：正向竖向 ---
     Dim btn3 As Object
-    Set btn3 = 设计器.Controls.Add("Forms.CommandButton.1", "CommandButton3")
+    Set btn3 = fra1.Controls.Add("Forms.CommandButton.1", "CommandButton3")
     With btn3
         .Caption = "A1B1" & Chr(10) & "A2B1" & Chr(10) & "A1B2" & Chr(10) & "A2B2"
-        .Left = 160: .Top = 90: .Width = 95: .Height = 55
+        .Left = 150: .Top = 25: .Width = 95: .Height = 55
         .Font.Size = 9
     End With
-    
+
     ' --- 按钮2：正向横向 ---
     Dim btn2 As Object
-    Set btn2 = 设计器.Controls.Add("Forms.CommandButton.1", "CommandButton2")
+    Set btn2 = fra1.Controls.Add("Forms.CommandButton.1", "CommandButton2")
     With btn2
         .Caption = "A1B1 A2B1 A1B2 A2B2"
-        .Left = 20: .Top = 155: .Width = 95: .Height = 25
+        .Left = 10: .Top = 90: .Width = 95: .Height = 25
         .Font.Size = 9
     End With
-    
+
     ' --- 按钮4：反向横向 ---
     Dim btn4 As Object
-    Set btn4 = 设计器.Controls.Add("Forms.CommandButton.1", "CommandButton4")
+    Set btn4 = fra1.Controls.Add("Forms.CommandButton.1", "CommandButton4")
     With btn4
         .Caption = "A1B1 A1B2 A2B1 A2B2"
-        .Left = 160: .Top = 155: .Width = 95: .Height = 25
+        .Left = 150: .Top = 90: .Width = 95: .Height = 25
         .Font.Size = 9
     End With
     
@@ -126,21 +126,21 @@ Sub 四方镜子()
         .Font.Size = 10: .Font.Bold = True
     End With
     
-    ' --- 按钮5：双边循环_竖 ---
+    ' --- 按钮5：双边循环_竖（放入Frame2内） ---
     Dim btn5 As Object
-    Set btn5 = 设计器.Controls.Add("Forms.CommandButton.1", "CommandButton5")
+    Set btn5 = fra2.Controls.Add("Forms.CommandButton.1", "CommandButton5")
     With btn5
         .Caption = "双边循环_合并_竖"
-        .Left = 20: .Top = 220: .Width = 110: .Height = 25
+        .Left = 10: .Top = 20: .Width = 110: .Height = 25
         .Font.Size = 9
     End With
-    
+
     ' --- 按钮6：双边循环_横 ---
     Dim btn6 As Object
-    Set btn6 = 设计器.Controls.Add("Forms.CommandButton.1", "CommandButton6")
+    Set btn6 = fra2.Controls.Add("Forms.CommandButton.1", "CommandButton6")
     With btn6
         .Caption = "双边循环_合并_横"
-        .Left = 160: .Top = 220: .Width = 110: .Height = 25
+        .Left = 150: .Top = 20: .Width = 110: .Height = 25
         .Font.Size = 9
     End With
     
@@ -335,6 +335,15 @@ Sub 四方循环_执行(是否正向 As Boolean, 是否横向 As Boolean)
         Next 行
     Next 列
 
+    ' 新建 sheet 输出结果（不再写入 F2）
+    Dim 新表 As Worksheet
+    Set 新表 = Worksheets.Add(After:=ws)
+    Dim 方向名 As String, 合并名 As String
+    If 是否正向 Then 方向名 = "正" Else 方向名 = "反"
+    If 是否横向 Then 方向名 = 方向名 & "横" Else 方向名 = 方向名 & "竖"
+    If 是否合并 Then 合并名 = "合并" Else 合并名 = "分开"
+    新表.Name = 方向名 & "_" & 合并名 & "_sheet" & Sheets.Count
+
     If 是否横向 Then
         If 是否合并 Then
             Dim 横合并() As String, 横片段() As String
@@ -346,9 +355,9 @@ Sub 四方循环_执行(是否正向 As Boolean, 是否横向 As Boolean)
                 Next 列
                 横合并(行) = Join(横片段, 连接符)
             Next 行
-            ws.Range("F2").Resize(1, 总行数) = 横合并
+            新表.Range("A1").Resize(1, 总行数) = 横合并
         Else
-            ws.Range("F2").Resize(总列数, 总行数) = 结果
+            新表.Range("A1").Resize(总列数, 总行数) = 结果
         End If
     Else
         If 是否合并 Then
@@ -366,7 +375,7 @@ Sub 四方循环_执行(是否正向 As Boolean, 是否横向 As Boolean)
             For 行 = 1 To 总行数
                 竖写入(行, 1) = 竖合并(行)
             Next 行
-            ws.Range("F2").Resize(总行数, 1) = 竖写入
+            新表.Range("A1").Resize(总行数, 1) = 竖写入
         Else
             Dim 竖结果() As Variant
             ReDim 竖结果(1 To 总行数, 1 To 总列数)
@@ -375,7 +384,7 @@ Sub 四方循环_执行(是否正向 As Boolean, 是否横向 As Boolean)
                     竖结果(行, 列) = 结果(列, 行)
                 Next 列
             Next 行
-            ws.Range("F2").Resize(总行数, 总列数) = 竖结果
+            新表.Range("A1").Resize(总行数, 总列数) = 竖结果
         End If
     End If
 
