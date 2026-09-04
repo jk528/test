@@ -34,8 +34,8 @@ Sub 四方镜子()
     ' 2. 设置窗体属性
     With 窗体组件.Properties
         .Item("Caption") = "四方镜"
-        .Item("Width") = 560
-        .Item("Height") = 500
+        .Item("Width") = 570
+        .Item("Height") = 520
         .Item("StartUpPosition") = 1 ' 居中
     End With
 
