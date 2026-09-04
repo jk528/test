@@ -310,13 +310,11 @@ End Function
 Public Sub 更新按钮图示(frm As Object)
     On Error Resume Next
 
-    ' 非对称占位符预览：A列2行 + B列3行 + C列4行（2x3x4 清晰展示三列循环节奏）
+    ' 非对称占位符预览：A列2行 + B列3行（2x3 清晰展示排列差异，且不会显示不全）
     Dim d1a As String, d2a As String
     Dim d1b As String, d2b As String, d3b As String
-    Dim d1c As String, d2c As String, d3c As String, d4c As String
     d1a = "a1": d2a = "a2"
     d1b = "b1": d2b = "b2": d3b = "b3"
-    d1c = "c1": d2c = "c2": d3c = "c3": d4c = "c4"
 
     ' 连接符：合并模式用用户输入的连接符，分开模式用双空格
     Dim 连 As String
@@ -325,68 +323,58 @@ Public Sub 更新按钮图示(frm As Object)
     Dim 空 As String
     If 是否合并 Then 空 = 连 Else 空 = "  "
 
-    ' 关键组合（正向笛卡尔积排序）
-    Dim c1 As String, c2 As String, c3 As String, c4 As String
-    Dim c5 As String, c6 As String, c7 As String, c8 As String
-    Dim c9 As String, c10 As String, c11 As String
-    c1 = d1a & 空 & d1b & 空 & d1c   ' a1-b1-c1
-    c2 = d2a & 空 & d1b & 空 & d1c   ' a2-b1-c1
-    c3 = d1a & 空 & d2b & 空 & d1c   ' a1-b2-c1
-    c4 = d2a & 空 & d2b & 空 & d1c   ' a2-b2-c1
-    c5 = d1a & 空 & d3b & 空 & d1c   ' a1-b3-c1
-    c6 = d2a & 空 & d3b & 空 & d1c   ' a2-b3-c1
-    c7 = d1a & 空 & d1b & 空 & d2c   ' a1-b1-c2
-    c8 = d2a & 空 & d1b & 空 & d2c   ' a2-b1-c2
-    c9 = d1a & 空 & d1b & 空 & d3c   ' a1-b1-c3
-    c10 = d1a & 空 & d1b & 空 & d4c  ' a1-b1-c4
-    c11 = d2a & 空 & d2b & 空 & d2c  ' a2-b2-c2（双边竖行2）
+    ' 6个基本组合（A×B 笛卡尔积）
+    Dim m1 As String, m2 As String, m3 As String, m4 As String, m5 As String, m6 As String
+    m1 = d1a & 空 & d1b   ' a1-b1
+    m2 = d2a & 空 & d1b   ' a2-b1
+    m3 = d1a & 空 & d2b   ' a1-b2
+    m4 = d2a & 空 & d2b   ' a2-b2
+    m5 = d1a & 空 & d3b   ' a1-b3
+    m6 = d2a & 空 & d3b   ' a2-b3
 
-    ' 按钮1：反向竖向（左慢右快：A每12行变，B每4行变，C每行变）
-    ' 前4行：a1b1c1, a1b1c2, a1b1c3, a1b1c4（A/B不变，C每行变）
+    ' 按钮1：反向竖向（左慢右快：A列每3行变，B列每行变）
+    ' 行序：a1b1, a1b2, a1b3, a2b1, a2b2, a2b3
     frm.Controls("CommandButton1").Caption = _
-        c1 & Chr(10) & c7 & Chr(10) & c9 & Chr(10) & c10
+        m1 & Chr(10) & m3 & Chr(10) & m5 & Chr(10) & m2
 
-    ' 按钮3：正向竖向（左快右慢：A每行变，B每2行变，C每6行变）
-    ' 前4行：a1b1c1, a2b1c1, a1b2c1, a2b2c1
+    ' 按钮3：正向竖向（左快右慢：A列每行变，B列每2行变）
+    ' 行序：a1b1, a2b1, a1b2, a2b2, a1b3, a2b3
     frm.Controls("CommandButton3").Caption = _
-        c1 & Chr(10) & c2 & Chr(10) & c3 & Chr(10) & c4
+        m1 & Chr(10) & m2 & Chr(10) & m3 & Chr(10) & m4
 
     If 是否合并 Then
         ' 按钮2：正向横向（前4个组合一行）
         frm.Controls("CommandButton2").Caption = _
-            c1 & "   " & c2 & "   " & c3 & "   " & c4
+            m1 & "   " & m2 & "   " & m3 & "   " & m4
         ' 按钮4：反向横向（前4个组合一行）
         frm.Controls("CommandButton4").Caption = _
-            c1 & "   " & c7 & "   " & c9 & "   " & c10
+            m1 & "   " & m3 & "   " & m5 & "   " & m2
     Else
-        ' 按钮2：正向横向 分开（矩阵3行：A每行变/B每2行/C每6行，显示前4列）
+        ' 按钮2：正向横向 分开（矩阵2行：A每行变/B每2行变，显示前4列）
         frm.Controls("CommandButton2").Caption = _
             d1a & "   " & d2a & "   " & d1a & "   " & d2a & Chr(10) & _
-            d1b & "   " & d1b & "   " & d2b & "   " & d2b & Chr(10) & _
-            d1c & "   " & d1c & "   " & d1c & "   " & d1c
-        ' 按钮4：反向横向 分开（矩阵3行：A每12行/B每4行/C每行，显示前4列）
+            d1b & "   " & d1b & "   " & d2b & "   " & d2b
+        ' 按钮4：反向横向 分开（矩阵2行：A每3行变/B每行变，显示前4列）
         frm.Controls("CommandButton4").Caption = _
-            d1a & "   " & d1a & "   " & d1a & "   " & d1a & Chr(10) & _
-            d1b & "   " & d1b & "   " & d1b & "   " & d1b & Chr(10) & _
-            d1c & "   " & d2c & "   " & d3c & "   " & d4c
+            d1a & "   " & d1a & "   " & d1a & "   " & d2a & Chr(10) & _
+            d1b & "   " & d2b & "   " & d3b & "   " & d1b
     End If
 
-    ' 按钮5：双边循环_竖（每列独立循环同步推进，LCM=12）
-    ' 行序：a1b1c1, a2b2c2, a1b3c3, a2b1c4, ...（显示前2行）
+    ' 按钮5：双边循环_竖（每列独立循环，同步推进）
+    ' 行序：a1b1, a2b2, a1b3, a2b1, ...（显示前2行）
     frm.Controls("CommandButton5").Caption = _
-        c1 & Chr(10) & c11
+        m1 & Chr(10) & m4
 
     ' 按钮6：双边循环_横
-    ' 合并：一行组合 a1-b1-c1  a2-b2-c2
+    ' 合并：一行组合 a1-b1  a2-b2
     ' 分开：矩阵形式，每列一行（双边循环每列独立循环，与实际生成一致）
     If 是否合并 Then
         frm.Controls("CommandButton6").Caption = _
-            c1 & "   " & c11
+            m1 & "   " & m4
     Else
         frm.Controls("CommandButton6").Caption = _
             d1a & "   " & d2a & Chr(10) & _
-            d1b & "   " & d2b & Chr(10) & _
-            d1c & "   " & d2c
+            d1b & "   " & d2b
     End If
 
     ' ---- 字号自适应：按 Caption 最长行长度自动缩放 ----
