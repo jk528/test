@@ -34,8 +34,8 @@ Sub 四方镜子()
     ' 2. 设置窗体属性
     With 窗体组件.Properties
         .Item("Caption") = "四方镜"
-        .Item("Width") = 300
-        .Item("Height") = 370
+        .Item("Width") = 560
+        .Item("Height") = 620
         .Item("StartUpPosition") = 1 ' 居中
     End With
 
@@ -57,7 +57,7 @@ Sub 四方镜子()
     Set txt = 设计器.Controls.Add("Forms.TextBox.1", "TextBox1")
     With txt
         .Text = "-"
-        .Left = 75: .Top = 10: .Width = 80: .Height = 22
+        .Left = 75: .Top = 10: .Width = 100: .Height = 22
         .Font.Size = 10
     End With
 
@@ -66,7 +66,7 @@ Sub 四方镜子()
     Set chk = 设计器.Controls.Add("Forms.CheckBox.1", "CheckBox1")
     With chk
         .Caption = "合并"
-        .Left = 10: .Top = 40: .Width = 80: .Height = 18
+        .Left = 200: .Top = 12: .Width = 100: .Height = 18
         .Value = True
         .Font.Size = 10
     End With
@@ -76,7 +76,7 @@ Sub 四方镜子()
     Set fra1 = 设计器.Controls.Add("Forms.Frame.1", "Frame1")
     With fra1
         .Caption = "四方循环（笛卡尔积）"
-        .Left = 10: .Top = 65: .Width = 275: .Height = 170
+        .Left = 10: .Top = 65: .Width = 540: .Height = 330
         .Font.Size = 10: .Font.Bold = True
     End With
 
@@ -85,8 +85,8 @@ Sub 四方镜子()
     Set btn1 = fra1.Controls.Add("Forms.CommandButton.1", "CommandButton1")
     With btn1
         .Caption = "反向竖向"
-        .Left = 10: .Top = 25: .Width = 125: .Height = 50
-        .Font.Size = 9
+        .Left = 15: .Top = 25: .Width = 250: .Height = 180
+        .Font.Size = 10
     End With
 
     ' --- 按钮3：正向竖向（左快右慢） ---
@@ -94,8 +94,8 @@ Sub 四方镜子()
     Set btn3 = fra1.Controls.Add("Forms.CommandButton.1", "CommandButton3")
     With btn3
         .Caption = "正向竖向"
-        .Left = 145: .Top = 25: .Width = 125: .Height = 50
-        .Font.Size = 9
+        .Left = 280: .Top = 25: .Width = 250: .Height = 180
+        .Font.Size = 10
     End With
 
     ' --- 按钮2：正向横向 ---
@@ -103,8 +103,8 @@ Sub 四方镜子()
     Set btn2 = fra1.Controls.Add("Forms.CommandButton.1", "CommandButton2")
     With btn2
         .Caption = "正向横向"
-        .Left = 10: .Top = 85: .Width = 255: .Height = 65
-        .Font.Size = 9
+        .Left = 15: .Top = 215: .Width = 510: .Height = 80
+        .Font.Size = 10
     End With
 
     ' --- 按钮4：反向横向 ---
@@ -112,8 +112,8 @@ Sub 四方镜子()
     Set btn4 = fra1.Controls.Add("Forms.CommandButton.1", "CommandButton4")
     With btn4
         .Caption = "反向横向"
-        .Left = 10: .Top = 155: .Width = 255: .Height = 65
-        .Font.Size = 9
+        .Left = 15: .Top = 300: .Width = 510: .Height = 80
+        .Font.Size = 10
     End With
 
     ' --- 框架2 ---
@@ -121,7 +121,7 @@ Sub 四方镜子()
     Set fra2 = 设计器.Controls.Add("Forms.Frame.1", "Frame2")
     With fra2
         .Caption = "双边循环（LCM独立循环）"
-        .Left = 10: .Top = 240: .Width = 275: .Height = 90
+        .Left = 10: .Top = 400: .Width = 540: .Height = 175
         .Font.Size = 10: .Font.Bold = True
     End With
 
@@ -130,8 +130,8 @@ Sub 四方镜子()
     Set btn5 = fra2.Controls.Add("Forms.CommandButton.1", "CommandButton5")
     With btn5
         .Caption = "双边循环_竖"
-        .Left = 10: .Top = 20: .Width = 125: .Height = 65
-        .Font.Size = 9
+        .Left = 15: .Top = 25: .Width = 250: .Height = 140
+        .Font.Size = 10
     End With
 
     ' --- 按钮6：双边循环_横 ---
@@ -139,8 +139,8 @@ Sub 四方镜子()
     Set btn6 = fra2.Controls.Add("Forms.CommandButton.1", "CommandButton6")
     With btn6
         .Caption = "双边循环_横"
-        .Left = 145: .Top = 20: .Width = 125: .Height = 65
-        .Font.Size = 9
+        .Left = 280: .Top = 25: .Width = 250: .Height = 140
+        .Font.Size = 10
     End With
 
     ' --- 关闭按钮 ---
@@ -148,7 +148,7 @@ Sub 四方镜子()
     Set btn7 = 设计器.Controls.Add("Forms.CommandButton.1", "CommandButton7")
     With btn7
         .Caption = "关闭窗体"
-        .Left = 100: .Top = 335: .Width = 95: .Height = 28
+        .Left = 230: .Top = 580: .Width = 100: .Height = 30
         .Font.Size = 10: .Font.Bold = True
         .BackColor = RGB(220, 80, 80)
     End With
@@ -310,7 +310,7 @@ End Function
 Public Sub 更新按钮图示(frm As Object)
     On Error Resume Next
 
-    ' 非对称占位符预览：A列2行 + B列3行（2x3 清晰展示排列差异，且不会显示不全）
+    ' 非对称占位符预览：A列2行 + B列3行（2x3，6个组合完整显示）
     Dim d1a As String, d2a As String
     Dim d1b As String, d2b As String, d3b As String
     d1a = "a1": d2a = "a2"
@@ -323,7 +323,7 @@ Public Sub 更新按钮图示(frm As Object)
     Dim 空 As String
     If 是否合并 Then 空 = 连 Else 空 = "  "
 
-    ' 6个基本组合（A×B 笛卡尔积）
+    ' 6个基本组合（正向笛卡尔积排序）
     Dim m1 As String, m2 As String, m3 As String, m4 As String, m5 As String, m6 As String
     m1 = d1a & 空 & d1b   ' a1-b1
     m2 = d2a & 空 & d1b   ' a2-b1
@@ -332,58 +332,61 @@ Public Sub 更新按钮图示(frm As Object)
     m5 = d1a & 空 & d3b   ' a1-b3
     m6 = d2a & 空 & d3b   ' a2-b3
 
-    ' 按钮1：反向竖向（左慢右快：A列每3行变，B列每行变）
-    ' 行序：a1b1, a1b2, a1b3, a2b1, a2b2, a2b3
+    ' 按钮1：反向竖向（左慢右快：A每3行变，B每行变）
+    ' 完整6行：a1b1, a1b2, a1b3, a2b1, a2b2, a2b3
     frm.Controls("CommandButton1").Caption = _
-        m1 & Chr(10) & m3 & Chr(10) & m5 & Chr(10) & m2
+        m1 & Chr(10) & m3 & Chr(10) & m5 & Chr(10) & _
+        m2 & Chr(10) & m4 & Chr(10) & m6
 
-    ' 按钮3：正向竖向（左快右慢：A列每行变，B列每2行变）
-    ' 行序：a1b1, a2b1, a1b2, a2b2, a1b3, a2b3
+    ' 按钮3：正向竖向（左快右慢：A每行变，B每2行变）
+    ' 完整6行：a1b1, a2b1, a1b2, a2b2, a1b3, a2b3
     frm.Controls("CommandButton3").Caption = _
-        m1 & Chr(10) & m2 & Chr(10) & m3 & Chr(10) & m4
+        m1 & Chr(10) & m2 & Chr(10) & m3 & Chr(10) & _
+        m4 & Chr(10) & m5 & Chr(10) & m6
 
     If 是否合并 Then
-        ' 按钮2：正向横向（前4个组合一行）
+        ' 按钮2：正向横向（6个组合一行）
         frm.Controls("CommandButton2").Caption = _
-            m1 & "   " & m2 & "   " & m3 & "   " & m4
-        ' 按钮4：反向横向（前4个组合一行）
+            m1 & "   " & m2 & "   " & m3 & "   " & m4 & "   " & m5 & "   " & m6
+        ' 按钮4：反向横向（6个组合一行）
         frm.Controls("CommandButton4").Caption = _
-            m1 & "   " & m3 & "   " & m5 & "   " & m2
+            m1 & "   " & m3 & "   " & m5 & "   " & m2 & "   " & m4 & "   " & m6
     Else
-        ' 按钮2：正向横向 分开（矩阵2行：A每行变/B每2行变，显示前4列）
+        ' 按钮2：正向横向 分开（完整矩阵2行各6列：A每行变/B每2行变）
         frm.Controls("CommandButton2").Caption = _
-            d1a & "   " & d2a & "   " & d1a & "   " & d2a & Chr(10) & _
-            d1b & "   " & d1b & "   " & d2b & "   " & d2b
-        ' 按钮4：反向横向 分开（矩阵2行：A每3行变/B每行变，显示前4列）
+            d1a & "  " & d2a & "  " & d1a & "  " & d2a & "  " & d1a & "  " & d2a & Chr(10) & _
+            d1b & "  " & d1b & "  " & d2b & "  " & d2b & "  " & d3b & "  " & d3b
+        ' 按钮4：反向横向 分开（完整矩阵2行各6列：A每3行变/B每行变）
         frm.Controls("CommandButton4").Caption = _
-            d1a & "   " & d1a & "   " & d1a & "   " & d2a & Chr(10) & _
-            d1b & "   " & d2b & "   " & d3b & "   " & d1b
+            d1a & "  " & d1a & "  " & d1a & "  " & d2a & "  " & d2a & "  " & d2a & Chr(10) & _
+            d1b & "  " & d2b & "  " & d3b & "  " & d1b & "  " & d2b & "  " & d3b
     End If
 
-    ' 按钮5：双边循环_竖（每列独立循环，同步推进）
-    ' 行序：a1b1, a2b2, a1b3, a2b1, ...（显示前2行）
+    ' 按钮5：双边循环_竖（每列独立循环同步推进，LCM=6）
+    ' 完整6行：a1b1, a2b2, a1b3, a2b1, a1b2, a2b3
     frm.Controls("CommandButton5").Caption = _
-        m1 & Chr(10) & m4
+        m1 & Chr(10) & m4 & Chr(10) & m5 & Chr(10) & _
+        m2 & Chr(10) & m3 & Chr(10) & m6
 
     ' 按钮6：双边循环_横
-    ' 合并：一行组合 a1-b1  a2-b2
+    ' 合并：6个组合一行
     ' 分开：矩阵形式，每列一行（双边循环每列独立循环，与实际生成一致）
     If 是否合并 Then
         frm.Controls("CommandButton6").Caption = _
-            m1 & "   " & m4
+            m1 & "   " & m4 & "   " & m5 & "   " & m2 & "   " & m3 & "   " & m6
     Else
         frm.Controls("CommandButton6").Caption = _
-            d1a & "   " & d2a & Chr(10) & _
-            d1b & "   " & d2b
+            d1a & "  " & d2a & "  " & d1a & "  " & d2a & "  " & d1a & "  " & d2a & Chr(10) & _
+            d1b & "  " & d2b & "  " & d3b & "  " & d1b & "  " & d2b & "  " & d3b
     End If
 
     ' ---- 字号自适应：按 Caption 最长行长度自动缩放 ----
-    frm.Controls("CommandButton1").Font.Size = 自动字号(frm.Controls("CommandButton1").Caption, 9)
-    frm.Controls("CommandButton2").Font.Size = 自动字号(frm.Controls("CommandButton2").Caption, 9)
-    frm.Controls("CommandButton3").Font.Size = 自动字号(frm.Controls("CommandButton3").Caption, 9)
-    frm.Controls("CommandButton4").Font.Size = 自动字号(frm.Controls("CommandButton4").Caption, 9)
-    frm.Controls("CommandButton5").Font.Size = 自动字号(frm.Controls("CommandButton5").Caption, 9)
-    frm.Controls("CommandButton6").Font.Size = 自动字号(frm.Controls("CommandButton6").Caption, 9)
+    frm.Controls("CommandButton1").Font.Size = 自动字号(frm.Controls("CommandButton1").Caption, 10)
+    frm.Controls("CommandButton2").Font.Size = 自动字号(frm.Controls("CommandButton2").Caption, 10)
+    frm.Controls("CommandButton3").Font.Size = 自动字号(frm.Controls("CommandButton3").Caption, 10)
+    frm.Controls("CommandButton4").Font.Size = 自动字号(frm.Controls("CommandButton4").Caption, 10)
+    frm.Controls("CommandButton5").Font.Size = 自动字号(frm.Controls("CommandButton5").Caption, 10)
+    frm.Controls("CommandButton6").Font.Size = 自动字号(frm.Controls("CommandButton6").Caption, 10)
 End Sub
 
 ' 字号自适应：按 Caption 最长行字符数调整字号
@@ -395,9 +398,9 @@ Private Function 自动字号(Caption文本 As String, 参考字号 As Single) A
     For i = 0 To UBound(行数组)
         If Len(行数组(i)) > 最长 Then 最长 = Len(行数组(i))
     Next i
-    If 最长 > 24 Then
+    If 最长 > 60 Then
         自动字号 = 参考字号 - 2
-    ElseIf 最长 > 16 Then
+    ElseIf 最长 > 40 Then
         自动字号 = 参考字号 - 1
     Else
         自动字号 = 参考字号
