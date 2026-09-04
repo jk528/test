@@ -35,7 +35,7 @@ Sub 四方镜子()
     With 窗体组件.Properties
         .Item("Caption") = "四方镜"
         .Item("Width") = 560
-        .Item("Height") = 470
+        .Item("Height") = 500
         .Item("StartUpPosition") = 1 ' 居中
     End With
 
@@ -76,7 +76,7 @@ Sub 四方镜子()
     Set fra1 = 设计器.Controls.Add("Forms.Frame.1", "Frame1")
     With fra1
         .Caption = "四方循环（笛卡尔积）"
-        .Left = 10: .Top = 65: .Width = 540: .Height = 230
+        .Left = 10: .Top = 65: .Width = 540: .Height = 220
         .Font.Size = 10: .Font.Bold = True
     End With
 
@@ -85,7 +85,7 @@ Sub 四方镜子()
     Set btn1 = fra1.Controls.Add("Forms.CommandButton.1", "CommandButton1")
     With btn1
         .Caption = "反向竖向"
-        .Left = 15: .Top = 25: .Width = 250: .Height = 90
+        .Left = 15: .Top = 25: .Width = 250: .Height = 80
         .Font.Size = 10
     End With
 
@@ -94,7 +94,7 @@ Sub 四方镜子()
     Set btn3 = fra1.Controls.Add("Forms.CommandButton.1", "CommandButton3")
     With btn3
         .Caption = "正向竖向"
-        .Left = 280: .Top = 25: .Width = 250: .Height = 90
+        .Left = 280: .Top = 25: .Width = 250: .Height = 80
         .Font.Size = 10
     End With
 
@@ -103,7 +103,7 @@ Sub 四方镜子()
     Set btn2 = fra1.Controls.Add("Forms.CommandButton.1", "CommandButton2")
     With btn2
         .Caption = "正向横向"
-        .Left = 15: .Top = 125: .Width = 510: .Height = 40
+        .Left = 15: .Top = 115: .Width = 250: .Height = 80
         .Font.Size = 10
     End With
 
@@ -112,7 +112,7 @@ Sub 四方镜子()
     Set btn4 = fra1.Controls.Add("Forms.CommandButton.1", "CommandButton4")
     With btn4
         .Caption = "反向横向"
-        .Left = 15: .Top = 175: .Width = 510: .Height = 40
+        .Left = 280: .Top = 115: .Width = 250: .Height = 80
         .Font.Size = 10
     End With
 
@@ -121,7 +121,7 @@ Sub 四方镜子()
     Set fra2 = 设计器.Controls.Add("Forms.Frame.1", "Frame2")
     With fra2
         .Caption = "双边循环（LCM独立循环）"
-        .Left = 10: .Top = 305: .Width = 540: .Height = 120
+        .Left = 10: .Top = 295: .Width = 540: .Height = 130
         .Font.Size = 10: .Font.Bold = True
     End With
 
@@ -148,7 +148,7 @@ Sub 四方镜子()
     Set btn7 = 设计器.Controls.Add("Forms.CommandButton.1", "CommandButton7")
     With btn7
         .Caption = "关闭窗体"
-        .Left = 230: .Top = 435: .Width = 100: .Height = 30
+        .Left = 230: .Top = 445: .Width = 100: .Height = 30
         .Font.Size = 10: .Font.Bold = True
         .BackColor = RGB(220, 80, 80)
     End With
@@ -345,12 +345,14 @@ Public Sub 更新按钮图示(frm As Object)
         m4 & Chr(10) & m5 & Chr(10) & m6
 
     If 是否合并 Then
-        ' 按钮2：正向横向（6个组合一行）
+        ' 按钮2：正向横向（250宽，两行显示，每行3个组合）
         frm.Controls("CommandButton2").Caption = _
-            m1 & "   " & m2 & "   " & m3 & "   " & m4 & "   " & m5 & "   " & m6
-        ' 按钮4：反向横向（6个组合一行）
+            m1 & "   " & m2 & "   " & m3 & Chr(10) & _
+            m4 & "   " & m5 & "   " & m6
+        ' 按钮4：反向横向（两行显示，每行3个组合）
         frm.Controls("CommandButton4").Caption = _
-            m1 & "   " & m3 & "   " & m5 & "   " & m2 & "   " & m4 & "   " & m6
+            m1 & "   " & m3 & "   " & m5 & Chr(10) & _
+            m2 & "   " & m4 & "   " & m6
     Else
         ' 按钮2：正向横向 分开（完整矩阵2行各6列：A每行变/B每2行变）
         frm.Controls("CommandButton2").Caption = _
