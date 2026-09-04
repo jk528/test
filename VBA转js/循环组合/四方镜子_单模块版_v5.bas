@@ -147,8 +147,8 @@ Sub 四方镜子()
     ' 4. 用 CodeModule 注入事件代码（逐行写入，范例111模式）
     注入事件代码 窗体组件
     
-    ' 5. 显示窗体
-    VBA.UserForms.Add(窗体名).Show
+    ' 5. 显示窗体（vbModeless 允许同时操作工作表）
+    VBA.UserForms.Add(窗体名).Show vbModeless
     
     ' 6. 清理
     VBP.VBComponents.Remove 窗体组件
@@ -212,40 +212,34 @@ Private Sub 注入事件代码(窗体组件 As Object)
     i = i + 1: CM.InsertLines i, "End Sub"
     i = i + 1: CM.InsertLines i, ""
     
-    ' ---- 按钮点击事件 ----
+    ' ---- 按钮点击事件（不关闭窗体，可反复操作） ----
     i = i + 1: CM.InsertLines i, "Private Sub CommandButton1_Click()"
     i = i + 1: CM.InsertLines i, "    四方循环_执行 False, False"
-    i = i + 1: CM.InsertLines i, "    Unload Me"
     i = i + 1: CM.InsertLines i, "End Sub"
     i = i + 1: CM.InsertLines i, ""
     
     i = i + 1: CM.InsertLines i, "Private Sub CommandButton2_Click()"
     i = i + 1: CM.InsertLines i, "    四方循环_执行 True, True"
-    i = i + 1: CM.InsertLines i, "    Unload Me"
     i = i + 1: CM.InsertLines i, "End Sub"
     i = i + 1: CM.InsertLines i, ""
     
     i = i + 1: CM.InsertLines i, "Private Sub CommandButton3_Click()"
     i = i + 1: CM.InsertLines i, "    四方循环_执行 True, False"
-    i = i + 1: CM.InsertLines i, "    Unload Me"
     i = i + 1: CM.InsertLines i, "End Sub"
     i = i + 1: CM.InsertLines i, ""
     
     i = i + 1: CM.InsertLines i, "Private Sub CommandButton4_Click()"
     i = i + 1: CM.InsertLines i, "    四方循环_执行 False, True"
-    i = i + 1: CM.InsertLines i, "    Unload Me"
     i = i + 1: CM.InsertLines i, "End Sub"
     i = i + 1: CM.InsertLines i, ""
     
     i = i + 1: CM.InsertLines i, "Private Sub CommandButton5_Click()"
     i = i + 1: CM.InsertLines i, "    双边循环_执行 True"
-    i = i + 1: CM.InsertLines i, "    Unload Me"
     i = i + 1: CM.InsertLines i, "End Sub"
     i = i + 1: CM.InsertLines i, ""
     
     i = i + 1: CM.InsertLines i, "Private Sub CommandButton6_Click()"
     i = i + 1: CM.InsertLines i, "    双边循环_执行 False"
-    i = i + 1: CM.InsertLines i, "    Unload Me"
     i = i + 1: CM.InsertLines i, "End Sub"
 End Sub
 
@@ -275,6 +269,21 @@ Private Function 数组乘积(数组 As Variant) As Long
     For i = LBound(数组) To UBound(数组)
         数组乘积 = 数组乘积 * 数组(i)
     Next i
+End Function
+
+' 新建结果表（统一创建逻辑和命名规则）
+Private Function 新建结果表(名称前缀 As String) As Worksheet
+    Dim ws As Worksheet
+    Set ws = Worksheets.Add(After:=ActiveSheet)
+    ' 表名最多31字符，截断超长名称
+    Dim 表名 As String
+    表名 = 名称前缀 & "_" & Sheets.Count
+    If Len(表名) > 31 Then 表名 = Left(名称前缀, 31 - Len(Sheets.Count) - 1) & "_" & Sheets.Count
+    On Error Resume Next
+    ws.Name = 表名
+    If Err.Number <> 0 Then ws.Name = "结果_" & Format(Now, "hhmmss")
+    On Error GoTo 0
+    Set 新建结果表 = ws
 End Function
 
 ' ============================================================
@@ -335,14 +344,13 @@ Sub 四方循环_执行(是否正向 As Boolean, 是否横向 As Boolean)
         Next 行
     Next 列
 
-    ' 新建 sheet 输出结果（不再写入 F2）
-    Dim 新表 As Worksheet
-    Set 新表 = Worksheets.Add(After:=ws)
+    ' 新建结果表（统一命名）
     Dim 方向名 As String, 合并名 As String
     If 是否正向 Then 方向名 = "正" Else 方向名 = "反"
     If 是否横向 Then 方向名 = 方向名 & "横" Else 方向名 = 方向名 & "竖"
     If 是否合并 Then 合并名 = "合并" Else 合并名 = "分开"
-    新表.Name = 方向名 & "_" & 合并名 & "_sheet" & Sheets.Count
+    Dim 新表 As Worksheet
+    Set 新表 = 新建结果表("四方_" & 方向名 & "_" & 合并名)
 
     If 是否横向 Then
         If 是否合并 Then
@@ -443,17 +451,14 @@ Sub 双边循环_执行(是否竖向 As Boolean)
         Next 行
     Next 列
 
+    ' 新建结果表（统一命名）
+    Dim 方向名 As String, 合并名 As String
+    If 是否竖向 Then 方向名 = "竖" Else 方向名 = "横"
+    If 是否合并 Then 合并名 = "合并" Else 合并名 = "分开"
+    Dim 完整名 As String
+    If 是否完整 Then 完整名 = "完整" Else 完整名 = "残缺" & 列乘积 & "-" & 最小公倍数
     Dim 新表 As Worksheet
-    On Error Resume Next
-    Set 新表 = Worksheets.Add(After:=Worksheets("重复字"))
-    If Err.Number <> 0 Then Set 新表 = Worksheets.Add
-    On Error GoTo 错误处理
-
-    If 是否完整 Then
-        新表.Name = "完整_" & 最小公倍数 & "sheet" & Sheets.Count
-    Else
-        新表.Name = "残缺_" & 列乘积 & "|" & 最小公倍数 & "sheet" & Sheets.Count
-    End If
+    Set 新表 = 新建结果表("双边_" & 方向名 & "_" & 完整名 & "_" & 合并名)
 
     If 是否竖向 Then
         If 是否合并 Then
