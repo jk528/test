@@ -1,0 +1,266 @@
+<!-- =============================================================
+  四方镜子 - HTML窗体版
+  用途：WPS JS宏通过 Application.ShowDialog() 调用此HTML作为交互界面
+  优点：界面更美观、布局更灵活、无需窗体设计器
+  调用方式：Application.ShowDialog("四方镜子_窗体.html", 800, 600)
+  ============================================================= -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>四方镜</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Microsoft YaHei", "微软雅黑", sans-serif;
+    background: #f5f7fa;
+    padding: 20px;
+    color: #333;
+    user-select: none;
+  }
+  .title {
+    font-size: 18px;
+    font-weight: bold;
+    color: #2c3e50;
+    margin-bottom: 16px;
+    text-align: center;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 10px;
+  }
+  .section {
+    background: #fff;
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 14px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  }
+  .section-title {
+    font-size: 14px;
+    font-weight: bold;
+    color: #3498db;
+    margin-bottom: 10px;
+    padding-left: 8px;
+    border-left: 3px solid #3498db;
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  label { font-size: 13px; color: #555; min-width: 70px; }
+  input[type="text"] {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  input[type="text"]:focus { border-color: #3498db; }
+  input[type="checkbox"] { cursor: pointer; }
+
+  /* 按钮网格：四方循环 2×2 */
+  .grid-2x2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .grid-2x1 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .btn {
+    padding: 14px 8px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1.6;
+    text-align: center;
+    transition: all 0.2s;
+    color: #444;
+    white-space: pre-line;
+    font-family: Consolas, monospace;
+  }
+  .btn:hover {
+    background: #ecf5ff;
+    border-color: #3498db;
+    color: #3498db;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(52,152,219,0.2);
+  }
+  .btn-wide {
+    font-family: "Microsoft YaHei", sans-serif;
+    font-size: 13px;
+    padding: 12px;
+    font-weight: 500;
+  }
+  .btn-primary {
+    background: #3498db;
+    color: #fff;
+    border-color: #3498db;
+  }
+  .btn-primary:hover {
+    background: #2980b9;
+    border-color: #2980b9;
+    color: #fff;
+  }
+
+  .mode-switch {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 10px;
+    font-size: 13px;
+  }
+  .hint {
+    font-size: 11px;
+    color: #999;
+    margin-top: 4px;
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+
+<div class="title">🔷 四方镜</div>
+
+<!-- 连接符号设置 -->
+<div class="section">
+  <div class="section-title">连接符号</div>
+  <div class="row">
+    <label>连接符：</label>
+    <input type="text" id="connector" value="-" maxlength="10" placeholder="如 - | 空格 等">
+  </div>
+  <div class="row">
+    <label></label>
+    <div class="mode-switch">
+      <input type="checkbox" id="mergeMode" checked>
+      <label for="mergeMode" style="min-width:auto;cursor:pointer;">合并模式（用连接符拼接各列）</label>
+    </div>
+  </div>
+</div>
+
+<!-- 四方循环 -->
+<div class="section">
+  <div class="section-title">四方循环（笛卡尔积）</div>
+  <div class="grid-2x2" id="fourGrid">
+    <button class="btn" onclick="runFourWay(false, false)" id="btn1">A1B1
+A1B2
+A2B1
+A2B2</button>
+    <button class="btn" onclick="runFourWay(true, false)" id="btn3">A1B1
+A2B1
+A1B2
+A2B2</button>
+    <button class="btn" onclick="runFourWay(true, true)" id="btn2">A1B1 A2B1 A1B2 A2B2</button>
+    <button class="btn" onclick="runFourWay(false, true)" id="btn4">A1B1 A1B2 A2B1 A2B2</button>
+  </div>
+  <div class="hint">
+    上方两个=竖向输出 &nbsp;|&nbsp; 下方两个=横向输出<br>
+    左列=反向(左快右慢) &nbsp;|&nbsp; 右列=正向(左慢右快)
+  </div>
+</div>
+
+<!-- 双边循环 -->
+<div class="section">
+  <div class="section-title">双边循环（LCM独立循环）</div>
+  <div class="grid-2x1">
+    <button class="btn btn-wide" onclick="runLcm(true)" id="btn5">双边循环_合并_竖</button>
+    <button class="btn btn-wide" onclick="runLcm(false)" id="btn6">双边循环_合并_横</button>
+  </div>
+</div>
+
+<script>
+// -----------------------------------------------------
+//  合并模式切换：更新按钮文字图示
+// -----------------------------------------------------
+document.getElementById('mergeMode').addEventListener('change', function(e) {
+  var merged = e.target.checked;
+  var btn1 = document.getElementById('btn1');
+  var btn2 = document.getElementById('btn2');
+  var btn3 = document.getElementById('btn3');
+  var btn4 = document.getElementById('btn4');
+  var btn5 = document.getElementById('btn5');
+  var btn6 = document.getElementById('btn6');
+
+  if (merged) {
+    // 合并模式 - 紧凑图示（A列+B列拼接）
+    btn1.textContent = "A1B1\nA1B2\nA2B1\nA2B2";
+    btn3.textContent = "A1B1\nA2B1\nA1B2\nA2B2";
+    btn2.textContent = "A1B1 A2B1 A1B2 A2B2";
+    btn4.textContent = "A1B1 A1B2 A2B1 A2B2";
+    btn5.textContent = "双边循环_合并_竖";
+    btn6.textContent = "双边循环_合并_横";
+  } else {
+    // 分开模式 - 带空格图示（A列  B列 分明）
+    btn1.textContent = "A1  B1\nA1  B2\nA2  B1\nA2  B2";
+    btn3.textContent = "A1  B1\nA2  B1\nA1  B2\nA2  B2";
+    btn2.textContent = "A1  B1  A2  B1  A1  B2  A2  B2";
+    btn4.textContent = "A1  B1  A1  B2  A2  B1  A2  B2";
+    btn5.textContent = "双边循环_分_竖";
+    btn6.textContent = "双边循环_分_横";
+  }
+});
+
+// -----------------------------------------------------
+//  连接符变化时更新
+// -----------------------------------------------------
+document.getElementById('connector').addEventListener('input', function(e) {
+  // 合并模式跟随连接符是否为空
+  var cb = document.getElementById('mergeMode');
+  if (e.target.value === '') {
+    cb.checked = false;
+    cb.dispatchEvent(new Event('change'));
+  }
+});
+
+// -----------------------------------------------------
+//  执行四方循环
+// -----------------------------------------------------
+function runFourWay(forward, horizontal) {
+  var connector = document.getElementById('connector').value;
+  var merged = document.getElementById('mergeMode').checked;
+  // 将参数传回宿主环境
+  if (window.external && window.external.Notify) {
+    window.external.Notify(JSON.stringify({
+      action: 'fourWay',
+      forward: forward,
+      horizontal: horizontal,
+      connector: merged ? connector : ''
+    }));
+  } else {
+    // 开发环境测试用
+    alert('四方循环：' + (forward ? '正向' : '反向') + ' + '
+      + (horizontal ? '横向' : '竖向') + '\n连接符："'
+      + (merged ? connector : '（不合并）') + '"');
+  }
+  window.close();
+}
+
+// -----------------------------------------------------
+//  执行双边循环
+// -----------------------------------------------------
+function runLcm(vertical) {
+  var connector = document.getElementById('connector').value;
+  var merged = document.getElementById('mergeMode').checked;
+  if (window.external && window.external.Notify) {
+    window.external.Notify(JSON.stringify({
+      action: 'lcm',
+      vertical: vertical,
+      connector: merged ? connector : ''
+    }));
+  } else {
+    alert('双边循环：' + (vertical ? '竖向' : '横向') + '\n连接符："'
+      + (merged ? connector : '（不合并）') + '"');
+  }
+  window.close();
+}
+</script>
+
+</body>
+</html>
