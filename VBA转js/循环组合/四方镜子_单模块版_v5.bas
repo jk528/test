@@ -1,8 +1,7 @@
 '============================================================
-' 四方镜子 - 单模块版 v5（模态 + 可反复操作）
-' 基于范例111模式：Designer.Controls.Add + CodeModule 注入事件代码
-' 与v6区别：按钮执行后不关闭窗体，可反复点击不同操作
-'           增加"关闭窗体"按钮用于退出
+' 四方镜子 - 单模块版 v5（modeless + DoEvents 循环）
+' 核心原理：Show vbModeless 后用 DoEvents 循环保持宏存活
+'           窗体可见且可编辑Excel，关闭窗体后才退出循环并清理
 ' 使用方法：运行 四方镜子()
 ' 注意：需启用"信任对VBA工程对象模型的访问"
 '============================================================
@@ -40,7 +39,7 @@ Sub 四方镜子()
         .Item("StartUpPosition") = 1 ' 居中
     End With
 
-    ' 3. 用 Designer 添加控件（设计时控件，事件原生支持）
+    ' 3. 用 Designer 添加控件
     Dim 设计器 As Object
     Set 设计器 = 窗体组件.Designer
 
@@ -157,10 +156,18 @@ Sub 四方镜子()
     ' 4. 用 CodeModule 注入事件代码
     注入事件代码 窗体组件
 
-    ' 5. 显示窗体（模态，阻塞直到用户点"关闭窗体"或X）
-    VBA.UserForms.Add(窗体名).Show
+    ' 5. modeless 显示窗体（不阻塞，可同时操作Excel）
+    Dim frm As Object
+    Set frm = VBA.UserForms.Add(窗体名)
+    frm.Show vbModeless
 
-    ' 6. Show 返回说明窗体已关闭，安全删除组件
+    ' 6. DoEvents 循环：保持宏存活，窗体可见且可操作Excel
+    '    当窗体被 Unload 后，UserForms.Count 变为0，循环退出
+    Do While UserForms.Count > 0
+        DoEvents
+    Loop
+
+    ' 7. 窗体已关闭，安全删除组件
     VBP.VBComponents.Remove 窗体组件
 
     Exit Sub
@@ -254,6 +261,11 @@ Private Sub 注入事件代码(窗体组件 As Object)
 
     ' ---- 关闭按钮：卸载窗体 ----
     i = i + 1: CM.InsertLines i, "Private Sub CommandButton7_Click()"
+    i = i + 1: CM.InsertLines i, "    Unload Me"
+    i = i + 1: CM.InsertLines i, "End Sub"
+
+    ' ---- QueryClose：点X关闭也触发Unload ----
+    i = i + 1: CM.InsertLines i, "Private Sub UserForm_QueryClose(Cancel As Integer, CloseMode As Integer)"
     i = i + 1: CM.InsertLines i, "    Unload Me"
     i = i + 1: CM.InsertLines i, "End Sub"
 End Sub
@@ -357,7 +369,6 @@ Sub 四方循环_执行(是否正向 As Boolean, 是否横向 As Boolean)
         Next 行
     Next 列
 
-    ' 新建结果表（统一命名）
     Dim 方向名 As String, 合并名 As String
     If 是否正向 Then 方向名 = "正" Else 方向名 = "反"
     If 是否横向 Then 方向名 = 方向名 & "横" Else 方向名 = 方向名 & "竖"
@@ -464,7 +475,6 @@ Sub 双边循环_执行(是否竖向 As Boolean)
         Next 行
     Next 列
 
-    ' 新建结果表（统一命名）
     Dim 方向名 As String, 合并名 As String
     If 是否竖向 Then 方向名 = "竖" Else 方向名 = "横"
     If 是否合并 Then 合并名 = "合并" Else 合并名 = "分开"
