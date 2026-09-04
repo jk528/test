@@ -157,13 +157,16 @@ Sub 四方镜子()
     注入事件代码 窗体组件
 
     ' 5. modeless 显示窗体（不阻塞，可同时操作Excel）
+    Dim 初始数量 As Long
+    初始数量 = UserForms.Count  ' 记录显示前的数量
+
     Dim frm As Object
     Set frm = VBA.UserForms.Add(窗体名)
     frm.Show vbModeless
 
     ' 6. DoEvents 循环：保持宏存活，窗体可见且可操作Excel
-    '    当窗体被 Unload 后，UserForms.Count 变为0，循环退出
-    Do While UserForms.Count > 0
+    '    当窗体被 Unload 后，UserForms.Count 减少回初始数量，循环退出
+    Do While UserForms.Count > 初始数量
         DoEvents
     Loop
 
