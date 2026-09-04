@@ -35,7 +35,7 @@ Sub 四方镜子()
     With 窗体组件.Properties
         .Item("Caption") = "四方镜"
         .Item("Width") = 300
-        .Item("Height") = 360
+        .Item("Height") = 400
         .Item("StartUpPosition") = 1 ' 居中
     End With
 
@@ -121,7 +121,7 @@ Sub 四方镜子()
     Set fra2 = 设计器.Controls.Add("Forms.Frame.1", "Frame2")
     With fra2
         .Caption = "双边循环（LCM独立循环）"
-        .Left = 10: .Top = 255: .Width = 275: .Height = 60
+        .Left = 10: .Top = 255: .Width = 275: .Height = 95
         .Font.Size = 10: .Font.Bold = True
     End With
 
@@ -130,7 +130,7 @@ Sub 四方镜子()
     Set btn5 = fra2.Controls.Add("Forms.CommandButton.1", "CommandButton5")
     With btn5
         .Caption = "双边循环_竖"
-        .Left = 10: .Top = 20: .Width = 125: .Height = 25
+        .Left = 10: .Top = 20: .Width = 125: .Height = 55
         .Font.Size = 9
     End With
 
@@ -139,7 +139,7 @@ Sub 四方镜子()
     Set btn6 = fra2.Controls.Add("Forms.CommandButton.1", "CommandButton6")
     With btn6
         .Caption = "双边循环_横"
-        .Left = 145: .Top = 20: .Width = 125: .Height = 25
+        .Left = 145: .Top = 20: .Width = 125: .Height = 55
         .Font.Size = 9
     End With
 
@@ -148,7 +148,7 @@ Sub 四方镜子()
     Set btn7 = 设计器.Controls.Add("Forms.CommandButton.1", "CommandButton7")
     With btn7
         .Caption = "关闭窗体"
-        .Left = 100: .Top = 320: .Width = 95: .Height = 28
+        .Left = 100: .Top = 360: .Width = 95: .Height = 28
         .Font.Size = 10: .Font.Bold = True
         .BackColor = RGB(220, 80, 80)
     End With
@@ -309,16 +309,10 @@ End Function
 
 Public Sub 更新按钮图示(frm As Object)
     On Error Resume Next
-    Dim ws As Worksheet
-    Set ws = ActiveSheet
 
-    ' 读取前2列每列前2行的真实数据（超长截断，避免按钮显示不全）
+    ' 固定占位符预览（不读取真实数据，保持简洁不易溢出）
     Dim d1a As String, d1b As String, d2a As String, d2b As String
-    d1a = "A1": d1b = "B1": d2a = "A2": d2b = "B2"
-    If ws.Cells(1, 1).Value <> "" Then d1a = 截断文本(CStr(ws.Cells(1, 1).Value), 4)
-    If ws.Cells(1, 2).Value <> "" Then d1b = 截断文本(CStr(ws.Cells(1, 2).Value), 4)
-    If ws.Cells(2, 1).Value <> "" Then d2a = 截断文本(CStr(ws.Cells(2, 1).Value), 4)
-    If ws.Cells(2, 2).Value <> "" Then d2b = 截断文本(CStr(ws.Cells(2, 2).Value), 4)
+    d1a = "a1": d1b = "b1": d2a = "a2": d2b = "b2"
 
     ' 连接符：合并模式用用户输入的连接符，分开模式用双空格
     Dim 连 As String
@@ -363,11 +357,21 @@ Public Sub 更新按钮图示(frm As Object)
     End If
 
     ' 按钮5：双边循环_竖（每列独立循环，同行同下标）
+    ' 合并：a1-b1 / a2-b2（竖排）；分开：a1  b1 / a2  b2（空=双空格）
     frm.Controls("CommandButton5").Caption = _
-        "双边_竖" & Chr(10) & m1 & Chr(10) & m4
+        m1 & Chr(10) & m4
+
     ' 按钮6：双边循环_横
-    frm.Controls("CommandButton6").Caption = _
-        "双边_横" & Chr(10) & m1 & "   " & m4
+    ' 合并：一行组合 a1-b1  a2-b2
+    ' 分开：矩阵形式，每列一行（双边循环每列独立循环，与实际生成一致）
+    If 是否合并 Then
+        frm.Controls("CommandButton6").Caption = _
+            m1 & "   " & m4
+    Else
+        frm.Controls("CommandButton6").Caption = _
+            d1a & "   " & d2a & Chr(10) & _
+            d1b & "   " & d2b
+    End If
 
     ' ---- 字号自适应：按 Caption 最长行长度自动缩放 ----
     frm.Controls("CommandButton1").Font.Size = 自动字号(frm.Controls("CommandButton1").Caption, 9)
@@ -377,15 +381,6 @@ Public Sub 更新按钮图示(frm As Object)
     frm.Controls("CommandButton5").Font.Size = 自动字号(frm.Controls("CommandButton5").Caption, 9)
     frm.Controls("CommandButton6").Font.Size = 自动字号(frm.Controls("CommandButton6").Caption, 9)
 End Sub
-
-' 截断超长文本（避免按钮显示不全）
-Private Function 截断文本(t As String, 最大长度 As Long) As String
-    If Len(t) > 最大长度 Then
-        截断文本 = Left(t, 最大长度) & "…"
-    Else
-        截断文本 = t
-    End If
-End Function
 
 ' 字号自适应：按 Caption 最长行字符数调整字号
 Private Function 自动字号(Caption文本 As String, 参考字号 As Single) As Single
