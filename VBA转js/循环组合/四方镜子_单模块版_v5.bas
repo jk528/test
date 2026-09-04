@@ -332,7 +332,7 @@ Private Function 新建结果表(名称前缀 As String) As Worksheet
     ' 表名最多31字符，截断超长名称
     Dim 表名 As String
     表名 = 名称前缀 & "_" & Sheets.Count
-    If Len(表名) > 31 Then 表名 = Left(名称前缀, 31 - Len(Sheets.Count) - 1) & "_" & Sheets.Count
+    If Len(表名) > 31 Then 表名 = Left(名称前缀, 31 - Len(CStr(Sheets.Count)) - 1) & "_" & Sheets.Count
     On Error Resume Next
     ws.Name = 表名
     If Err.Number <> 0 Then ws.Name = "结果_" & Format(Now, "hhmmss")
