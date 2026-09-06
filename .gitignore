@@ -1,0 +1,4 @@
+# Python 字节码缓存（不生成、不提交）
+__pycache__/
+*.pyc
+*.pyo

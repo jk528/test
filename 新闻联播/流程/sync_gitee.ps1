@@ -1,12 +1,8 @@
-﻿$ErrorActionPreference = "Continue"
-$logDir = "$PSScriptRoot\sync_logs"
-if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
-$logFile = Join-Path $logDir ("sync_" + (Get-Date -Format "yyyyMMdd") + ".log")
+$ErrorActionPreference = "Continue"
 
 function Write-Log {
     param([string]$msg)
-    $line = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $msg"
-    Add-Content -Path $logFile -Value $line -Encoding UTF8
+    Write-Host "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $msg"
 }
 
 Write-Log "===== sync start ====="
@@ -45,7 +41,7 @@ if ($pullExit -ne 0) {
 }
 
 Write-Log "git push origin main"
-git push origin main 2>&1 | ForEach-Object { Write-Log $_ }
+git push origin main 2>&1 | Out-Host
 $pushExit = $LASTEXITCODE
 Write-Log "push exit code: $pushExit"
 
