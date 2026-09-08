@@ -1037,8 +1037,12 @@ def _extract_subject(title, text, category):
             return "也门冲突双方"
         if "欧佩克" in title or "产油国" in title:
             return "主要产油国"
-        if "伊朗" in title and "美国" in title:
+        if "伊朗" in title and ("美国" in title or "美称" in title or "美方" in title):
             return "伊朗与美国"
+        if "货机" in title and "美" in title:
+            return "美国航空部门"
+        if "火山" in title and "印尼" in title:
+            return "印尼火山"
         return "相关方"
 
     # 第7层：按类别兜底
@@ -1128,6 +1132,26 @@ def _extract_location(title, text, category):
             loc = m.group(1).strip()
             if 2 <= len(loc) <= 15:
                 return loc
+
+    # 第1.5层：从标题判断是否是全国/多地性新闻
+    # 如果标题有"各地""全国""我国""一批""乡村振兴""主体功能区"等全国性概念，
+    # 正文里的具体城市只是举例，不算新闻核心地点
+    nationwide_keywords = [
+        "各地", "全国", "我国", "一批", "乡村振兴", "主体功能区",
+        "高质量发展", "国家", "总体", "全面",
+    ]
+    is_nationwide = any(kw in title for kw in nationwide_keywords)
+    if is_nationwide and category in ["政策/会议", "经济要闻"]:
+        # 检查标题里有没有明确的具体地点
+        has_specific_place = False
+        for p in place_patterns_title:
+            if re.search(p, title):
+                has_specific_place = True
+                break
+        if not has_specific_place:
+            if "各地" in title or "一批" in title:
+                return "多地"
+            return "全国"
 
     # 第2层：从正文首段提取
     first_para = text[:200] if len(text) > 200 else text
@@ -1242,8 +1266,34 @@ def _extract_location(title, text, category):
             "缅甸", "菲律宾", "马来西亚", "新加坡", "澳大利亚",
             "加拿大", "德国", "法国", "英国", "意大利", "西班牙",
         ]
+        # 4a: 标题简称匹配（乌美/俄乌/俄美等）
+        abbr_map = [
+            ("乌美", "乌克兰"), ("美乌", "乌克兰"),
+            ("俄乌", "乌克兰"), ("乌俄", "乌克兰"),
+            ("俄美", "俄罗斯"), ("美俄", "俄罗斯"),
+        ]
+        for abbr, country in abbr_map:
+            if abbr in title:
+                return country
+        # 4b: 标题完整国名匹配
+        title_places = []
         for place in intl_places:
-            if place in title or place in first_para:
+            if place in title:
+                title_places.append(place)
+        if title_places:
+            # 如果是"X美会谈"模式，X国是发生地（如乌克兰与美国→乌克兰）
+            if len(title_places) == 2 and "美国" in title_places:
+                for p in title_places:
+                    if p != "美国":
+                        return p
+            # 如果只有一个国家，直接返回
+            if len(title_places) == 1:
+                return title_places[0]
+            # 多个国家，返回第一个（通常是主要发生地）
+            return title_places[0]
+        # 4c: 正文首段匹配
+        for place in intl_places:
+            if place in first_para:
                 return place
         return "相关地区"
 
@@ -1304,7 +1354,12 @@ def _extract_cause(title, text, category):
 
     # 第2层：从标题关键词推断
     if "会见" in title or "会谈" in title:
-        return "深化双边关系与务实合作"
+        # 区分不同类型的会见/会谈
+        if any(kw in title for kw in ["乌美", "美乌", "俄乌", "乌俄", "俄美", "美俄"]):
+            return "讨论冲突与援助事宜"
+        if any(kw in title for kw in ["首相", "总理", "总统", "外长", "特使"]):
+            return "深化双边关系与务实合作"
+        return "双边沟通磋商"
     if "出版发行" in title:
         return "推动理论学习与思想传播"
     if "工程" in title or "运河" in title or "通航" in title:
@@ -1317,6 +1372,12 @@ def _extract_cause(title, text, category):
         return "加快农业农村现代化"
     if "高质量发展" in title:
         return "推动经济社会高质量发展"
+    if "节气" in title or "白露" in title or "立春" in title or "清明" in title:
+        return "节气更替 自然现象"
+    if "冲突" in title or "交火" in title or "制裁" in title:
+        return "地区局势紧张升级"
+    if "禁区" in title or "封锁" in title:
+        return "军事对峙升级"
 
     # 第3层：从正文关键词推断
     if any(kw in first_para for kw in ["合作", "交流", "伙伴关系"]):
@@ -1324,6 +1385,9 @@ def _extract_cause(title, text, category):
     if any(kw in first_para for kw in ["发展", "建设", "推进", "完善"]):
         return "推动高质量发展"
     if any(kw in first_para for kw in ["安全", "稳定", "和平"]):
+        # 国际冲突类的"安全"不是"维护和平"的意思
+        if category == "国际新闻" and any(kw in title for kw in ["冲突", "制裁", "禁区", "封锁"]):
+            return "地区安全局势紧张"
         return "维护和平与安全"
     if any(kw in first_para for kw in ["民生", "人民", "群众"]):
         return "增进民生福祉"
@@ -1332,7 +1396,7 @@ def _extract_cause(title, text, category):
     fallbacks = {
         "政策/会议": "推动国家治理现代化",
         "经济要闻": "促进经济高质量发展",
-        "国际新闻": "维护地区和平稳定",
+        "国际新闻": "地区局势发展变化",
         "社会/文化要闻": "丰富人民精神文化生活",
     }
     if category in fallbacks:
