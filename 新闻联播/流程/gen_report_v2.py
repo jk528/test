@@ -909,58 +909,108 @@ def extract_six_elements(video, detail, date_display):
 
 
 def _extract_subject(title, text, category):
-    """提取新闻主体（核心行动者）"""
+    """提取新闻主体（核心行动者）
+    优先级：行动主体 > 发布主体 > 信息来源 > 常见机构 > 兜底
+    注意：书名/标题中的领导人不算，国新办召开发布会不算（要找发布会内容的主体）
+    """
     # 快讯目录特殊处理
     if "国内联播快讯" in title or "国际联播快讯" in title:
         return "多部门/机构"
 
-    # 先检查是否有领导人占位符
+    # 领导人主体判断（排除书名中的情况）
     person_positions = [
         "国家主席", "国务院总理", "全国人大常委会委员长", "全国政协主席",
         "国家副主席", "中共中央政治局常委", "国务院副总理", "中央纪委书记",
     ]
     for pos in person_positions:
         if pos in title:
+            # 检查是否在书名号里（《...》），如果是则不算行动主体
+            before = title.split(pos)[0]
+            book_title_match = re.search(r'《[^》]*$', before)
+            after = title.split(pos)[1] if pos in title else ""
+            book_close_match = re.search(r'^[^《]*》', after)
+            if book_title_match and book_close_match:
+                # 在书名号里，跳过
+                continue
             return f"<u>{pos}</u>"
 
-    # 从正文提取机构名（多层级匹配）
-    dept_patterns = [
-        # 高优先级：明确的发布主体
-        (r'由(.+?)组织编写', 1),
-        (r'(.+?)联合发布', 1),
-        (r'(.+?)发布公告', 1),
-        (r'记者从(.+?)获悉', 1),
-        (r'据(.+?)介绍', 1),
-        (r'(.+?)公布', 1),
-        (r'(.+?)发布的数据显示', 1),
-        (r'(.+?)举行新闻发布会', 1),
-        (r'(.+?)印发', 1),
-        # 中优先级：行动主体
-        (r'(.+?)加快推进', 1),
-        (r'(.+?)启动实施', 1),
-        (r'(.+?)出台', 1),
+    # 第1层：行动主体（高优先级）
+    action_patterns = [
+        r'由(.+?)组织编写',
+        r'(.+?)联合印发',
+        r'(.+?)印发《',
+        r'(.+?)出台',
+        r'(.+?)加快推进',
+        r'(.+?)启动实施',
+        r'(.+?)发布实施',
+        r'(.+?)正式启动',
+        r'(.+?)开工建设',
+        r'(.+?)建成通航',
+        r'(.+?)签署',
+        r'(.+?)批准',
+        r'(.+?)决定',
+        r'(.+?)拨付',
     ]
-    for pattern, group_idx in dept_patterns:
-        m = re.search(pattern, text)
+    for p in action_patterns:
+        m = re.search(p, text)
         if m:
-            dept = m.group(group_idx).strip()
-            # 过滤不合格结果
-            if len(dept) < 4 or len(dept) > 25:
-                continue
-            # 过滤明显不是机构的
-            if any(kw in dept for kw in ["今天", "记者", "报道", "此外", "目前", "同时", "另外"]):
-                continue
-            # 去掉前缀中的人名和时间状语
-            dept = re.sub(r'^[^，。]*[，、]', '', dept).strip()
-            dept = re.sub(r'^(近日|日前|今天|当日|当天|今年以来|近期)', '', dept).strip()
-            dept = re.sub(r'(近日|日前|今天|当日|当天|联合|共同|印发)$', '', dept).strip()
-            dept = re.sub(r'等(六|五|四|三|两|多)部门.*$', '等部门', dept).strip()
-            if dept and len(dept) >= 4:
+            dept = m.group(1).strip()
+            dept = _clean_subject(dept)
+            if dept:
                 return dept
 
-    # 从正文中匹配常见机构名（按优先级排序，更具体的在前）
+    # 第2层：发布主体（次优先，但排除国新办/记者从等信息渠道）
+    publish_patterns = [
+        r'(.+?)联合发布',
+        r'(.+?)发布公告',
+        r'(.+?)公布',
+        r'(.+?)发布的数据显示',
+    ]
+    for p in publish_patterns:
+        m = re.search(p, text)
+        if m:
+            dept = m.group(1).strip()
+            dept = _clean_subject(dept)
+            if dept and "国务院新闻办公室" not in dept and "国务院新闻办" not in dept:
+                return dept
+
+    # 第3层：如果有"国新办/国务院新闻办公室举行发布会"，从发布会内容找主体
+    if "国务院新闻办公室" in text[:300] or "国务院新闻办" in text[:300] or "新闻发布会" in text[:300]:
+        # 从发布会内容中找真正的发布部门（在"介绍"后面找）
+        intro_match = re.search(r'介绍(.+?)情况', text[:500])
+        if intro_match:
+            intro_text = intro_match.group(1)
+            # 在介绍的内容里找部门
+            for dept in ["国家发展改革委", "商务部", "教育部", "科技部", "工信部",
+                         "财政部", "自然资源部", "生态环境部", "住建部", "交通运输部",
+                         "水利部", "农业农村部", "文化和旅游部", "国家卫生健康委",
+                         "人民银行", "海关总署", "税务总局", "市场监管总局",
+                         "国家外汇管理局", "国家医保局", "体育总局", "统计局"]:
+                if dept in intro_text:
+                    return dept
+        # 从"…将介绍"前面找主体
+        will_intro = re.search(r'(.+?)将(介绍|通报|发布)', text[:500])
+        if will_intro:
+            dept = will_intro.group(1).strip()
+            dept = _clean_subject(dept)
+            if dept:
+                return dept
+
+    # 第4层：信息来源（低优先级，作为线索）
+    source_patterns = [
+        r'记者从(.+?)获悉',
+        r'据(.+?)介绍',
+    ]
+    for p in source_patterns:
+        m = re.search(p, text)
+        if m:
+            dept = m.group(1).strip()
+            dept = _clean_subject(dept)
+            if dept and "国务院新闻办公室" not in dept and "国务院新闻办" not in dept:
+                return dept
+
+    # 第5层：从正文中匹配常见机构名（按优先级排序，更具体的在前）
     common_depts = [
-        "国务院新闻办公室", "国务院新闻办",
         "国家发展改革委", "国家发改委",
         "最高人民法院", "最高人民检察院",
         "中央宣传部", "中央组织部", "中央统战部",
@@ -972,20 +1022,57 @@ def _extract_subject(title, text, category):
         "国家外汇管理局",
         "全国总工会", "共青团中央",
         "上海海关", "北京海关", "广州海关", "深圳海关",
-        "国务院",
+        "国务院新闻办公室", "国务院新闻办",  # 最后才考虑
+        "国务院",  # 最泛的放在最后
     ]
     for dept in common_depts:
         if dept in text:
             return dept
 
-    # 基于类别智能推断
-    defaults = {
+    # 第6层：国际新闻特殊处理
+    if category == "国际新闻":
+        if any(kw in title for kw in ["乌美", "美乌", "俄美", "美俄", "乌俄"]):
+            return "会谈双方"
+        if "也门" in title:
+            return "也门冲突双方"
+        if "欧佩克" in title or "产油国" in title:
+            return "主要产油国"
+        if "伊朗" in title and "美国" in title:
+            return "伊朗与美国"
+        return "相关方"
+
+    # 第7层：按类别兜底
+    fallbacks = {
         "政策/会议": "国家相关部门",
         "经济要闻": "行业主管部门",
-        "国际新闻": "冲突双方",
         "社会/文化要闻": "相关机构",
     }
-    return defaults.get(category, "—")
+    return fallbacks.get(category, "—")
+
+
+def _clean_subject(dept):
+    """清洗主体名称，去掉冗余前缀后缀"""
+    if not dept:
+        return None
+    dept = dept.strip()
+    if len(dept) < 4 or len(dept) > 30:
+        return None
+    # 过滤明显不是机构的
+    if any(kw in dept for kw in ["今天", "记者", "报道", "此外", "目前", "同时", "另外", "明天", "昨日"]):
+        return None
+    # 去掉前缀中的人名、时间状语、介词
+    dept = re.sub(r'^[^，。、]*[，、]', '', dept).strip()
+    dept = re.sub(r'^(近日|日前|今天|当日|当天|今年以来|近期|此前|随后)', '', dept).strip()
+    dept = re.sub(r'^(在|从|由|据|根据|按照|通过)', '', dept).strip()
+    # 去掉后缀
+    dept = re.sub(r'(近日|日前|今天|当日|当天|联合|共同|印发|发布|公布|宣布|表示|透露)$', '', dept).strip()
+    dept = re.sub(r'等(六|五|四|三|两|多)个?部门.*$', '等部门', dept).strip()
+    dept = re.sub(r'等(六|五|四|三|两|多)部委.*$', '等部委', dept).strip()
+    # 去掉句末标点
+    dept = re.sub(r'[，。、；：]$', '', dept).strip()
+    if len(dept) < 4:
+        return None
+    return dept
 
 
 def _extract_event(title, text):
