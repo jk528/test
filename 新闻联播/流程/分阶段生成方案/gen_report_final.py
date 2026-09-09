@@ -25,7 +25,7 @@ import argparse
 from datetime import datetime, date, timedelta
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.dirname(SCRIPT_DIR)
+BASE_DIR = os.path.dirname(os.path.dirname(SCRIPT_DIR))
 TEMP_DIR = os.path.join(
     os.environ.get("TEMP", os.environ.get("TMP", "/tmp")), "xwlb_cache"
 )
