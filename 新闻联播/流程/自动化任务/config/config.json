@@ -1,0 +1,57 @@
+{
+  "task_name": "新闻联播每日总结",
+  "task_description": "每天自动生成新闻联播总结报告",
+  "schedule": {
+    "enabled": true,
+    "time": "06:30",
+    "timezone": "China Standard Time",
+    "run_if_missed": true
+  },
+  "mode": "auto_v2",
+  "modes": {
+    "auto_v2": {
+      "description": "全自动模式（v2正则版）- 零人工干预，使用正则提取六要素",
+      "enabled": true
+    },
+    "semi_auto": {
+      "description": "半自动模式（分阶段版）- Phase1自动生成，Phase2人工填写后自动合并",
+      "enabled": false,
+      "merge_check_interval_minutes": 30,
+      "merge_check_max_hours": 24
+    },
+    "ai_api": {
+      "description": "AI API全自动模式 - 调用AI API自动填写六要素（需配置API Key）",
+      "enabled": false,
+      "api_provider": "",
+      "api_key": "",
+      "api_model": "",
+      "api_base_url": ""
+    }
+  },
+  "paths": {
+    "python_exe": "python",
+    "script_dir": "../分阶段生成方案",
+    "gen_v2_script": "gen_report_v2.py",
+    "gen_final_script": "gen_report_final.py",
+    "output_dir": "../../归档",
+    "log_dir": "./logs"
+  },
+  "quality": {
+    "run_quality_check": true,
+    "quality_check_script": "check_md_quality.py",
+    "min_file_size_kb": 10
+  },
+  "sync": {
+    "enabled": true,
+    "sync_script": "../旧版本/sync_gitee.ps1"
+  },
+  "notification": {
+    "enabled": false,
+    "method": "none",
+    "webhook_url": ""
+  },
+  "retry": {
+    "max_retries": 3,
+    "retry_interval_seconds": 300
+  }
+}
