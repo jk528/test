@@ -1,0 +1,427 @@
+{
+  "date": "20260913",
+  "date_display": "2026年09月13日",
+  "total_items": 24,
+  "ai_items": 23,
+  "instructions": "请根据每条的 title/url/summary/full_text 填写 elements 中的 location/subject/event/cause/method 五个字段。规则：人物用<u>占位符</u>（如<u>国家主席</u>），机构名不加下划线（如农业农村部），事件核心对象不加下划线（如也门冲突双方）。无明确值填—。快讯目录行（idx为纯数字且title含'联播快讯'）填 location=—, subject=—, event=播报XX联播快讯, cause=—, method=目录播报。",
+  "news_items": [
+    {
+      "idx": "完整版",
+      "title": "完整版《新闻联播》2026年09月13日",
+      "url": "https://tv.cctv.com/2026/09/13/VIDEoh9EMMJfC9Vk9lAzsGPy260913.shtml",
+      "category": "完整版",
+      "is_placeholder": true,
+      "elements": {
+        "location": "全国",
+        "subject": "—",
+        "event": "当日全部新闻汇总",
+        "cause": "—",
+        "method": "完整播报"
+      }
+    },
+    {
+      "idx": "1",
+      "title": "<u>国家主席</u>出席金砖国家领导人第十八次会晤第一阶段会议并发表重要讲话",
+      "url": "https://tv.cctv.com/2026/09/13/VIDEoh9EMMJfC9Vk9lAzsGPy260913.shtml",
+      "category": "国际新闻",
+      "importance": "🔴",
+      "summary": "当地时间9月12日下午，国家主席习近平在新德里出席金砖国家领导人第十八次会晤第一阶段会议。",
+      "full_text": "当地时间9月12日下午，国家主席习近平在新德里出席金砖国家领导人第十八次会晤第一阶段会议。",
+      "is_placeholder": false,
+      "elements": {
+        "location": "印度新德里",
+        "subject": "<u>国家主席</u>",
+        "event": "出席金砖国家领导人第十八次会晤第一阶段会议并发表重要讲话",
+        "cause": "共担时代责任，推动金砖合作发展",
+        "method": "出席会议并发表讲话"
+      }
+    },
+    {
+      "idx": "2",
+      "title": "<u>国家主席</u>出席金砖国家领导人第十八次会晤第二阶段会议并发表重要讲话",
+      "url": "https://tv.cctv.com/2026/09/13/VIDEbHCQzJBGPAS16KyAhX8Y260913.shtml",
+      "category": "国际新闻",
+      "importance": "🔴",
+      "summary": "当地时间9月13日上午，国家主席习近平在新德里出席金砖国家领导人第十八次会晤第二阶段会议，并发表题为《筑牢金砖合作根基 壮大全球南方力量》的重要讲话。",
+      "full_text": "当地时间9月13日上午，国家主席习近平在新德里出席金砖国家领导人第十八次会晤第二阶段会议。",
+      "is_placeholder": false,
+      "elements": {
+        "location": "印度新德里",
+        "subject": "<u>国家主席</u>",
+        "event": "出席金砖国家领导人第十八次会晤第二阶段会议并发表重要讲话",
+        "cause": "筑牢金砖合作根基，壮大全球南方力量",
+        "method": "出席会议并发表讲话"
+      }
+    },
+    {
+      "idx": "3",
+      "title": "<u>国家主席</u>会见印度总理",
+      "url": "https://tv.cctv.com/2026/09/13/VIDE9JiX2xGiM6vkruq2Bw4Y260913.shtml",
+      "category": "政策/会议",
+      "importance": "🔴",
+      "summary": "当地时间9月12日下午，国家主席习近平在印度新德里出席金砖国家领导人第十八次会晤期间会见印度总理莫迪。两国领导人坦诚深入交换意见，就中印要做伙伴达成重要共识。",
+      "full_text": "当地时间9月12日下午，国家主席习近平在印度新德里出席金砖国家领导人第十八次会晤期间会见印度总理莫迪。",
+      "is_placeholder": false,
+      "elements": {
+        "location": "印度新德里",
+        "subject": "<u>国家主席</u>",
+        "event": "会见印度总理莫迪",
+        "cause": "推动中印关系行稳致远",
+        "method": "金砖会晤期间会见"
+      }
+    },
+    {
+      "idx": "4",
+      "title": "<u>国家主席</u>圆满结束出席金砖国家领导人第十八次会晤",
+      "url": "https://tv.cctv.com/2026/09/13/VIDE18UtHtM6QrQQOAYITezu260913.shtml",
+      "category": "其他",
+      "importance": "🔴",
+      "summary": "当地时间9月13日中午，国家主席习近平圆满结束出席金砖国家领导人第十八次会晤返回北京。",
+      "full_text": "当地时间9月13日中午，国家主席习近平圆满结束出席金砖国家领导人第十八次会晤返回北京。",
+      "is_placeholder": false,
+      "elements": {
+        "location": "北京",
+        "subject": "<u>国家主席</u>",
+        "event": "圆满结束出席金砖国家领导人第十八次会晤返回北京",
+        "cause": "—",
+        "method": "乘专机返回"
+      }
+    },
+    {
+      "idx": "5",
+      "title": "央视快评：勇做时代先锋，携手推动构建人类命运共同体",
+      "url": "https://tv.cctv.com/2026/09/13/VIDEtDw2wfMVop28Giw5ZCE4260913.shtml",
+      "category": "其他",
+      "importance": "一般",
+      "summary": "本台播发央视快评《勇做时代先锋，携手推动构建人类命运共同体》。",
+      "full_text": "本台播发央视快评《勇做时代先锋，携手推动构建人类命运共同体》。",
+      "is_placeholder": false,
+      "elements": {
+        "location": "北京",
+        "subject": "中央广播电视总台",
+        "event": "播发央视快评文章",
+        "cause": "评论金砖国家领导人会晤重要讲话",
+        "method": "发表评论文章"
+      }
+    },
+    {
+      "idx": "6",
+      "title": "中央组织部会同有关部委修订印发"5个办法" 进一步加强行业事业单位领导人员管理",
+      "url": "https://tv.cctv.com/2026/09/13/VIDEG3O1zFdZJrZRNOs8SgrM260913.shtml",
+      "category": "其他",
+      "importance": "一般",
+      "summary": "日前，中央组织部分别会同中央宣传部、教育部、科技部、国家卫生健康委，印发5个行业事业单位领导人员管理办法。",
+      "full_text": "日前，中央组织部分别会同中央宣传部、教育部、科技部、国家卫生健康委，印发5个行业事业单位领导人员管理办法。",
+      "is_placeholder": false,
+      "elements": {
+        "location": "北京",
+        "subject": "中央组织部",
+        "event": "修订印发5个行业事业单位领导人员管理办法",
+        "cause": "加强行业事业单位领导人员管理，建设高素质专业化队伍",
+        "method": "会同有关部委印发管理办法"
+      }
+    },
+    {
+      "idx": "7",
+      "title": "2026年服贸会达成各类成果超1200项",
+      "url": "https://tv.cctv.com/2026/09/13/VIDEihXhAzneKI8rEqJv7p2N260913.shtml",
+      "category": "经济要闻",
+      "importance": "一般",
+      "summary": "2026年服贸会在北京首钢园闭幕，五天会期共达成各类成果超1200项。",
+      "full_text": "2026年服贸会在北京首钢园闭幕。五天会期，134场推介洽谈活动密集开展，数量同比增加近80%。大会共达成各类成果超1200项。",
+      "is_placeholder": false,
+      "elements": {
+        "location": "北京",
+        "subject": "服贸会组委会",
+        "event": "2026年服贸会闭幕，达成各类成果超1200项",
+        "cause": "推动服务贸易发展",
+        "method": "举办展会及推介洽谈活动"
+      }
+    },
+    {
+      "idx": "8",
+      "title": "国内联播快讯",
+      "url": "https://tv.cctv.com/2026/09/13/VIDEwylJ943p4urK6XNhz55y260913.shtml",
+      "category": "经济要闻",
+      "importance": "一般",
+      "summary": "《\"人工智能+软件\"专项行动实施方案》发布",
+      "full_text": "《\"人工智能+软件\"专项行动实施方案》发布",
+      "is_placeholder": false,
+      "elements": {
+        "location": "—",
+        "subject": "—",
+        "event": "播报国内联播快讯",
+        "cause": "—",
+        "method": "目录播报"
+      }
+    },
+    {
+      "idx": "9",
+      "title": "共担时代责任 携手开启金砖合作新的"金色十年"——国际社会高度评价<u>国家主席</u>主席金砖峰会重要讲话",
+      "url": "https://tv.cctv.com/2026/09/13/VIDE24LaWBE2SAZXzcUerkB7260913.shtml",
+      "category": "国际新闻",
+      "importance": "🔴",
+      "summary": "多国人士表示，习近平主席在出席金砖国家领导人第十八次会晤期间发表的重要讲话为\"金砖大家庭\"携手走向下一个\"金色十年\"提供明确指引。",
+      "full_text": "多国人士表示，习近平主席在出席金砖国家领导人第十八次会晤期间发表的重要讲话为\"金砖大家庭\"携手走向下一个\"金色十年\"提供明确指引。",
+      "is_placeholder": false,
+      "elements": {
+        "location": "全球",
+        "subject": "国际社会",
+        "event": "高度评价国家主席金砖峰会重要讲话",
+        "cause": "—",
+        "method": "多国人士接受采访表态"
+      }
+    },
+    {
+      "idx": "10",
+      "title": "国际联播快讯",
+      "url": "https://tv.cctv.com/2026/09/13/VIDEoXIWCCpAiSa7yLTy4pBa260913.shtml",
+      "category": "国际新闻",
+      "importance": "一般",
+      "summary": "胡塞称遭沙特上百次空袭 沙特吉赞遭袭",
+      "full_text": "胡塞称遭沙特上百次空袭 沙特吉赞遭袭",
+      "is_placeholder": false,
+      "elements": {
+        "location": "—",
+        "subject": "—",
+        "event": "播报国际联播快讯",
+        "cause": "—",
+        "method": "目录播报"
+      }
+    },
+    {
+      "idx": "8-1",
+      "title": "《\"人工智能+软件\"专项行动实施方案》发布",
+      "url": "https://v.iqilu.com/jcdb/ysxwlb/202609/13/5941427.html",
+      "category": "社会/文化要闻",
+      "importance": "一般",
+      "summary": "工业和信息化部近日印发《\"人工智能+软件\"专项行动实施方案》。提出，到2028年，培育一批高水平智能编程工具和智能开发平台，推广应用覆盖2万家规模以上软件企业。",
+      "full_text": "",
+      "source_url": "https://tv.cctv.com/2026/09/13/VIDEwylJ943p4urK6XNhz55y260913.shtml",
+      "is_placeholder": false,
+      "elements": {
+        "location": "北京",
+        "subject": "工业和信息化部",
+        "event": "发布《\"人工智能+软件\"专项行动实施方案》",
+        "cause": "推动软件产业智能化升级",
+        "method": "印发专项行动实施方案"
+      }
+    },
+    {
+      "idx": "8-2",
+      "title": "国家发展改革委向民营企业推介一批投资项目",
+      "url": "https://v.iqilu.com/jcdb/ysxwlb/202609/13/5941429.html",
+      "category": "经济要闻",
+      "importance": "一般",
+      "summary": "为进一步激发民间投资活力，国家发展改革委近日向民营企业集中推介一批投资项目。项目覆盖交通、物流、水利、能源等四大重点领域，拟引入民间资本156亿元。",
+      "full_text": "",
+      "source_url": "https://tv.cctv.com/2026/09/13/VIDEwylJ943p4urK6XNhz55y260913.shtml",
+      "is_placeholder": false,
+      "elements": {
+        "location": "全国",
+        "subject": "国家发展改革委",
+        "event": "向民营企业集中推介一批投资项目",
+        "cause": "激发民间投资活力",
+        "method": "集中推介投资项目"
+      }
+    },
+    {
+      "idx": "8-3",
+      "title": "国家自然科学基金长三角基础研究联合基金重大专项启动",
+      "url": "https://v.iqilu.com/jcdb/ysxwlb/202609/13/5941431.html",
+      "category": "社会/文化要闻",
+      "importance": "一般",
+      "summary": "2026浦江创新论坛在上海开幕。论坛上，国家自然科学基金长三角基础研究联合基金重大专项启动。联合基金每年合计2.5亿元，投入基础研究。",
+      "full_text": "",
+      "source_url": "https://tv.cctv.com/2026/09/13/VIDEwylJ943p4urK6XNhz55y260913.shtml",
+      "is_placeholder": false,
+      "elements": {
+        "location": "上海",
+        "subject": "国家自然科学基金委员会",
+        "event": "启动长三角基础研究联合基金重大专项",
+        "cause": "推动长三角基础研究发展",
+        "method": "在浦江创新论坛上启动"
+      }
+    },
+    {
+      "idx": "8-4",
+      "title": "市场监管总局今年1到6月废止地方标准7400余项",
+      "url": "https://v.iqilu.com/jcdb/ysxwlb/202609/13/5941433.html",
+      "category": "社会/文化要闻",
+      "importance": "一般",
+      "summary": "市场监管总局今年以来聚焦破除妨碍统一市场和公平竞争卡点堵点，持续组织31个省（区、市）开展地方标准清理，截至6月底已废止地方标准7400余项。",
+      "full_text": "",
+      "source_url": "https://tv.cctv.com/2026/09/13/VIDEwylJ943p4urK6XNhz55y260913.shtml",
+      "is_placeholder": false,
+      "elements": {
+        "location": "全国",
+        "subject": "市场监管总局",
+        "event": "废止地方标准7400余项",
+        "cause": "破除妨碍统一市场和公平竞争卡点堵点",
+        "method": "组织地方标准清理"
+      }
+    },
+    {
+      "idx": "8-5",
+      "title": "我国实现一体化算力统筹监测",
+      "url": "https://v.iqilu.com/jcdb/ysxwlb/202609/13/5941435.html",
+      "category": "社会/文化要闻",
+      "importance": "一般",
+      "summary": "中国算力平台已实现全国一体化算力统筹监测，我国算力\"一张网、一盘棋、一体化\"发展格局基本形成。",
+      "full_text": "",
+      "source_url": "https://tv.cctv.com/2026/09/13/VIDEwylJ943p4urK6XNhz55y260913.shtml",
+      "is_placeholder": false,
+      "elements": {
+        "location": "全国",
+        "subject": "工业和信息化部",
+        "event": "中国算力平台实现全国一体化算力统筹监测",
+        "cause": "构建算力\"一张网、一盘棋、一体化\"发展格局",
+        "method": "建设国家级算力服务平台"
+      }
+    },
+    {
+      "idx": "8-6",
+      "title": "甬舟铁路全线桥梁主塔全部封顶",
+      "url": "https://v.iqilu.com/jcdb/ysxwlb/202609/13/5941437.html",
+      "category": "社会/文化要闻",
+      "importance": "一般",
+      "summary": "甬舟铁路全线重点工程之一的富翅门公铁两用大桥主塔顺利封顶，标志着全线三座跨海大桥的六座主塔全部完工。甬舟铁路预计2028年建成通车。",
+      "full_text": "",
+      "source_url": "https://tv.cctv.com/2026/09/13/VIDEwylJ943p4urK6XNhz55y260913.shtml",
+      "is_placeholder": false,
+      "elements": {
+        "location": "浙江宁波舟山",
+        "subject": "甬舟铁路建设方",
+        "event": "甬舟铁路全线桥梁主塔全部封顶",
+        "cause": "推进甬舟铁路建设",
+        "method": "桥梁主塔施工封顶"
+      }
+    },
+    {
+      "idx": "8-7",
+      "title": "江苏实施科技成果转化20条措施",
+      "url": "https://v.iqilu.com/jcdb/ysxwlb/202609/13/5941439.html",
+      "category": "社会/文化要闻",
+      "importance": "一般",
+      "summary": "江苏近日推出科技成果转化20条措施，将从建设科技成果转化高能级平台、壮大职业化技术经理人队伍等六个方面发力，加快科技成果落地见效。",
+      "full_text": "",
+      "source_url": "https://tv.cctv.com/2026/09/13/VIDEwylJ943p4urK6XNhz55y260913.shtml",
+      "is_placeholder": false,
+      "elements": {
+        "location": "江苏",
+        "subject": "江苏省人民政府",
+        "event": "推出科技成果转化20条措施",
+        "cause": "加快科技成果落地见效",
+        "method": "出台政策措施"
+      }
+    },
+    {
+      "idx": "8-8",
+      "title": "内蒙古电力市场新能源交易规模突破5000亿千瓦时",
+      "url": "https://v.iqilu.com/jcdb/ysxwlb/202609/13/5941441.html",
+      "category": "社会/文化要闻",
+      "importance": "一般",
+      "summary": "截至今年8月底，内蒙古电力市场新能源交易规模累计达5095.8亿千瓦时。内蒙古风光资源富集，蒙西新能源装机突破1亿千瓦。",
+      "full_text": "",
+      "source_url": "https://tv.cctv.com/2026/09/13/VIDEwylJ943p4urK6XNhz55y260913.shtml",
+      "is_placeholder": false,
+      "elements": {
+        "location": "内蒙古",
+        "subject": "内蒙古电力市场",
+        "event": "新能源交易规模突破5000亿千瓦时",
+        "cause": "推动新能源发展",
+        "method": "电力市场交易"
+      }
+    },
+    {
+      "idx": "10-1",
+      "title": "胡塞称遭沙特上百次空袭 沙特吉赞遭袭",
+      "url": "https://v.iqilu.com/jcdb/ysxwlb/202609/13/5941417.html",
+      "category": "国际新闻",
+      "importance": "一般",
+      "summary": "也门胡塞武装称，过去48小时内，沙特对也门7个省份发动了上百次空袭。作为回应，胡塞武装使用导弹和无人机打击了沙特的一处军事基地。",
+      "full_text": "",
+      "source_url": "https://tv.cctv.com/2026/09/13/VIDEoXIWCCpAiSa7yLTy4pBa260913.shtml",
+      "is_placeholder": false,
+      "elements": {
+        "location": "也门、沙特",
+        "subject": "也门胡塞武装、沙特",
+        "event": "胡塞武装遭沙特空袭并反击",
+        "cause": "地区冲突持续",
+        "method": "空袭与导弹无人机打击"
+      }
+    },
+    {
+      "idx": "10-2",
+      "title": "伊拉克临时关闭部分与伊朗边境口岸",
+      "url": "https://v.iqilu.com/jcdb/ysxwlb/202609/13/5941419.html",
+      "category": "国际新闻",
+      "importance": "一般",
+      "summary": "伊拉克临时关闭两处与伊朗接壤的边境口岸。伊拉克政府称，将应伊朗请求，对在两国边境发现的无人机发射平台进行联合调查。",
+      "full_text": "",
+      "source_url": "https://tv.cctv.com/2026/09/13/VIDEoXIWCCpAiSa7yLTy4pBa260913.shtml",
+      "is_placeholder": false,
+      "elements": {
+        "location": "伊拉克、伊朗",
+        "subject": "伊拉克政府",
+        "event": "临时关闭部分与伊朗边境口岸",
+        "cause": "调查边境无人机发射平台",
+        "method": "关闭边境口岸"
+      }
+    },
+    {
+      "idx": "10-3",
+      "title": "美国总统称爱尔兰终将统一",
+      "url": "https://v.iqilu.com/jcdb/ysxwlb/202609/13/5941421.html",
+      "category": "国际新闻",
+      "importance": "一般",
+      "summary": "美国总统特朗普在访问爱尔兰期间称，如果爱尔兰和英国的北爱尔兰地区实现统一将是一件很好的事情，他认为这终将成为现实。",
+      "full_text": "",
+      "source_url": "https://tv.cctv.com/2026/09/13/VIDEoXIWCCpAiSa7yLTy4pBa260913.shtml",
+      "is_placeholder": false,
+      "elements": {
+        "location": "爱尔兰",
+        "subject": "<u>美国总统</u>",
+        "event": "称爱尔兰终将统一",
+        "cause": "—",
+        "method": "访问期间公开表态"
+      }
+    },
+    {
+      "idx": "10-4",
+      "title": "阿根廷计划启动马岛附近海军基地建设",
+      "url": "https://v.iqilu.com/jcdb/ysxwlb/202609/13/5941423.html",
+      "category": "国际新闻",
+      "importance": "一般",
+      "summary": "阿根廷国防部长普雷斯蒂日前表示，计划于明年1月在乌斯怀亚建设一座海军军事基地。该基地建成后将配备潜艇、海军陆战队和海军航空兵。",
+      "full_text": "",
+      "source_url": "https://tv.cctv.com/2026/09/13/VIDEoXIWCCpAiSa7yLTy4pBa260913.shtml",
+      "is_placeholder": false,
+      "elements": {
+        "location": "阿根廷乌斯怀亚",
+        "subject": "阿根廷国防部",
+        "event": "计划在马岛附近建设海军基地",
+        "cause": "加强军事力量",
+        "method": "建设海军军事基地"
+      }
+    },
+    {
+      "idx": "10-5",
+      "title": "印尼载有约240人的客轮沉没 上百人获救",
+      "url": "https://v.iqilu.com/jcdb/ysxwlb/202609/13/5941425.html",
+      "category": "国际新闻",
+      "importance": "一般",
+      "summary": "印度尼西亚国家搜救局说，今天凌晨一度在爪哇海海域失联的一艘客轮已经沉没。客轮载有约240人，曾报告遭遇恶劣天气。目前已确认有6人遇难、110余人获救。",
+      "full_text": "",
+      "source_url": "https://tv.cctv.com/2026/09/13/VIDEoXIWCCpAiSa7yLTy4pBa260913.shtml",
+      "is_placeholder": false,
+      "elements": {
+        "location": "印度尼西亚爪哇海",
+        "subject": "印尼国家搜救局",
+        "event": "客轮沉没，上百人获救",
+        "cause": "遭遇恶劣天气",
+        "method": "搜救救援行动"
+      }
+    }
+  ]
+}
