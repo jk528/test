@@ -11,32 +11,32 @@
     {
       "quote": "底层人民的信息不对称生成md文件",
       "expected": "HARD | 生成关于底层人民信息不对称的markdown文件",
-      "final_check": "PENDING | 检查是否生成了主题为底层人民信息不对称的md文件"
+      "final_check": "PASS | 已生成主题为'底层人民的信息不对称'的md文件，共290余行，内容完整"
     },
     {
       "quote": "医疗报销",
       "expected": "HARD | 包含医疗报销方面的信息不对称内容",
-      "final_check": "PENDING | 检查是否包含医疗报销章节"
+      "final_check": "PASS | 第一章包含报销比例幻觉、门诊共济暗门、异地就医坑、医疗救助沉默政策、实用提醒共5小节"
     },
     {
       "quote": "社保与退休",
       "expected": "HARD | 包含社保与退休方面的信息不对称内容",
-      "final_check": "PENDING | 检查是否包含社保与退休章节"
+      "final_check": "PASS | 第二章包含养老保险真相、退休年龄模糊地带、失业保险误区、工伤保险时间差、社保断缴影响、实用提醒共6小节"
     },
     {
       "quote": "困难和救助",
       "expected": "HARD | 包含困难和救助方面的信息不对称内容",
-      "final_check": "PENDING | 检查是否包含困难和救助章节"
+      "final_check": "PASS | 第三章包含救助体系分层秘密、单人户隐藏福利、专项救助叠加效应、隐性门槛、临时救助、实用提醒共6小节"
     },
     {
       "quote": "消费和财产核查",
       "expected": "HARD | 包含消费和财产核查方面的信息不对称内容",
-      "final_check": "PENDING | 检查是否包含消费和财产核查章节"
+      "final_check": "PASS | 第四章包含财产核查范围、豁免政策、消费行为反向核查、赡养隐形收入、个人信息保护、实用提醒共6小节"
     },
     {
       "quote": "其他补充",
       "expected": "HARD | 包含其他补充内容",
-      "final_check": "PENDING | 检查是否包含其他补充章节"
+      "final_check": "PASS | 第五章包含政策信息阶层差、办事流程隐形墙、宣传漏斗效应、会哭的孩子有奶吃、打破信息差建议共5小节"
     }
   ],
   "claims": [],
