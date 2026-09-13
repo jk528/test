@@ -1,7 +1,7 @@
 {
   "outputs": [
     {
-      "path": "c:\\Users\\Administrator\\Documents\\这是什么\\JK-temp\\输入法相关\\成都市社会救助体系审核要求.md",
+      "path": "c:\\Users\\Administrator\\Documents\\这是什么\\JK-temp\\输入法相关\\底层人民的信息不对称.md",
       "type": "markdown",
       "editable": true
     }
@@ -9,53 +9,37 @@
   "source_files": [],
   "acceptance_items": [
     {
-      "quote": "社会救助体系，成都",
-      "expected": "HARD | 文档内容围绕成都市社会救助体系展开",
-      "final_check": "PASS | 文档标题为成都市社会救助体系审核要求，内容全部围绕成都市社会救助政策展开"
+      "quote": "底层人民的信息不对称生成md文件",
+      "expected": "HARD | 生成关于底层人民信息不对称的markdown文件",
+      "final_check": "PENDING | 检查是否生成了主题为底层人民信息不对称的md文件"
     },
     {
-      "quote": "一类低保",
-      "expected": "HARD | 包含一类低保（最低生活保障）的审核要求",
-      "final_check": "PASS | 第一章详细列出了低保的认定条件、家庭成员范围、不计入收入项目、豁免情形、申请材料、办理流程、救助标准等"
+      "quote": "医疗报销",
+      "expected": "HARD | 包含医疗报销方面的信息不对称内容",
+      "final_check": "PENDING | 检查是否包含医疗报销章节"
     },
     {
-      "quote": "二类低边",
-      "expected": "HARD | 包含二类低边（低保边缘家庭）的审核要求",
-      "final_check": "PASS | 第二章详细列出了低保边缘1类、2类的分类标准、认定条件、财产标准、刚性支出范围、不得认定情形、申请材料、办理流程、救助措施等"
+      "quote": "社保与退休",
+      "expected": "HARD | 包含社保与退休方面的信息不对称内容",
+      "final_check": "PENDING | 检查是否包含社保与退休章节"
     },
     {
-      "quote": "三类刚性困难",
-      "expected": "HARD | 包含三类刚性困难（刚性支出困难家庭）的审核要求",
-      "final_check": "PASS | 第三章详细列出了刚性支出困难家庭的认定条件、刚性支出范围、不得认定情形、申请方式、申请材料、办理流程、认定结果运用等"
+      "quote": "困难和救助",
+      "expected": "HARD | 包含困难和救助方面的信息不对称内容",
+      "final_check": "PENDING | 检查是否包含困难和救助章节"
     },
     {
-      "quote": "审核要求",
-      "expected": "HARD | 详细列出各类救助的审核条件、申请材料、办理流程等",
-      "final_check": "PASS | 每一类救助都包含了认定条件、申请材料、办理流程、审核要点等内容，第五章还补充了通用审核要求"
+      "quote": "消费和财产核查",
+      "expected": "HARD | 包含消费和财产核查方面的信息不对称内容",
+      "final_check": "PENDING | 检查是否包含消费和财产核查章节"
     },
     {
-      "quote": "md文件",
-      "expected": "HARD | 输出为markdown格式文件",
-      "final_check": "PASS | 文件为.md后缀，使用标准markdown语法（标题、列表、表格、引用、代码块等），内容完整共335行"
+      "quote": "其他补充",
+      "expected": "HARD | 包含其他补充内容",
+      "final_check": "PENDING | 检查是否包含其他补充章节"
     }
   ],
-  "claims": [
-    {
-      "id": "claim1",
-      "text": "成都市低保审核依据《成都市最低生活保障审核确认工作规程》（成民发〔2023〕38号）",
-      "evidence": "成都市民政局官网政策文件"
-    },
-    {
-      "id": "claim2",
-      "text": "成都市低保边缘家庭分为1类和2类，依据《成都市最低生活保障边缘家庭救助办法》（成民发〔2022〕37号）",
-      "evidence": "成都市民政局官网政策文件"
-    },
-    {
-      "id": "claim3",
-      "text": "成都市刚性支出困难家庭依据《成都市刚性支出困难家庭认定办法》（2025年11月1日起施行）",
-      "evidence": "大邑县人民政府官网转载成都市民政局文件"
-    }
-  ],
+  "claims": [],
   "target_scope": {
     "required": false
   }
