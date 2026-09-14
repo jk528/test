@@ -687,8 +687,8 @@ Sub 备选算法_菜单()
         & "     → 输出与 笛卡尔积正向 相同" & vbLf & vbLf _
         & " F = 格雷码遍历（Gray Code）" & vbLf _
         & "     → 相邻组合仅一列变化" & vbLf & vbLf _
-        & " G = 混合进制随机访问" & vbLf _
-        & "     → 输入序号直接取第 k 个组合" & vbLf & vbLf _
+        & " G = 混合进制随机访问（区间+正反）" & vbLf _
+        & "     → 起始/结束序号+方向，直接取区间组合" & vbLf & vbLf _
         & "输入 A~G 选择算法："
     Dim 输入 As String
     输入 = InputBox(菜单, "备选算法", "A")
@@ -1034,9 +1034,10 @@ Private Sub 格雷递归(源数据 As Variant, 每列行数() As Long, 总列数
 End Sub
 
 ' ============================================================
-'  备选算法G：混合进制随机访问（Index → Combination）
-'  输入序号 k，直接用混合进制解码得到第 k 个组合
-'  无需生成全序列，可随机访问任意组合（断点续算/并行分区基础）
+'  备选算法G：混合进制随机访问（区间版 + 正/反向）
+'  输入起始序号、结束序号、方向，直接解码输出该区间内所有组合
+'  正向：左快右慢（= scct 正向）；反向：右快左慢（= scct 反向）
+'  无需生成前面的组合，可随机访问任意区间（断点续算/并行分区基础）
 ' ============================================================
 
 Sub 备选算法G_随机访问()
@@ -1046,30 +1047,73 @@ Sub 备选算法G_随机访问()
     Dim 总列数 As Long: 总列数 = UBound(每列行数)
     Dim 总行数 As Long: 总行数 = 数组乘积(每列行数)
 
-    Dim 输入 As String
-    输入 = InputBox("输入组合序号 k（1~" & 总行数 & "）:", "混合进制随机访问", "1")
-    If 输入 = "" Then Exit Sub
-    Dim k As Long
-    k = Val(输入)
-    If k < 1 Or k > 总行数 Then
-        MsgBox "序号超出范围（1~" & 总行数 & "）", vbExclamation
+    ' 选择方向
+    Dim 方向输入 As String
+    方向输入 = InputBox("选择方向：" & vbLf & "  1 = 正向（左快右慢，= scct正向）" & vbLf & "  0 = 反向（右快左慢，= scct反向）" & vbLf & vbLf & "输入 1 或 0：", "混合进制随机访问 - 方向", "1")
+    If 方向输入 = "" Then Exit Sub
+    Dim 是否正向 As Boolean
+    是否正向 = (方向输入 = "1")
+
+    ' 输入起始序号
+    Dim 起始输入 As String
+    起始输入 = InputBox("输入起始序号（1~" & 总行数 & "）:", "混合进制随机访问 - 起始", "1")
+    If 起始输入 = "" Then Exit Sub
+    Dim 起始 As Long
+    起始 = Val(起始输入)
+    If 起始 < 1 Or 起始 > 总行数 Then
+        MsgBox "起始序号超出范围（1~" & 总行数 & "）", vbExclamation
         Exit Sub
     End If
 
-    ' 混合进制解码：列1权重1、列2权重n1、列3权重n1*n2...
+    ' 输入结束序号
+    Dim 结束输入 As String
+    结束输入 = InputBox("输入结束序号（" & 起始 & "~" & 总行数 & "）:", "混合进制随机访问 - 结束", CStr(起始))
+    If 结束输入 = "" Then Exit Sub
+    Dim 结束 As Long
+    结束 = Val(结束输入)
+    If 结束 < 起始 Or 结束 > 总行数 Then
+        MsgBox "结束序号超出范围（" & 起始 & "~" & 总行数 & "）", vbExclamation
+        Exit Sub
+    End If
+
+    Dim 输出行数 As Long
+    输出行数 = 结束 - 起始 + 1
+    If 输出行数 > 1048576 Then MsgBox "输出行数超出表格限制": Exit Sub
+
+    ' 预计算权重数组
+    '   正向（左快右慢）：权重(1)=1，权重(列)=权重(列-1)*每列行数(列-1)
+    '   反向（右快左慢）：权重(总列数)=1，权重(列)=权重(列+1)*每列行数(列+1)
+    Dim 权重() As Long
+    ReDim 权重(1 To 总列数)
+    Dim 列 As Long
+    If 是否正向 Then
+        权重(1) = 1
+        For 列 = 2 To 总列数
+            权重(列) = 权重(列 - 1) * 每列行数(列 - 1)
+        Next 列
+    Else
+        权重(总列数) = 1
+        For 列 = 总列数 - 1 To 1 Step -1
+            权重(列) = 权重(列 + 1) * 每列行数(列 + 1)
+        Next 列
+    End If
+
+    ' 混合进制解码：逐行计算
     Dim 结果() As Variant
-    ReDim 结果(1 To 1, 1 To 总列数)
-    Dim 余 As Long, 权重 As Long, 列 As Long
-    余 = k - 1: 权重 = 1
-    For 列 = 1 To 总列数
-        结果(1, 列) = 源数据((余 \ 权重) Mod 每列行数(列) + 1, 列)
-        权重 = 权重 * 每列行数(列)
-    Next 列
+    ReDim 结果(1 To 输出行数, 1 To 总列数)
+    Dim 行 As Long, 余 As Long, k As Long
+    For 行 = 1 To 输出行数
+        k = 起始 + 行 - 1
+        余 = k - 1
+        For 列 = 1 To 总列数
+            结果(行, 列) = 源数据((余 \ 权重(列)) Mod 每列行数(列) + 1, 列)
+        Next 列
+    Next 行
 
     Dim 新表 As Worksheet
     Set 新表 = 新建结果表("备选G_随机访问")
-    写入备选结果 新表, 结果, 1, 总列数
-    MsgBox "备选算法G 混合进制随机访问：第 " & k & " 个组合已输出。", vbInformation, "备选算法G"
+    写入备选结果 新表, 结果, 输出行数, 总列数
+    MsgBox "备选算法G 混合进制随机访问：" & IIf(是否正向, "正向", "反向") & "，第 " & 起始 & " ~ " & 结束 & " 个组合，共 " & 输出行数 & " 行。", vbInformation, "备选算法G"
     Exit Sub
 错误处理:
     MsgBox "备选算法G错误: " & Err.Description, vbCritical
