@@ -1,17 +1,17 @@
 '============================================================
-' 四方镜子 - 单模块版 v11.5（4基础元素 × 4对称位置 = 16样式）
-' 基于 v11 重构：四象限从多个按钮简化为 4选1基准 + 生成按钮
+' 四方镜子 - 单模块版 v11.5（四象限真正镜像对称）
+' 基于 v11 优化：去除冗余关系，四象限=真正的上下左右镜像
 ' 现有功能（不变）：
 '   - 四方循环 scct（笛卡尔积，4个按钮：正竖/反竖/正横/反横）
 '   - 双边循环 zxgbs（LCM独立循环，2个按钮）
 '   - 备选算法验证（7种：A/B/C/D/E/F/G）
 '   - 数据反转开关
-' 四象限（v11.5）：
-'   - 4 个基础元素（正竖/反竖/正横/反横）= 4 个按钮
-'   - 4 个对称位置（左上/右上/左下/右下）
-'   - 4 × 4 = 16 种样式排列，全部满足上下左右对称
-'   - 选择一个基准元素，生成以它为左上的对称四象限
+' 四象限镜像（v11.5 优化）：
+'   - 左上=原始  右上=左右镜像（元素反转）
+'   - 左下=上下镜像（行反转）  右下=中心镜像（行+元素双反转）
+'   - 选择布局（竖向/横向），一个按钮生成
 '   - 支持合并/分开模式，支持数据反转
+'   - 严格满足：左右对称 + 上下对称 + 中心对称
 ' 模式：Designer.Controls.Add + CodeModule 注入事件代码
 ' 使用方法：运行 四方镜子()
 ' 注意：需启用"信任对VBA工程对象模型的访问"
@@ -23,6 +23,7 @@ Option Explicit
 Public 连接符 As String
 Public 是否合并 As Boolean
 Public 数据是否反转 As Boolean  ' v9 新增：数据行序是否反转（从下到上读取）
+Public 四象限是否对称 As Boolean  ' v11.5 新增：四方循环按钮是否输出四象限对称版
 
 ' 回溯法专用模块级变量
 Private 回溯行号 As Long
@@ -52,7 +53,7 @@ Sub 四方镜子()
     With 窗体组件.Properties
         .Item("Caption") = "四方镜"
         .Item("Width") = 570
-        .Item("Height") = 540
+        .Item("Height") = 520
         .Item("StartUpPosition") = 1 ' 居中
     End With
 
@@ -94,6 +95,16 @@ Sub 四方镜子()
     With chk2
         .Caption = "数据反转"
         .Left = 280: .Top = 12: .Width = 80: .Height = 18
+        .Value = False
+        .Font.Size = 10
+    End With
+
+    ' --- 复选框3：四象限对称（v11.5 新增） ---
+    Dim chk3 As Object
+    Set chk3 = 设计器.Controls.Add("Forms.CheckBox.1", "CheckBox3")
+    With chk3
+        .Caption = "四象限对称"
+        .Left = 380: .Top = 12: .Width = 90: .Height = 18
         .Value = False
         .Font.Size = 10
     End With
@@ -180,43 +191,6 @@ Sub 四方镜子()
         .BackColor = RGB(80, 160, 220)
     End With
 
-    ' --- 框架3：四象限（真正镜像对称：上下翻转 + 左右翻转） ---
-    Dim fra3 As Object
-    Set fra3 = 设计器.Controls.Add("Forms.Frame.1", "Frame3")
-    With fra3
-        .Caption = "四象限镜像"
-        .Left = 10: .Top = 435: .Width = 540: .Height = 70
-        .Font.Size = 10: .Font.Bold = True
-    End With
-
-    ' --- 布局单选：竖向 / 横向 ---
-    Dim optV As Object
-    Set optV = fra3.Controls.Add("Forms.OptionButton.1", "OptionButton1")
-    With optV
-        .Caption = "竖向"
-        .Left = 15: .Top = 25: .Width = 60: .Height = 20
-        .Font.Size = 10: .Font.Bold = False
-        .Value = True  ' 默认竖向
-    End With
-
-    Dim optH As Object
-    Set optH = fra3.Controls.Add("Forms.OptionButton.1", "OptionButton2")
-    With optH
-        .Caption = "横向"
-        .Left = 80: .Top = 25: .Width = 60: .Height = 20
-        .Font.Size = 10: .Font.Bold = False
-    End With
-
-    ' --- 按钮8：生成四象限 ---
-    Dim btn8 As Object
-    Set btn8 = fra3.Controls.Add("Forms.CommandButton.1", "CommandButton8")
-    With btn8
-        .Caption = "生成四象限"
-        .Left = 170: .Top = 22: .Width = 355: .Height = 28
-        .Font.Size = 11: .Font.Bold = True
-        .BackColor = RGB(200, 120, 200)
-    End With
-
     ' 4. 用 CodeModule 注入事件代码
     注入事件代码 窗体组件
 
@@ -280,27 +254,34 @@ Private Sub 注入事件代码(窗体组件 As Object)
     i = i + 1: CM.InsertLines i, "End Sub"
     i = i + 1: CM.InsertLines i, ""
 
-    ' ---- 现有6个按钮点击事件（执行后关闭窗体，与 v6 完全一致） ----
+    ' ---- CheckBox3_Click（四象限对称，v11.5 新增） ----
+    i = i + 1: CM.InsertLines i, "Private Sub CheckBox3_Click()"
+    i = i + 1: CM.InsertLines i, "    四象限是否对称 = CheckBox3.Value"
+    i = i + 1: CM.InsertLines i, "    CommandButton1.SetFocus"
+    i = i + 1: CM.InsertLines i, "End Sub"
+    i = i + 1: CM.InsertLines i, ""
+
+    ' ---- 按钮1~4：四方循环（四象限开关打开时生成四象限） ----
     i = i + 1: CM.InsertLines i, "Private Sub CommandButton1_Click()"
-    i = i + 1: CM.InsertLines i, "    四方循环_执行 False, False"
+    i = i + 1: CM.InsertLines i, "    If 四象限是否对称 Then 四象限_执行 False, False Else 四方循环_执行 False, False"
     i = i + 1: CM.InsertLines i, "    Unload Me"
     i = i + 1: CM.InsertLines i, "End Sub"
     i = i + 1: CM.InsertLines i, ""
 
     i = i + 1: CM.InsertLines i, "Private Sub CommandButton2_Click()"
-    i = i + 1: CM.InsertLines i, "    四方循环_执行 True, True"
+    i = i + 1: CM.InsertLines i, "    If 四象限是否对称 Then 四象限_执行 True, True Else 四方循环_执行 True, True"
     i = i + 1: CM.InsertLines i, "    Unload Me"
     i = i + 1: CM.InsertLines i, "End Sub"
     i = i + 1: CM.InsertLines i, ""
 
     i = i + 1: CM.InsertLines i, "Private Sub CommandButton3_Click()"
-    i = i + 1: CM.InsertLines i, "    四方循环_执行 True, False"
+    i = i + 1: CM.InsertLines i, "    If 四象限是否对称 Then 四象限_执行 True, False Else 四方循环_执行 True, False"
     i = i + 1: CM.InsertLines i, "    Unload Me"
     i = i + 1: CM.InsertLines i, "End Sub"
     i = i + 1: CM.InsertLines i, ""
 
     i = i + 1: CM.InsertLines i, "Private Sub CommandButton4_Click()"
-    i = i + 1: CM.InsertLines i, "    四方循环_执行 False, True"
+    i = i + 1: CM.InsertLines i, "    If 四象限是否对称 Then 四象限_执行 False, True Else 四方循环_执行 False, True"
     i = i + 1: CM.InsertLines i, "    Unload Me"
     i = i + 1: CM.InsertLines i, "End Sub"
     i = i + 1: CM.InsertLines i, ""
@@ -324,28 +305,11 @@ Private Sub 注入事件代码(窗体组件 As Object)
     i = i + 1: CM.InsertLines i, "End Sub"
     i = i + 1: CM.InsertLines i, ""
 
-    ' ---- 按钮8：生成四象限（根据布局选择） ----
-    i = i + 1: CM.InsertLines i, "Private Sub CommandButton8_Click()"
-    i = i + 1: CM.InsertLines i, "    四象限_执行 OptionButton1.Value"
-    i = i + 1: CM.InsertLines i, "    Unload Me"
-    i = i + 1: CM.InsertLines i, "End Sub"
 End Sub
 
 ' ============================================================
 '  工具函数
 ' ============================================================
-
-' 生成象限标签（方向 + 是否反转 + 布局）
-Private Function 生成标签(方向正向 As Boolean, 用反转 As Boolean, 是否竖向 As Boolean) As String
-    Dim 方向名 As String, 布局名 As String
-    If 方向正向 Then 方向名 = "正" Else 方向名 = "反"
-    If 是否竖向 Then 布局名 = "竖" Else 布局名 = "横"
-    If 用反转 Then
-        生成标签 = 方向名 & 布局名 & "+反转"
-    Else
-        生成标签 = 方向名 & 布局名
-    End If
-End Function
 
 Private Function ys(n As Long, Y As Long) As Long
     ys = ((n + Y - 1) Mod Y) + 1
@@ -813,7 +777,7 @@ Sub 双边循环_执行(是否竖向 As Boolean)
 End Sub
 
 ' ============================================================
-'  四象限对称生成（v10/v11 新增，按钮8/9触发）
+'  四象限对称生成（v11.5，四象限开关打开时由按钮1~4触发）
 '  是否竖向=True  → 竖向版：每个组合占一行，左右两列并排
 '  是否竖向=False → 横向版：每个组合占一列，上下两行堆叠
 '  四象限布局：
@@ -823,7 +787,7 @@ End Sub
 '    右下：反向（右快左慢，反转数据）   ← 中心对称
 ' ============================================================
 
-Sub 四象限_执行(是否竖向 As Boolean)
+Sub 四象限_执行(是否正向 As Boolean, 是否横向 As Boolean)
     On Error GoTo 错误处理
     Dim 原刷新 As Boolean, 原计算 As XlCalculation
     原刷新 = Application.ScreenUpdating
@@ -839,12 +803,13 @@ Sub 四象限_执行(是否竖向 As Boolean)
     Dim 反转数据() As Variant
     Dim r As Long, 反转行 As Long
     ' 四个象限数据（按列存：Q(列, 行)）
-    Dim Q1() As Variant  ' 左上 = 原始
+    Dim Q1() As Variant  ' 左上 = 基准
     Dim Q2() As Variant  ' 右上 = 左右镜像（元素反转）
     Dim Q3() As Variant  ' 左下 = 上下镜像（行反转）
     Dim Q4() As Variant  ' 右下 = 中心镜像（行+元素双反转）
     Dim 合并名 As String, 反转后缀 As String
-    Dim 布局名 As String
+    Dim 基准名 As String, 布局名 As String
+    Dim 是否竖向 As Boolean
     Dim 新表 As Worksheet
     Dim i As Long, j As Long
     ' 竖向布局用
@@ -892,11 +857,16 @@ Sub 四象限_执行(是否竖向 As Boolean)
         Next r
     Next 列
 
-    ' ---- 生成 Q1 左上 = 原始正向数据 ----
+    ' ---- 计算布局和基准名 ----
+    是否竖向 = Not 是否横向
+    If 是否正向 Then 基准名 = "正" Else 基准名 = "反"
+    If 是否竖向 Then 布局名 = "竖" Else 布局名 = "横"
+
+    ' ---- 生成 Q1 左上 = 基准数据 ----
     If 数据是否反转 Then
-        生成scct结果 Q1, 反转数据, 每列行数, 总列数, 总行数, True
+        生成scct结果 Q1, 反转数据, 每列行数, 总列数, 总行数, 是否正向
     Else
-        生成scct结果 Q1, 源数据, 每列行数, 总列数, 总行数, True
+        生成scct结果 Q1, 源数据, 每列行数, 总列数, 总行数, 是否正向
     End If
 
     ' ---- 生成 Q2 右上 = 左右镜像（每行元素反转）----
@@ -923,13 +893,10 @@ Sub 四象限_执行(是否竖向 As Boolean)
         Next j
     Next i
 
-    ' 布局名
-    If 是否竖向 Then 布局名 = "竖" Else 布局名 = "横"
-
     ' 新建结果表
     If 是否合并 Then 合并名 = "合并" Else 合并名 = "分开"
     If 数据是否反转 Then 反转后缀 = "_反序" Else 反转后缀 = ""
-    Set 新表 = 新建结果表("四象限_" & 布局名 & "_" & 合并名 & 反转后缀)
+    Set 新表 = 新建结果表("四象限_" & 基准名 & 布局名 & "_" & 合并名 & 反转后缀)
 
     If 是否竖向 Then
         ' ============== 竖向布局：每个组合一行 ==============
@@ -1076,7 +1043,7 @@ Sub 四象限_执行(是否竖向 As Boolean)
     新表.Cells.EntireColumn.AutoFit
     新表.Cells.EntireRow.AutoFit
 
-    MsgBox "四象限生成完成（基准：" & 基准名 & "）：" & 总行数 & " 组 × 4 象限。", vbInformation, "四象限"
+    MsgBox "四象限镜像生成完成（基准：" & 基准名 & 布局名 & "）：" & 总行数 & " 组 × 4 象限。", vbInformation, "四象限镜像"
 
 退出:
     Application.ScreenUpdating = 原刷新
