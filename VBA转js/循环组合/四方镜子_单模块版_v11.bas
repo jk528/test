@@ -868,7 +868,7 @@ Sub 四象限_执行(是否竖向 As Boolean)
     Dim 新表 As Worksheet
     Set 新表 = 新建结果表("四象限" & 横竖名 & "_" & 合并名 & 反转后缀)
 
-    Dim 行 As Long, 列 As Long
+    Dim 行 As Long
     If 是否竖向 Then
         ' ============== 竖向版：每个组合一行 ==============
         If 是否合并 Then
