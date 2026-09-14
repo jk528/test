@@ -1,15 +1,19 @@
 '============================================================
-' 四方镜子 - 单模块版 v9（数据反转版）
-' 基于 v8 扩展：完全保留现有功能不变，新增"数据反转"开关
+' 四方镜子 - 单模块版 v10（四象限对称版）
+' 基于 v9 扩展：完全保留现有功能不变，新增"四象限对称生成"
 ' 现有功能（不变）：
 '   - 四方循环 scct（笛卡尔积，4个按钮）
 '   - 双边循环 zxgbs（LCM独立循环，2个按钮）
 '   - 备选算法验证（7种：A/B/C/D/E/F/G）
-'   - 窗体布局、按钮预览、命名规则 全部与 v8 一致
+'   - 数据反转开关
+'   - 窗体布局、按钮预览、命名规则 全部与 v9 一致
 ' 新增功能：
-'   - "数据反转"复选框 → 每列数据从下到上读取（行序颠倒）
-'     例：2×2×2 数据，原输出 111→222，反转后输出 222→111
-'     适用于四方镜对称场景，上下/左右镜像时数据方向同步翻转
+'   - 按钮8 "四象限对称" → 一张表同时生成四个象限
+'     左上：正竖（左快右慢，原始）
+'     右上：反竖（右快左慢，左右对称）
+'     左下：正竖+数据反转（上下对称）
+'     右下：反竖+数据反转（上下+左右对称）
+'     四象限拼在一起形成整体上下左右对称的效果
 ' 模式：Designer.Controls.Add + CodeModule 注入事件代码
 ' 使用方法：运行 四方镜子()
 ' 注意：需启用"信任对VBA工程对象模型的访问"
@@ -173,9 +177,19 @@ Sub 四方镜子()
     Set btn7 = 设计器.Controls.Add("Forms.CommandButton.1", "CommandButton7")
     With btn7
         .Caption = "备选算法验证"
-        .Left = 200: .Top = 445: .Width = 170: .Height = 30
+        .Left = 20: .Top = 445: .Width = 250: .Height = 30
         .Font.Size = 10: .Font.Bold = True
         .BackColor = RGB(80, 160, 220)
+    End With
+
+    ' --- 按钮8：四象限对称（v10 新增） ---
+    Dim btn8 As Object
+    Set btn8 = 设计器.Controls.Add("Forms.CommandButton.1", "CommandButton8")
+    With btn8
+        .Caption = "四象限对称"
+        .Left = 290: .Top = 445: .Width = 250: .Height = 30
+        .Font.Size = 10: .Font.Bold = True
+        .BackColor = RGB(200, 120, 200)
     End With
 
     ' 4. 用 CodeModule 注入事件代码
@@ -281,6 +295,13 @@ Private Sub 注入事件代码(窗体组件 As Object)
     ' ---- 按钮7：备选算法验证（v8 新增） ----
     i = i + 1: CM.InsertLines i, "Private Sub CommandButton7_Click()"
     i = i + 1: CM.InsertLines i, "    备选算法_菜单"
+    i = i + 1: CM.InsertLines i, "    Unload Me"
+    i = i + 1: CM.InsertLines i, "End Sub"
+    i = i + 1: CM.InsertLines i, ""
+
+    ' ---- 按钮8：四象限对称（v10 新增） ----
+    i = i + 1: CM.InsertLines i, "Private Sub CommandButton8_Click()"
+    i = i + 1: CM.InsertLines i, "    四象限_执行"
     i = i + 1: CM.InsertLines i, "    Unload Me"
     i = i + 1: CM.InsertLines i, "End Sub"
 End Sub
@@ -752,6 +773,191 @@ Sub 双边循环_执行(是否竖向 As Boolean)
 错误处理:
     MsgBox "双边循环错误: " & Err.Description, vbCritical
     Resume 退出
+End Sub
+
+' ============================================================
+'  四象限对称生成（v10 新增，按钮8触发）
+'  一张表同时生成四个象限，上下左右整体对称
+'  布局（竖向）：
+'    左上：正竖（左快右慢，原始数据）  |  右上：反竖（右快左慢，原始数据）
+'    ----------------------------------+----------------------------------
+'    左下：正竖（左快右慢，反转数据）  |  右下：反竖（右快左慢，反转数据）
+'  合并模式：每象限1列，中间空1列分隔，上下中间空1行
+'  分开模式：每象限K列，中间空1列分隔，上下中间空1行
+' ============================================================
+
+Sub 四象限_执行()
+    On Error GoTo 错误处理
+    Dim 原刷新 As Boolean, 原计算 As XlCalculation
+    原刷新 = Application.ScreenUpdating
+    原计算 = Application.Calculation
+    Application.ScreenUpdating = False
+    Application.Calculation = xlCalculationManual
+
+    Dim ws As Worksheet
+    Set ws = ActiveSheet
+
+    Dim 总列数 As Long, 列 As Long
+    总列数 = 最后列(ws)
+    If 总列数 = 0 Then MsgBox "无有效数据": GoTo 退出
+
+    Dim 每列行数() As Long
+    ReDim 每列行数(1 To 总列数)
+    For 列 = 1 To 总列数
+        每列行数(列) = 最后行(ws, 列)
+    Next 列
+
+    Dim 总行数 As Long
+    总行数 = 数组乘积(每列行数)
+    If 总行数 > 500000 Then MsgBox "行数过大，四象限暂不支持（单象限需在50万行内）": GoTo 退出
+
+    ' 读取原始数据
+    Dim 源数据 As Variant
+    源数据 = ws.Range(ws.Cells(1, 1), ws.Cells(总行数, 总列数)).Value2
+
+    ' 生成反转数据（每列上下颠倒）
+    Dim 反转数据() As Variant
+    ReDim 反转数据(1 To 总行数, 1 To 总列数)
+    Dim r As Long, 反转行 As Long
+    For 列 = 1 To 总列数
+        For r = 1 To 每列行数(列)
+            反转行 = 每列行数(列) - r + 1
+            反转数据(r, 列) = 源数据(反转行, 列)
+        Next r
+        For r = 每列行数(列) + 1 To 总行数
+            反转数据(r, 列) = 源数据(r, 列)
+        Next r
+    Next 列
+
+    ' 生成四个象限的结果（按列存，与 scct 一致）
+    ' Q1=左上 正竖 Q2=右上 反竖 Q3=左下 正竖+反转 Q4=右下 反竖+反转
+    Dim Q1() As Variant, Q2() As Variant, Q3() As Variant, Q4() As Variant
+    生成scct结果 Q1, 源数据, 每列行数, 总列数, 总行数, True   ' 正竖
+    生成scct结果 Q2, 源数据, 每列行数, 总列数, 总行数, False  ' 反竖
+    生成scct结果 Q3, 反转数据, 每列行数, 总列数, 总行数, True  ' 正竖+反转
+    生成scct结果 Q4, 反转数据, 每列行数, 总列数, 总行数, False ' 反竖+反转
+
+    ' 新建结果表
+    Dim 合并名 As String, 反转后缀 As String
+    If 是否合并 Then 合并名 = "合并" Else 合并名 = "分开"
+    If 数据是否反转 Then 反转后缀 = "_反序" Else 反转后缀 = ""
+    Dim 新表 As Worksheet
+    Set 新表 = 新建结果表("四象限_" & 合并名 & 反转后缀)
+
+    Dim 行 As Long
+    If 是否合并 Then
+        ' 合并模式：每象限1列字符串
+        ' 列布局：A=左上 B=空 C=右上
+        ' 行布局：第1行=标签，2~M+1 = 上半，M+2=空行，M+3~2M+2 = 下半
+        Dim 左列() As String, 右列() As String
+        ReDim 左列(1 To 总行数, 1 To 1)
+        ReDim 右列(1 To 总行数, 1 To 1)
+        Dim 片段() As String
+        ReDim 片段(1 To 总列数)
+
+        ' 上半：左上(Q1) + 右上(Q2)
+        For 行 = 1 To 总行数
+            For 列 = 1 To 总列数
+                片段(列) = Q1(列, 行)
+            Next 列
+            左列(行, 1) = Join(片段, 连接符)
+            For 列 = 1 To 总列数
+                片段(列) = Q2(列, 行)
+            Next 列
+            右列(行, 1) = Join(片段, 连接符)
+        Next 行
+        新表.Range("A2").Resize(总行数, 1) = 左列
+        新表.Range("C2").Resize(总行数, 1) = 右列
+
+        ' 下半：左下(Q3) + 右下(Q4)
+        For 行 = 1 To 总行数
+            For 列 = 1 To 总列数
+                片段(列) = Q3(列, 行)
+            Next 列
+            左列(行, 1) = Join(片段, 连接符)
+            For 列 = 1 To 总列数
+                片段(列) = Q4(列, 行)
+            Next 列
+            右列(行, 1) = Join(片段, 连接符)
+        Next 行
+        新表.Range("A" & 总行数 + 3).Resize(总行数, 1) = 左列
+        新表.Range("C" & 总行数 + 3).Resize(总行数, 1) = 右列
+
+        ' 象限标签（第1行）
+        新表.Cells(1, 1).Value = "【左上 正竖】"
+        新表.Cells(1, 3).Value = "【右上 反竖】"
+        新表.Cells(总行数 + 3, 1).Offset(-1, 0).Value = "【左下 正竖+反转】"
+        新表.Cells(总行数 + 3, 3).Offset(-1, 0).Value = "【右下 反竖+反转】"
+    Else
+        ' 分开模式：每象限K列，中间空1列
+        ' 列布局：A~K = 左上，K+2 ~ 2K+1 = 右上
+        ' 行布局：第1行=标签，2~M+1 = 上半，M+2=空行，M+3~2M+2 = 下半
+        Dim 每象限列数 As Long
+        每象限列数 = 总列数
+        Dim 右起始列 As Long
+        右起始列 = 每象限列数 + 2
+
+        ' 上半
+        For 列 = 1 To 每象限列数
+            For 行 = 1 To 总行数
+                新表.Cells(行 + 1, 列).Value = Q1(列, 行)
+                新表.Cells(行 + 1, 右起始列 + 列 - 1).Value = Q2(列, 行)
+            Next 行
+        Next 列
+
+        ' 下半
+        Dim 下起始行 As Long
+        下起始行 = 总行数 + 3
+        For 列 = 1 To 每象限列数
+            For 行 = 1 To 总行数
+                新表.Cells(下起始行 + 行 - 1, 列).Value = Q3(列, 行)
+                新表.Cells(下起始行 + 行 - 1, 右起始列 + 列 - 1).Value = Q4(列, 行)
+            Next 行
+        Next 列
+
+        ' 象限标签（第1行）
+        新表.Cells(1, 1).Value = "【左上 正竖】"
+        新表.Cells(1, 右起始列).Value = "【右上 反竖】"
+        新表.Cells(下起始行 - 1, 1).Value = "【左下 正竖+反转】"
+        新表.Cells(下起始行 - 1, 右起始列).Value = "【右下 反竖+反转】"
+    End If
+
+    MsgBox "四象限对称生成完成：" & 总行数 & " 行 × 4 象限。", vbInformation, "四象限对称"
+
+退出:
+    Application.ScreenUpdating = 原刷新
+    Application.Calculation = 原计算
+    Exit Sub
+错误处理:
+    MsgBox "四象限错误: " & Err.Description, vbCritical
+    Resume 退出
+End Sub
+
+' 辅助：生成 scct 结果（按列存），是否正向=True→左快右慢，False→右快左慢
+Private Sub 生成scct结果(结果 As Variant, 源数据 As Variant, 每列行数() As Long, 总列数 As Long, 总行数 As Long, 是否正向 As Boolean)
+    ReDim 结果(1 To 总列数, 1 To 总行数)
+    Dim 步长() As Long
+    ReDim 步长(1 To 总列数)
+    Dim 列 As Long, 行 As Long, 源行 As Long
+    If 是否正向 Then
+        步长(1) = 1
+        For 列 = 2 To 总列数
+            步长(列) = 步长(列 - 1) * 每列行数(列 - 1)
+        Next 列
+    Else
+        Dim 累计 As Long
+        累计 = 1
+        For 列 = 1 To 总列数
+            累计 = 累计 * 每列行数(列)
+            步长(列) = 总行数 / 累计
+        Next 列
+    End If
+    For 列 = 1 To 总列数
+        For 行 = 1 To 总行数
+            源行 = ys(cd(行, 步长(列)), 每列行数(列))
+            结果(列, 行) = 源数据(源行, 列)
+        Next 行
+    Next 列
 End Sub
 
 ' ============================================================
