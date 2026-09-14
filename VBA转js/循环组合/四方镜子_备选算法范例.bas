@@ -269,32 +269,37 @@ Sub 算法D_随机抽样(抽样数 As Long, Optional 去重 As Boolean = False)
     Randomize
     Dim 行 As Long, 列 As Long, 源行 As Long
     Dim 结果() As Variant: ReDim 结果(1 To 抽样数, 1 To 总列数)
-    Dim 已用 As Object
-    Set 已用 = CreateObject("Scripting.Dictionary")
 
-    Dim 尝试 As Long, 键 As String
-    For 行 = 1 To 抽样数
-        If 去重 Then
-            ' 无放回：随机尝试直到生成不重复组合
-            尝试 = 0
-            Do
-                For 列 = 1 To 总列数
-                    源行 = Int(Rnd * 每列行数(列)) + 1
-                    结果(行, 列) = 源数据(源行, 列)
-                Next 列
-                键 = ""
-                For 列 = 1 To 总列数: 键 = 键 & "|" & CStr(结果(行, 列)): Next
-                尝试 = 尝试 + 1
-            Loop While 已用.Exists(键) And 尝试 < 10000
-            已用(键) = True
-        Else
-            ' 有放回：直接随机
+    If 去重 Then
+        ' 不重复：Partial Fisher-Yates 洗牌法（比"随机尝试+查重"高效）
+        ' 生成 1..总行数 索引，只洗前 N 个，取前 N 个解码成组合。
+        ' O(N) 时间、零重试零查重，N 接近总组合数也不慢。
+        Dim 索引数组() As Long
+        ReDim 索引数组(1 To 总行数)
+        Dim i As Long, j As Long, tmp As Long
+        For i = 1 To 总行数: 索引数组(i) = i: Next
+        For i = 1 To 抽样数
+            j = Int(Rnd * (总行数 - i + 1)) + i
+            tmp = 索引数组(i): 索引数组(i) = 索引数组(j): 索引数组(j) = tmp
+        Next i
+        Dim 余 As Long, 权重 As Long
+        For 行 = 1 To 抽样数
+            余 = 索引数组(行) - 1
+            权重 = 1
+            For 列 = 1 To 总列数
+                结果(行, 列) = 源数据((余 \ 权重) Mod 每列行数(列) + 1, 列)
+                权重 = 权重 * 每列行数(列)
+            Next 列
+        Next 行
+    Else
+        ' 有放回：直接随机
+        For 行 = 1 To 抽样数
             For 列 = 1 To 总列数
                 源行 = Int(Rnd * 每列行数(列)) + 1
                 结果(行, 列) = 源数据(源行, 列)
             Next 列
-        End If
-    Next 行
+        Next 行
+    End If
 
     Dim 新表 As Worksheet
     Set 新表 = 新建结果表("算法D_随机抽样")

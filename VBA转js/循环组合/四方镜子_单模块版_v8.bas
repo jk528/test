@@ -852,21 +852,60 @@ Sub 备选算法D_随机抽样()
     If N < 1 Then Exit Sub
     If N > 总行数 Then N = 总行数
 
+    ' 询问是否不重复（无放回）
+    Dim 去重输入 As String
+    去重输入 = InputBox("是否不重复（无放回）？" & vbLf & "  1 = 不重复（各行组合不重复）" & vbLf & "  0 = 可重复（有放回）" & vbLf & vbLf & "输入 1 或 0：", "随机抽样模式", "1")
+    Dim 去重 As Boolean
+    去重 = (去重输入 = "1")
+    If 去重 Then
+        If N > 总行数 Then
+            MsgBox "不重复模式下抽样数不能超过总组合数（" & 总行数 & "）", vbExclamation
+            Exit Sub
+        End If
+    End If
+
     Randomize
     Dim 结果() As Variant
     ReDim 结果(1 To N, 1 To 总列数)
     Dim 行 As Long, 列 As Long, 源行 As Long
-    For 行 = 1 To N
-        For 列 = 1 To 总列数
-            源行 = Int(Rnd * 每列行数(列)) + 1
-            结果(行, 列) = 源数据(源行, 列)
-        Next 列
-    Next 行
+
+    If 去重 Then
+        ' 不重复：Partial Fisher-Yates 洗牌法（比"随机尝试+查重"高效得多）
+        ' 原理：生成 1..总行数 的索引数组，洗牌只洗前 N 个，取前 N 个索引解码成组合。
+        ' 特点：O(N) 时间、O(总行数) 空间，零重试、零查重，
+        '       即使 N 接近总组合数（如抽 95/100）也不慢。
+        Dim 索引数组() As Long
+        ReDim 索引数组(1 To 总行数)
+        Dim i As Long, j As Long, tmp As Long
+        For i = 1 To 总行数: 索引数组(i) = i: Next
+        For i = 1 To N
+            j = Int(Rnd * (总行数 - i + 1)) + i
+            tmp = 索引数组(i): 索引数组(i) = 索引数组(j): 索引数组(j) = tmp
+        Next i
+        ' 把索引解码为组合（混合进制：列1每行变、列2每n1行变...）
+        Dim 余 As Long, 权重 As Long
+        For 行 = 1 To N
+            余 = 索引数组(行) - 1
+            权重 = 1
+            For 列 = 1 To 总列数
+                结果(行, 列) = 源数据((余 \ 权重) Mod 每列行数(列) + 1, 列)
+                权重 = 权重 * 每列行数(列)
+            Next 列
+        Next 行
+    Else
+        ' 可重复：直接随机（有放回）
+        For 行 = 1 To N
+            For 列 = 1 To 总列数
+                源行 = Int(Rnd * 每列行数(列)) + 1
+                结果(行, 列) = 源数据(源行, 列)
+            Next 列
+        Next 行
+    End If
 
     Dim 新表 As Worksheet
     Set 新表 = 新建结果表("备选D_随机抽样")
     写入备选结果 新表, 结果, N, 总列数
-    MsgBox "备选算法D 随机抽样 完成：" & N & " 行（可重复）。", vbInformation, "备选算法D"
+    MsgBox "备选算法D 随机抽样 完成：" & N & " 行（" & IIf(去重, "不重复", "可重复") & "）。", vbInformation, "备选算法D"
     Exit Sub
 错误处理:
     MsgBox "备选算法D错误: " & Err.Description, vbCritical
