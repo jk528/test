@@ -1,17 +1,17 @@
 '============================================================
-' 四方镜子 - 单模块版 v11.5（两种元模型 × 四种四象限按钮）
-' 基于 v11 扩展：完全保留现有功能不变，四象限从 2 按钮升级为 4 按钮
+' 四方镜子 - 单模块版 v11.5（4基础元素 × 4对称位置 = 16样式）
+' 基于 v11 重构：四象限从多个按钮简化为 4选1基准 + 生成按钮
 ' 现有功能（不变）：
-'   - 四方循环 scct（笛卡尔积，4个按钮）
+'   - 四方循环 scct（笛卡尔积，4个按钮：正竖/反竖/正横/反横）
 '   - 双边循环 zxgbs（LCM独立循环，2个按钮）
 '   - 备选算法验证（7种：A/B/C/D/E/F/G）
 '   - 数据反转开关
-' 新增功能（v11.5）：
-'   - 按钮8 "四象限竖·左快" → 竖向 + 正向基准（里快模型）
-'   - 按钮9 "四象限竖·右快" → 竖向 + 反向基准（外快模型）
-'   - 按钮10 "四象限横·左快" → 横向 + 正向基准（里快模型）
-'   - 按钮11 "四象限横·右快" → 横向 + 反向基准（外快模型）
-'   核心洞察：里面快和外面快是两种元模型，竖横各两项，共 4 个四象限按钮
+' 四象限（v11.5）：
+'   - 4 个基础元素（正竖/反竖/正横/反横）= 4 个按钮
+'   - 4 个对称位置（左上/右上/左下/右下）
+'   - 4 × 4 = 16 种样式排列，全部满足上下左右对称
+'   - 选择一个基准元素，生成以它为左上的对称四象限
+'   - 支持合并/分开模式，支持数据反转
 ' 模式：Designer.Controls.Add + CodeModule 注入事件代码
 ' 使用方法：运行 四方镜子()
 ' 注意：需启用"信任对VBA工程对象模型的访问"
@@ -52,7 +52,7 @@ Sub 四方镜子()
     With 窗体组件.Properties
         .Item("Caption") = "四方镜"
         .Item("Width") = 570
-        .Item("Height") = 520
+        .Item("Height") = 540
         .Item("StartUpPosition") = 1 ' 居中
     End With
 
@@ -180,44 +180,57 @@ Sub 四方镜子()
         .BackColor = RGB(80, 160, 220)
     End With
 
-    ' --- 按钮8：四象限竖·左快（正向基准） ---
+    ' --- 框架3：四象限（4基准 × 4位置 = 16样式，上下左右对称） ---
+    Dim fra3 As Object
+    Set fra3 = 设计器.Controls.Add("Forms.Frame.1", "Frame3")
+    With fra3
+        .Caption = "四象限（选择基准元素）"
+        .Left = 10: .Top = 435: .Width = 540: .Height = 90
+        .Font.Size = 10: .Font.Bold = True
+    End With
+
+    ' --- 基准单选：4个基础元素 ---
+    Dim opt1 As Object
+    Set opt1 = fra3.Controls.Add("Forms.OptionButton.1", "OptionButton1")
+    With opt1
+        .Caption = "正竖"
+        .Left = 15: .Top = 25: .Width = 55: .Height = 20
+        .Font.Size = 10: .Font.Bold = False
+        .Value = True  ' 默认正竖
+    End With
+
+    Dim opt2 As Object
+    Set opt2 = fra3.Controls.Add("Forms.OptionButton.1", "OptionButton2")
+    With opt2
+        .Caption = "反竖"
+        .Left = 75: .Top = 25: .Width = 55: .Height = 20
+        .Font.Size = 10: .Font.Bold = False
+    End With
+
+    Dim opt3 As Object
+    Set opt3 = fra3.Controls.Add("Forms.OptionButton.1", "OptionButton3")
+    With opt3
+        .Caption = "正横"
+        .Left = 140: .Top = 25: .Width = 55: .Height = 20
+        .Font.Size = 10: .Font.Bold = False
+    End With
+
+    Dim opt4 As Object
+    Set opt4 = fra3.Controls.Add("Forms.OptionButton.1", "OptionButton4")
+    With opt4
+        .Caption = "反横"
+        .Left = 200: .Top = 25: .Width = 55: .Height = 20
+        .Font.Size = 10: .Font.Bold = False
+    End With
+
+    ' --- 按钮8：生成四象限 ---
     Dim btn8 As Object
-    Set btn8 = 设计器.Controls.Add("Forms.CommandButton.1", "CommandButton8")
+    Set btn8 = fra3.Controls.Add("Forms.CommandButton.1", "CommandButton8")
     With btn8
-        .Caption = "四象限竖·左快"
-        .Left = 20: .Top = 440: .Width = 255: .Height = 26
-        .Font.Size = 10: .Font.Bold = True
+        .Caption = "生成四象限"
+        .Left = 280: .Top = 22: .Width = 245: .Height = 28
+        .Font.Size = 11: .Font.Bold = True
         .BackColor = RGB(200, 120, 200)
-    End With
-
-    ' --- 按钮9：四象限竖·右快（反向基准） ---
-    Dim btn9 As Object
-    Set btn9 = 设计器.Controls.Add("Forms.CommandButton.1", "CommandButton9")
-    With btn9
-        .Caption = "四象限竖·右快"
-        .Left = 285: .Top = 440: .Width = 255: .Height = 26
-        .Font.Size = 10: .Font.Bold = True
-        .BackColor = RGB(180, 140, 220)
-    End With
-
-    ' --- 按钮10：四象限横·左快（正向基准） ---
-    Dim btn10 As Object
-    Set btn10 = 设计器.Controls.Add("Forms.CommandButton.1", "CommandButton10")
-    With btn10
-        .Caption = "四象限横·左快"
-        .Left = 20: .Top = 473: .Width = 255: .Height = 26
-        .Font.Size = 10: .Font.Bold = True
-        .BackColor = RGB(220, 160, 100)
-    End With
-
-    ' --- 按钮11：四象限横·右快（反向基准） ---
-    Dim btn11 As Object
-    Set btn11 = 设计器.Controls.Add("Forms.CommandButton.1", "CommandButton11")
-    With btn11
-        .Caption = "四象限横·右快"
-        .Left = 285: .Top = 473: .Width = 255: .Height = 26
-        .Font.Size = 10: .Font.Bold = True
-        .BackColor = RGB(220, 180, 120)
     End With
 
     ' 4. 用 CodeModule 注入事件代码
@@ -327,30 +340,14 @@ Private Sub 注入事件代码(窗体组件 As Object)
     i = i + 1: CM.InsertLines i, "End Sub"
     i = i + 1: CM.InsertLines i, ""
 
-    ' ---- 按钮8：四象限竖·左快（正向基准） ----
+    ' ---- 按钮8：生成四象限（根据选中的基准元素） ----
     i = i + 1: CM.InsertLines i, "Private Sub CommandButton8_Click()"
-    i = i + 1: CM.InsertLines i, "    四象限_执行 True, True"
-    i = i + 1: CM.InsertLines i, "    Unload Me"
-    i = i + 1: CM.InsertLines i, "End Sub"
-    i = i + 1: CM.InsertLines i, ""
-
-    ' ---- 按钮9：四象限竖·右快（反向基准） ----
-    i = i + 1: CM.InsertLines i, "Private Sub CommandButton9_Click()"
-    i = i + 1: CM.InsertLines i, "    四象限_执行 True, False"
-    i = i + 1: CM.InsertLines i, "    Unload Me"
-    i = i + 1: CM.InsertLines i, "End Sub"
-    i = i + 1: CM.InsertLines i, ""
-
-    ' ---- 按钮10：四象限横·左快（正向基准） ----
-    i = i + 1: CM.InsertLines i, "Private Sub CommandButton10_Click()"
-    i = i + 1: CM.InsertLines i, "    四象限_执行 False, True"
-    i = i + 1: CM.InsertLines i, "    Unload Me"
-    i = i + 1: CM.InsertLines i, "End Sub"
-    i = i + 1: CM.InsertLines i, ""
-
-    ' ---- 按钮11：四象限横·右快（反向基准） ----
-    i = i + 1: CM.InsertLines i, "Private Sub CommandButton11_Click()"
-    i = i + 1: CM.InsertLines i, "    四象限_执行 False, False"
+    i = i + 1: CM.InsertLines i, "    Dim 基准 As Long"
+    i = i + 1: CM.InsertLines i, "    If OptionButton1.Value Then 基准 = 1"
+    i = i + 1: CM.InsertLines i, "    If OptionButton2.Value Then 基准 = 2"
+    i = i + 1: CM.InsertLines i, "    If OptionButton3.Value Then 基准 = 3"
+    i = i + 1: CM.InsertLines i, "    If OptionButton4.Value Then 基准 = 4"
+    i = i + 1: CM.InsertLines i, "    四象限_执行 基准"
     i = i + 1: CM.InsertLines i, "    Unload Me"
     i = i + 1: CM.InsertLines i, "End Sub"
 End Sub
@@ -359,14 +356,15 @@ End Sub
 '  工具函数
 ' ============================================================
 
-' 生成象限标签文字（方向+是否反转）
-Private Function 象限标签(方向正向 As Boolean, 用反转 As Boolean, 正名 As String, 反名 As String) As String
-    Dim 方向名 As String
-    If 方向正向 Then 方向名 = 正名 Else 方向名 = 反名
+' 生成象限标签（方向 + 是否反转 + 布局）
+Private Function 生成标签(方向正向 As Boolean, 用反转 As Boolean, 是否竖向 As Boolean) As String
+    Dim 方向名 As String, 布局名 As String
+    If 方向正向 Then 方向名 = "正" Else 方向名 = "反"
+    If 是否竖向 Then 布局名 = "竖" Else 布局名 = "横"
     If 用反转 Then
-        象限标签 = 方向名 & "+反转"
+        生成标签 = 方向名 & 布局名 & "+反转"
     Else
-        象限标签 = 方向名
+        生成标签 = 方向名 & 布局名
     End If
 End Function
 
@@ -846,7 +844,7 @@ End Sub
 '    右下：反向（右快左慢，反转数据）   ← 中心对称
 ' ============================================================
 
-Sub 四象限_执行(是否竖向 As Boolean, 正向基准 As Boolean)
+Sub 四象限_执行(基准 As Long)
     On Error GoTo 错误处理
     Dim 原刷新 As Boolean, 原计算 As XlCalculation
     原刷新 = Application.ScreenUpdating
@@ -861,32 +859,47 @@ Sub 四象限_执行(是否竖向 As Boolean, 正向基准 As Boolean)
     Dim 源数据 As Variant
     Dim 反转数据() As Variant
     Dim r As Long, 反转行 As Long
+    ' 四个象限数据（按列存：Q(列, 行)）
     Dim Q1() As Variant, Q2() As Variant, Q3() As Variant, Q4() As Variant
     Dim Q1方向 As Boolean, Q2方向 As Boolean, Q3方向 As Boolean, Q4方向 As Boolean
     Dim Q1用反转 As Boolean, Q2用反转 As Boolean, Q3用反转 As Boolean, Q4用反转 As Boolean
-    Dim 正名 As String, 反名 As String, 横竖名 As String
     Dim 合并名 As String, 反转后缀 As String
     Dim 新表 As Worksheet
     Dim 标签左上 As String, 标签右上 As String, 标签左下 As String, 标签右下 As String
-    Dim 基准名 As String
-    ' 竖向合并用
+    Dim 基准名 As String, 布局名 As String
+    Dim 是否竖向 As Boolean, 正向基准 As Boolean
+    ' 竖向布局用
     Dim 左列() As String, 右列() As String
-    Dim 片段() As String
-    ' 竖向分开用
-    Dim 每象限列数 As Long, 右起始列 As Long
+    Dim 片段竖() As String
+    Dim 每象限列数 As Long, 右上起始列 As Long
     Dim 下起始行 As Long
-    ' 横向合并用
+    ' 横向布局用
     Dim 上左横() As String, 上右横() As String
     Dim 下左横() As String, 下右横() As String
     Dim 片段横() As String
     Dim 列索引 As Long
-    Dim 右起始列横 As Long
-    ' 横向分开用
+    Dim 右上起始列横 As Long
     Dim 每组合行数 As Long
-    Dim 右起始列横2 As Long
+    Dim 右上起始列横2 As Long
     Dim 下起始行横 As Long
     Dim ci As Long, ri As Long
     ' =========================
+
+    ' ---- 解析基准：1=正竖, 2=反竖, 3=正横, 4=反横 ----
+    If 基准 = 1 Or 基准 = 2 Then
+        是否竖向 = True
+        布局名 = "竖"
+    Else
+        是否竖向 = False
+        布局名 = "横"
+    End If
+    If 基准 = 1 Or 基准 = 3 Then
+        正向基准 = True
+        基准名 = "正" & 布局名
+    Else
+        正向基准 = False
+        基准名 = "反" & 布局名
+    End If
 
     Set ws = ActiveSheet
 
@@ -916,45 +929,25 @@ Sub 四象限_执行(是否竖向 As Boolean, 正向基准 As Boolean)
         Next r
     Next 列
 
-    ' 生成四个象限的结果（按列存，与 scct 一致）
+    ' ---- 确定四个象限的方向和数据状态 ----
+    ' 左上=基准  右上=左右镜像  左下=上下镜像  右下=中心镜像
     '
-    ' ╔══════════════════════════════════════════════════════════╗
-    ' ║  四象限核心总结：                                        ║
-    ' ║  竖反转 = 上下颠倒（数据反转 → 上下镜像）                  ║
-    ' ║  横反转 = 左右颠倒（数据反转 → 左右镜像）                  ║
-    ' ║                                                          ║
-    ' ║  两种元模型（基准方向）：                                 ║
-    ' ║  左快右慢基准 → Q1 = 正向                                ║
-    ' ║  右快左慢基准 → Q1 = 反向                                ║
-    ' ║                                                          ║
-    ' ║  左右镜像 vs 上下镜像 由布局决定：                        ║
-    ' ║  竖向：方向反转→左右镜像  数据反转→上下镜像              ║
-    ' ║  横向：数据反转→左右镜像  方向反转→上下镜像              ║
-    ' ╚══════════════════════════════════════════════════════════╝
+    ' 竖向布局：左右镜像=方向反转，上下镜像=数据反转
+    ' 横向布局：左右镜像=数据反转，上下镜像=方向反转
 
-    ' ---- 确定每个象限的方向和数据源 ----
-    ' Q1=左上（基准） Q2=右上（左右镜像） Q3=左下（上下镜像） Q4=右下（中心镜像）
-
-    If 正向基准 Then
-        Q1方向 = True   ' 基准 = 正向
-    Else
-        Q1方向 = False  ' 基准 = 反向
-    End If
+    Q1方向 = 正向基准: Q1用反转 = False   ' 左上 = 基准
 
     If 是否竖向 Then
-        ' 竖向：左右镜像=方向反转，上下镜像=数据反转
         Q2方向 = Not Q1方向: Q2用反转 = False           ' 右上 = 左右镜像 = 方向反转
         Q3方向 = Q1方向:     Q3用反转 = True            ' 左下 = 上下镜像 = 数据反转
         Q4方向 = Not Q1方向: Q4用反转 = True            ' 右下 = 中心镜像 = 方向+数据双反转
     Else
-        ' 横向：左右镜像=数据反转，上下镜像=方向反转
         Q2方向 = Q1方向:     Q2用反转 = True            ' 右上 = 左右镜像 = 数据反转
         Q3方向 = Not Q1方向: Q3用反转 = False           ' 左下 = 上下镜像 = 方向反转
         Q4方向 = Not Q1方向: Q4用反转 = True            ' 右下 = 中心镜像 = 方向+数据双反转
     End If
 
     ' 数据反转开关：四个象限位置不变，各自内容整体翻转
-    ' 实现：所有象限的数据源反转状态翻转（用反转数据的改用源数据，反之亦然）
     If 数据是否反转 Then
         Q1用反转 = Not Q1用反转
         Q2用反转 = Not Q2用反转
@@ -962,7 +955,7 @@ Sub 四象限_执行(是否竖向 As Boolean, 正向基准 As Boolean)
         Q4用反转 = Not Q4用反转
     End If
 
-    ' 生成四个象限
+    ' 生成四个象限的数据
     If Q1用反转 Then
         生成scct结果 Q1, 反转数据, 每列行数, 总列数, 总行数, Q1方向
     Else
@@ -984,47 +977,35 @@ Sub 四象限_执行(是否竖向 As Boolean, 正向基准 As Boolean)
         生成scct结果 Q4, 源数据, 每列行数, 总列数, 总行数, Q4方向
     End If
 
-    ' 方向名（正/反 + 竖/横）
-    If 是否竖向 Then
-        正名 = "正竖": 反名 = "反竖": 横竖名 = "竖"
-    Else
-        正名 = "正横": 反名 = "反横": 横竖名 = "横"
-    End If
-
-    ' 生成四个象限的标签文字（根据实际方向和数据源动态生成）
-    标签左上 = 象限标签(Q1方向, Q1用反转, 正名, 反名)
-    标签右上 = 象限标签(Q2方向, Q2用反转, 正名, 反名)
-    标签左下 = 象限标签(Q3方向, Q3用反转, 正名, 反名)
-    标签右下 = 象限标签(Q4方向, Q4用反转, 正名, 反名)
-
-    ' 基准名
-    If 正向基准 Then 基准名 = "左快" Else 基准名 = "右快"
+    ' 生成标签文字
+    标签左上 = 生成标签(Q1方向, Q1用反转, 是否竖向)
+    标签右上 = 生成标签(Q2方向, Q2用反转, 是否竖向)
+    标签左下 = 生成标签(Q3方向, Q3用反转, 是否竖向)
+    标签右下 = 生成标签(Q4方向, Q4用反转, 是否竖向)
 
     ' 新建结果表
     If 是否合并 Then 合并名 = "合并" Else 合并名 = "分开"
     If 数据是否反转 Then 反转后缀 = "_反序" Else 反转后缀 = ""
-    Set 新表 = 新建结果表("四象限" & 横竖名 & "_" & 基准名 & "_" & 合并名 & 反转后缀)
+    Set 新表 = 新建结果表("四象限_" & 基准名 & "_" & 合并名 & 反转后缀)
 
     If 是否竖向 Then
-        ' ============== 竖向版：每个组合一行 ==============
+        ' ============== 竖向布局：每个组合一行 ==============
         If 是否合并 Then
             ' 合并模式：每象限1列字符串
-            ' 列布局：A=左列两象限 B=空 C=右列两象限
-            ' 行布局：第1行=上标签 2~M+1=上半 M+2=空 M+3=下标签 M+4~2M+3=下半
             ReDim 左列(1 To 总行数, 1 To 1)
             ReDim 右列(1 To 总行数, 1 To 1)
-            ReDim 片段(1 To 总列数)
+            ReDim 片段竖(1 To 总列数)
 
             ' 上半：左上(Q1) + 右上(Q2)
             For 行 = 1 To 总行数
                 For 列 = 1 To 总列数
-                    片段(列) = Q1(列, 行)
+                    片段竖(列) = Q1(列, 行)
                 Next 列
-                左列(行, 1) = Join(片段, 连接符)
+                左列(行, 1) = Join(片段竖, 连接符)
                 For 列 = 1 To 总列数
-                    片段(列) = Q2(列, 行)
+                    片段竖(列) = Q2(列, 行)
                 Next 列
-                右列(行, 1) = Join(片段, 连接符)
+                右列(行, 1) = Join(片段竖, 连接符)
             Next 行
             新表.Range("A2").Resize(总行数, 1) = 左列
             新表.Range("C2").Resize(总行数, 1) = 右列
@@ -1032,18 +1013,18 @@ Sub 四象限_执行(是否竖向 As Boolean, 正向基准 As Boolean)
             ' 下半：左下(Q3) + 右下(Q4)
             For 行 = 1 To 总行数
                 For 列 = 1 To 总列数
-                    片段(列) = Q3(列, 行)
+                    片段竖(列) = Q3(列, 行)
                 Next 列
-                左列(行, 1) = Join(片段, 连接符)
+                左列(行, 1) = Join(片段竖, 连接符)
                 For 列 = 1 To 总列数
-                    片段(列) = Q4(列, 行)
+                    片段竖(列) = Q4(列, 行)
                 Next 列
-                右列(行, 1) = Join(片段, 连接符)
+                右列(行, 1) = Join(片段竖, 连接符)
             Next 行
             新表.Range("A" & 总行数 + 4).Resize(总行数, 1) = 左列
             新表.Range("C" & 总行数 + 4).Resize(总行数, 1) = 右列
 
-            ' 标签（竖合并）—— 基准=正竖
+            ' 标签
             新表.Cells(1, 1).Value = "【左上 " & 标签左上 & "】"
             新表.Cells(1, 3).Value = "【右上 " & 标签右上 & "】"
             新表.Cells(总行数 + 3, 1).Value = "【左下 " & 标签左下 & "】"
@@ -1051,13 +1032,13 @@ Sub 四象限_执行(是否竖向 As Boolean, 正向基准 As Boolean)
         Else
             ' 分开模式：每象限K列，中间空1列
             每象限列数 = 总列数
-            右起始列 = 每象限列数 + 2
+            右上起始列 = 每象限列数 + 2
 
             ' 上半
             For 列 = 1 To 每象限列数
                 For 行 = 1 To 总行数
                     新表.Cells(行 + 1, 列).Value = Q1(列, 行)
-                    新表.Cells(行 + 1, 右起始列 + 列 - 1).Value = Q2(列, 行)
+                    新表.Cells(行 + 1, 右上起始列 + 列 - 1).Value = Q2(列, 行)
                 Next 行
             Next 列
 
@@ -1066,22 +1047,20 @@ Sub 四象限_执行(是否竖向 As Boolean, 正向基准 As Boolean)
             For 列 = 1 To 每象限列数
                 For 行 = 1 To 总行数
                     新表.Cells(下起始行 + 行 - 1, 列).Value = Q3(列, 行)
-                    新表.Cells(下起始行 + 行 - 1, 右起始列 + 列 - 1).Value = Q4(列, 行)
+                    新表.Cells(下起始行 + 行 - 1, 右上起始列 + 列 - 1).Value = Q4(列, 行)
                 Next 行
             Next 列
 
-            ' 标签（竖分开）—— 基准=正竖
+            ' 标签
             新表.Cells(1, 1).Value = "【左上 " & 标签左上 & "】"
-            新表.Cells(1, 右起始列).Value = "【右上 " & 标签右上 & "】"
+            新表.Cells(1, 右上起始列).Value = "【右上 " & 标签右上 & "】"
             新表.Cells(下起始行 - 1, 1).Value = "【左下 " & 标签左下 & "】"
-            新表.Cells(下起始行 - 1, 右起始列).Value = "【右下 " & 标签右下 & "】"
+            新表.Cells(下起始行 - 1, 右上起始列).Value = "【右下 " & 标签右下 & "】"
         End If
     Else
-        ' ============== 横向版：组合横向排列 ==============
+        ' ============== 横向布局：组合横向排列 ==============
         If 是否合并 Then
-            ' 合并模式：每象限1行字符串（M个组合横排）
-            ' 行布局：1=上标签 2=上半 3=空行 4=下标签 5=下半
-            ' 列布局：B列起 左半M个=左上 Q1，M+3列起 右半M个=右上 Q2
+            ' 合并模式：每象限1行字符串
             ReDim 上左横(1 To 总行数)
             ReDim 上右横(1 To 总行数)
             ReDim 下左横(1 To 总行数)
@@ -1107,52 +1086,54 @@ Sub 四象限_执行(是否竖向 As Boolean, 正向基准 As Boolean)
             Next 列索引
 
             ' 写入布局
-            右起始列横 = 总行数 + 3
+            右上起始列横 = 总行数 + 3
             新表.Range("B2").Resize(1, 总行数) = 上左横
-            新表.Cells(2, 右起始列横).Resize(1, 总行数) = 上右横
+            新表.Cells(2, 右上起始列横).Resize(1, 总行数) = 上右横
             新表.Range("B5").Resize(1, 总行数) = 下左横
-            新表.Cells(5, 右起始列横).Resize(1, 总行数) = 下右横
+            新表.Cells(5, 右上起始列横).Resize(1, 总行数) = 下右横
 
-            ' 标签（横合并）—— 基准=反横
+            ' 标签
             新表.Cells(1, 2).Value = "【左上 " & 标签左上 & "】"
-            新表.Cells(1, 右起始列横).Value = "【右上 " & 标签右上 & "】"
+            新表.Cells(1, 右上起始列横).Value = "【右上 " & 标签右上 & "】"
             新表.Cells(4, 2).Value = "【左下 " & 标签左下 & "】"
-            新表.Cells(4, 右起始列横).Value = "【右下 " & 标签右下 & "】"
+            新表.Cells(4, 右上起始列横).Value = "【右下 " & 标签右下 & "】"
         Else
-            ' 分开模式（横向）：M个组合横排，每个组合占1列K行（竖排）
-            ' 行布局：1=上标签 2~K+1=上半 K+2=空行 K+3=下标签 K+4~2K+3=下半
-            ' 列布局：B列起 左半M列=左上Q1，M+2列起 右半M列=右上Q2
+            ' 分开模式：M个组合横排，每个组合占1列K行（竖排）
             每组合行数 = 总列数
-            右起始列横2 = 总行数 + 3 ' 留空一列
+            右上起始列横2 = 总行数 + 3 ' 中间空2列
 
-            ' 上半：Q1（左上）+ Q2（右上）
+            ' 上半：Q1 + Q2
             For ci = 1 To 总行数
                 For ri = 1 To 每组合行数
                     新表.Cells(ri + 1, ci + 1).Value = Q1(ri, ci)
-                    新表.Cells(ri + 1, 右起始列横2 + ci - 1).Value = Q2(ri, ci)
+                    新表.Cells(ri + 1, 右上起始列横2 + ci - 1).Value = Q2(ri, ci)
                 Next ri
             Next ci
 
             ' 下半起始行
-            下起始行横 = 每组合行数 + 4 ' 标签1行 + 数据K行 + 空行1行 + 标签1行 = K+3，数据从K+4开始
+            下起始行横 = 每组合行数 + 4
 
-            ' 下半：Q3（左下）+ Q4（右下）
+            ' 下半：Q3 + Q4
             For ci = 1 To 总行数
                 For ri = 1 To 每组合行数
                     新表.Cells(下起始行横 + ri - 1, ci + 1).Value = Q3(ri, ci)
-                    新表.Cells(下起始行横 + ri - 1, 右起始列横2 + ci - 1).Value = Q4(ri, ci)
+                    新表.Cells(下起始行横 + ri - 1, 右上起始列横2 + ci - 1).Value = Q4(ri, ci)
                 Next ri
             Next ci
 
-            ' 标签（横分开）—— 基准=反横
+            ' 标签
             新表.Cells(1, 2).Value = "【左上 " & 标签左上 & "】"
-            新表.Cells(1, 右起始列横2).Value = "【右上 " & 标签右上 & "】"
+            新表.Cells(1, 右上起始列横2).Value = "【右上 " & 标签右上 & "】"
             新表.Cells(每组合行数 + 3, 2).Value = "【左下 " & 标签左下 & "】"
-            新表.Cells(每组合行数 + 3, 右起始列横2).Value = "【右下 " & 标签右下 & "】"
+            新表.Cells(每组合行数 + 3, 右上起始列横2).Value = "【右下 " & 标签右下 & "】"
         End If
     End If
 
-    MsgBox "四象限对称·" & 横竖名 & " 生成完成：" & 总行数 & " 组 × 4 象限。", vbInformation, "四象限对称"
+    ' 格式化
+    新表.Cells.EntireColumn.AutoFit
+    新表.Cells.EntireRow.AutoFit
+
+    MsgBox "四象限生成完成（基准：" & 基准名 & "）：" & 总行数 & " 组 × 4 象限。", vbInformation, "四象限"
 
 退出:
     Application.ScreenUpdating = 原刷新
