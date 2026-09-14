@@ -1001,36 +1001,39 @@ Sub 四象限_执行(是否竖向 As Boolean)
             新表.Cells(4, 2).Value = "【左下 " & 正名 & "】"
             新表.Cells(4, 右起始列横).Value = "【右下 " & 反名 & "+反转】"
         Else
-            ' 分开模式（横向）：M个组合横排，每个占K列
-            ' 行布局：1=上标签 2=上半 3=空行 4=下标签 5=下半
-            ' 列布局：B列起 左半M*K列=左上Q1，M*K+K+2列起 右半M*K列=右上Q2
-            Dim 每组合列数 As Long
-            每组合列数 = 总列数
+            ' 分开模式（横向）：M个组合横排，每个组合占1列K行（竖排）
+            ' 行布局：1=上标签 2~K+1=上半 K+2=空行 K+3=下标签 K+4~2K+3=下半
+            ' 列布局：B列起 左半M列=左上Q1，M+2列起 右半M列=右上Q2
+            Dim 每组合行数 As Long
+            每组合行数 = 总列数
             Dim 右起始列横2 As Long
-            右起始列横2 = 总行数 * 每组合列数 + 每组合列数 + 2 ' 留空一列
+            右起始列横2 = 总行数 + 3 ' 留空一列
 
-            Dim ci As Long, ri As Long
             ' 上半：Q1（左上）+ Q2（右上）
             For ci = 1 To 总行数
-                For ri = 1 To 每组合列数
-                    新表.Cells(2, (ci - 1) * 每组合列数 + ri + 1).Value = Q1(ri, ci)
-                    新表.Cells(2, 右起始列横2 + (ci - 1) * 每组合列数 + ri - 1).Value = Q2(ri, ci)
+                For ri = 1 To 每组合行数
+                    新表.Cells(ri + 1, ci + 1).Value = Q1(ri, ci)
+                    新表.Cells(ri + 1, 右起始列横2 + ci - 1).Value = Q2(ri, ci)
                 Next ri
             Next ci
 
+            ' 下半起始行
+            Dim 下起始行横 As Long
+            下起始行横 = 每组合行数 + 4 ' 标签1行 + 数据K行 + 空行1行 + 标签1行 = K+3，数据从K+4开始
+
             ' 下半：Q3（左下）+ Q4（右下）
             For ci = 1 To 总行数
-                For ri = 1 To 每组合列数
-                    新表.Cells(5, (ci - 1) * 每组合列数 + ri + 1).Value = Q3(ri, ci)
-                    新表.Cells(5, 右起始列横2 + (ci - 1) * 每组合列数 + ri - 1).Value = Q4(ri, ci)
+                For ri = 1 To 每组合行数
+                    新表.Cells(下起始行横 + ri - 1, ci + 1).Value = Q3(ri, ci)
+                    新表.Cells(下起始行横 + ri - 1, 右起始列横2 + ci - 1).Value = Q4(ri, ci)
                 Next ri
             Next ci
 
             ' 标签
             新表.Cells(1, 2).Value = "【左上 " & 反名 & "】"
             新表.Cells(1, 右起始列横2).Value = "【右上 " & 正名 & "+反转】"
-            新表.Cells(4, 2).Value = "【左下 " & 正名 & "】"
-            新表.Cells(4, 右起始列横2).Value = "【右下 " & 反名 & "+反转】"
+            新表.Cells(每组合行数 + 3, 2).Value = "【左下 " & 正名 & "】"
+            新表.Cells(每组合行数 + 3, 右起始列横2).Value = "【右下 " & 反名 & "+反转】"
         End If
     End If
 
