@@ -682,8 +682,14 @@ Sub 备选算法_菜单()
         & " C = 自定义周期独立循环（zxgbs推广）" & vbLf _
         & "     → 周期 A列2、B列3，输出LCM行" & vbLf & vbLf _
         & " D = 随机抽样组合" & vbLf _
-        & "     → 随机生成 N 行" & vbLf & vbLf _
-        & "输入 A/B/C/D 选择算法："
+        & "     → 随机生成 N 行（可重复/不重复）" & vbLf & vbLf _
+        & " E = 逐列扩展法（Array Expansion）" & vbLf _
+        & "     → 输出与 笛卡尔积正向 相同" & vbLf & vbLf _
+        & " F = 格雷码遍历（Gray Code）" & vbLf _
+        & "     → 相邻组合仅一列变化" & vbLf & vbLf _
+        & " G = 混合进制随机访问" & vbLf _
+        & "     → 输入序号直接取第 k 个组合" & vbLf & vbLf _
+        & "输入 A~G 选择算法："
     Dim 输入 As String
     输入 = InputBox(菜单, "备选算法", "A")
     If 输入 = "" Then Exit Sub
@@ -692,6 +698,9 @@ Sub 备选算法_菜单()
         Case "B": 备选算法B_回溯法
         Case "C": 备选算法C_自定义周期
         Case "D": 备选算法D_随机抽样
+        Case "E": 备选算法E_逐列扩展
+        Case "F": 备选算法F_格雷码
+        Case "G": 备选算法G_随机访问
         Case Else: MsgBox "无效选择：" & 输入, vbExclamation
     End Select
 End Sub
@@ -909,4 +918,159 @@ Sub 备选算法D_随机抽样()
     Exit Sub
 错误处理:
     MsgBox "备选算法D错误: " & Err.Description, vbCritical
+End Sub
+
+' ============================================================
+'  备选算法E：逐列扩展法（Array Expansion）
+'  从第1列开始，每列把已有数组复制该列行数份，第 i 份追加该列第 i 个元素
+'  输出 = 笛卡尔积正向（与 scct 正向一致）
+' ============================================================
+
+Sub 备选算法E_逐列扩展()
+    On Error GoTo 错误处理
+    Dim 每列行数() As Long, 源数据 As Variant
+    读取源数据 每列行数, 源数据
+    Dim 总列数 As Long: 总列数 = UBound(每列行数)
+    Dim 总行数 As Long: 总行数 = 数组乘积(每列行数)
+    If 总行数 > 1048576 Then MsgBox "超出表格限制": Exit Sub
+
+    ' 初始：第1列
+    Dim 结果() As Variant
+    ReDim 结果(1 To 每列行数(1), 1 To 1)
+    Dim 行 As Long
+    For 行 = 1 To 每列行数(1): 结果(行, 1) = 源数据(行, 1): Next
+
+    Dim 列 As Long
+    For 列 = 2 To 总列数
+        Dim 新行数 As Long
+        新行数 = UBound(结果, 1) * 每列行数(列)
+        Dim 新结果() As Variant
+        ReDim 新结果(1 To 新行数, 1 To 列)
+        Dim k As Long, 旧列 As Long
+        ' 外层按新列元素份数复制，内层展开已有组合 → 旧列（A）快变 = 正向顺序
+        For k = 1 To 每列行数(列)
+            For 行 = 1 To UBound(结果, 1)
+                For 旧列 = 1 To 列 - 1
+                    新结果((k - 1) * UBound(结果, 1) + 行, 旧列) = 结果(行, 旧列)
+                Next 旧列
+                新结果((k - 1) * UBound(结果, 1) + 行, 列) = 源数据(k, 列)
+            Next 行
+        Next k
+        ' 结果 = 新结果（动态数组整体赋值）
+        ReDim 结果(1 To 新行数, 1 To 列)
+        For 行 = 1 To 新行数
+            For 旧列 = 1 To 列
+                结果(行, 旧列) = 新结果(行, 旧列)
+            Next 旧列
+        Next 行
+    Next 列
+
+    Dim 新表 As Worksheet
+    Set 新表 = 新建结果表("备选E_逐列扩展")
+    写入备选结果 新表, 结果, 总行数, 总列数
+    MsgBox "备选算法E 逐列扩展法 完成：" & 总行数 & " 行（与笛卡尔积正向一致）。", vbInformation, "备选算法E"
+    Exit Sub
+错误处理:
+    MsgBox "备选算法E错误: " & Err.Description, vbCritical
+End Sub
+
+' ============================================================
+'  备选算法F：格雷码遍历（Gray Code）
+'  相邻两个组合只差一列元素变化（递归反射构造）
+'  应用：穷举测试相邻用例只改一个参数
+' ============================================================
+
+Sub 备选算法F_格雷码()
+    On Error GoTo 错误处理
+    Dim 每列行数() As Long, 源数据 As Variant
+    读取源数据 每列行数, 源数据
+    Dim 总列数 As Long: 总列数 = UBound(每列行数)
+    Dim 总行数 As Long: 总行数 = 数组乘积(每列行数)
+    If 总行数 > 1048576 Then MsgBox "超出表格限制": Exit Sub
+
+    ReDim 回溯结果(1 To 总行数, 1 To 总列数)
+    回溯行号 = 0
+    Dim 当前行() As Variant
+    ReDim 当前行(1 To 总列数)
+    Call 格雷递归(源数据, 每列行数, 总列数, 1, 1, 当前行)
+
+    Dim 新表 As Worksheet
+    Set 新表 = 新建结果表("备选F_格雷码")
+    写入备选结果 新表, 回溯结果, 总行数, 总列数
+    MsgBox "备选算法F 格雷码遍历 完成：" & 总行数 & " 行（相邻组合仅一列变化）。", vbInformation, "备选算法F"
+    Exit Sub
+错误处理:
+    MsgBox "备选算法F错误: " & Err.Description, vbCritical
+End Sub
+
+' 格雷码递归反射：每层按方向取元素，子层方向按位置奇偶交替（奇→正向，偶→反向）
+Private Sub 格雷递归(源数据 As Variant, 每列行数() As Long, 总列数 As Long, 当前列 As Long, 方向 As Long, 当前行() As Variant)
+    If 当前列 > 总列数 Then
+        回溯行号 = 回溯行号 + 1
+        Dim 列 As Long
+        For 列 = 1 To 总列数
+            回溯结果(回溯行号, 列) = 当前行(列)
+        Next 列
+        Exit Sub
+    End If
+    Dim i As Long, 位置 As Long, 子方向 As Long
+    If 方向 = 1 Then
+        ' 正向：1..n
+        For i = 1 To 每列行数(当前列)
+            当前行(当前列) = 源数据(i, 当前列)
+            位置 = i
+            子方向 = IIf(位置 Mod 2 = 1, 1, -1)
+            Call 格雷递归(源数据, 每列行数, 总列数, 当前列 + 1, 子方向, 当前行)
+        Next i
+    Else
+        ' 反向：n..1（反射）
+        For i = 每列行数(当前列) To 1 Step -1
+            当前行(当前列) = 源数据(i, 当前列)
+            位置 = 每列行数(当前列) - i + 1
+            子方向 = IIf(位置 Mod 2 = 1, 1, -1)
+            Call 格雷递归(源数据, 每列行数, 总列数, 当前列 + 1, 子方向, 当前行)
+        Next i
+    End If
+End Sub
+
+' ============================================================
+'  备选算法G：混合进制随机访问（Index → Combination）
+'  输入序号 k，直接用混合进制解码得到第 k 个组合
+'  无需生成全序列，可随机访问任意组合（断点续算/并行分区基础）
+' ============================================================
+
+Sub 备选算法G_随机访问()
+    On Error GoTo 错误处理
+    Dim 每列行数() As Long, 源数据 As Variant
+    读取源数据 每列行数, 源数据
+    Dim 总列数 As Long: 总列数 = UBound(每列行数)
+    Dim 总行数 As Long: 总行数 = 数组乘积(每列行数)
+
+    Dim 输入 As String
+    输入 = InputBox("输入组合序号 k（1~" & 总行数 & "）:", "混合进制随机访问", "1")
+    If 输入 = "" Then Exit Sub
+    Dim k As Long
+    k = Val(输入)
+    If k < 1 Or k > 总行数 Then
+        MsgBox "序号超出范围（1~" & 总行数 & "）", vbExclamation
+        Exit Sub
+    End If
+
+    ' 混合进制解码：列1权重1、列2权重n1、列3权重n1*n2...
+    Dim 结果() As Variant
+    ReDim 结果(1 To 1, 1 To 总列数)
+    Dim 余 As Long, 权重 As Long, 列 As Long
+    余 = k - 1: 权重 = 1
+    For 列 = 1 To 总列数
+        结果(1, 列) = 源数据((余 \ 权重) Mod 每列行数(列) + 1, 列)
+        权重 = 权重 * 每列行数(列)
+    Next 列
+
+    Dim 新表 As Worksheet
+    Set 新表 = 新建结果表("备选G_随机访问")
+    写入备选结果 新表, 结果, 1, 总列数
+    MsgBox "备选算法G 混合进制随机访问：第 " & k & " 个组合已输出。", vbInformation, "备选算法G"
+    Exit Sub
+错误处理:
+    MsgBox "备选算法G错误: " & Err.Description, vbCritical
 End Sub
