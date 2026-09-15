@@ -62,7 +62,7 @@ Sub 四方镜子()
     With 窗体组件.Properties
         .Item("Caption") = "四方镜"
         .Item("Width") = 570
-        .Item("Height") = 520
+        .Item("Height") = 540
         .Item("StartUpPosition") = 1 ' 居中
     End With
 
@@ -195,7 +195,7 @@ Sub 四方镜子()
     Set btn7 = 设计器.Controls.Add("Forms.CommandButton.1", "CommandButton7")
     With btn7
         .Caption = "备选算法验证"
-        .Left = 20: .Top = 405: .Width = 520: .Height = 26
+        .Left = 20: .Top = 450: .Width = 520: .Height = 26
         .Font.Size = 10: .Font.Bold = True
         .BackColor = RGB(80, 160, 220)
     End With
