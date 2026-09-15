@@ -610,6 +610,7 @@ Sub 四方循环_执行(是否正向 As Boolean, 是否横向 As Boolean)
             Next 行
             新表.Range("A1").Resize(1, 总行数) = 横合并
         Else
+            ' 横分开：K行 × M列（每列一个组合，元素从上往下读）
             新表.Range("A1").Resize(总列数, 总行数) = 结果
         End If
     Else
@@ -827,6 +828,7 @@ Sub 四象限_执行(是否正向 As Boolean, 是否横向 As Boolean)
     Dim 右上起始列横2 As Long
     Dim 下起始行横 As Long
     Dim ci As Long, ri As Long
+    Dim 列 As Long
     ' =========================
 
     Set ws = ActiveSheet
@@ -1008,7 +1010,7 @@ Sub 四象限_执行(是否正向 As Boolean, 是否横向 As Boolean)
             新表.Cells(4, 2).Value = "【左下 上下镜像】"
             新表.Cells(4, 右上起始列横).Value = "【右下 中心镜像】"
         Else
-            ' 分开模式：M个组合横排，每个组合占1列K行（竖排）
+            ' 横分开：K行 × M列（每列一个组合，元素从上往下读）
             每组合行数 = 总列数
             右上起始列横2 = 总行数 + 3 ' 中间空2列
 

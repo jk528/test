@@ -399,6 +399,7 @@ function 输出结果(新表, 结果, 总列数, 总行数, 是否横向, 连接
             }
             新表.Range("A1").Resize(1, 总行数).Value2 = [横合并];
         } else {
+            // 横分开：K行 × M列（每列一个组合，元素从上往下读）
             新表.Range("A1").Resize(总列数, 总行数).Value2 = 结果;
         }
     } else {
@@ -692,23 +693,23 @@ function 四象限_横向输出(新表, Q1, Q2, Q3, Q4, 总列数, 总行数, �
         新表.Range("A" + (下起始 + 1)).Resize(1, 总行数).Value2 = [下左];
         新表.Range(新表.Cells.Item(下起始 + 1, 总行数 + 2), 新表.Cells.Item(下起始 + 1, 总行数 * 2 + 1)).Value2 = [下右];
     } else {
-        // 分开模式：每象限多列（横向 = 每列一个组合，组合内部纵向排列）
-        // 上半：Q1 + Q2
-        var 上左 = Q1; // 按列存
-        var 上右 = Q2;
-        新表.Cells.Item(1, 1).Value2 = "原始";
-        新表.Range("A2").Resize(总列数, 总行数).Value2 = 上左;
-        新表.Cells.Item(1, 总行数 + 2).Value2 = "左右镜像";
-        新表.Range(新表.Cells.Item(2, 总行数 + 2), 新表.Cells.Item(总列数 + 1, 总行数 * 2 + 1)).Value2 = 上右;
+        // 横分开：K行 × M列（每列一个组合，元素从上往下读）
+        var 每组合行 = 总列数;
+        var 右起始列 = 总行数 + 2; // 中间空1列
+        var 下起始行号 = 每组合行 + 3;
 
-        // 下半：Q3 + Q4
-        var 下起始行 = 总列数 + 3;
-        var 下左 = Q3;
-        var 下右 = Q4;
-        新表.Cells.Item(下起始行, 1).Value2 = "上下镜像";
-        新表.Range("A" + (下起始行 + 1)).Resize(总列数, 总行数).Value2 = 下左;
-        新表.Cells.Item(下起始行, 总行数 + 2).Value2 = "中心镜像";
-        新表.Range(新表.Cells.Item(下起始行 + 1, 总行数 + 2), 新表.Cells.Item(下起始行 + 总列数, 总行数 * 2 + 1)).Value2 = 下右;
+        // 上半：Q1（左） + Q2（右）—— Q1/Q2按列存，直接K行×M列
+        新表.Range("A2").Resize(总列数, 总行数).Value2 = Q1;
+        新表.Range(新表.Cells.Item(2, 右起始列), 新表.Cells.Item(每组合行 + 1, 右起始列 + 总行数 - 1)).Value2 = Q2;
+        // 下半：Q3（左） + Q4（右）
+        新表.Range("A" + 下起始行号).Resize(总列数, 总行数).Value2 = Q3;
+        新表.Range(新表.Cells.Item(下起始行号, 右起始列), 新表.Cells.Item(下起始行号 + 每组合行 - 1, 右起始列 + 总行数 - 1)).Value2 = Q4;
+
+        // 标签
+        新表.Cells.Item(1, 1).Value2 = "原始";
+        新表.Cells.Item(1, 右起始列).Value2 = "左右镜像";
+        新表.Cells.Item(下起始行号 - 1, 1).Value2 = "上下镜像";
+        新表.Cells.Item(下起始行号 - 1, 右起始列).Value2 = "中心镜像";
     }
 }
 
