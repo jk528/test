@@ -1,7 +1,18 @@
+---
+AIGC:
+  ContentProducer: '001191110102MAD55U9H0F10002'
+  ContentPropagator: '001191110102MAD55U9H0F10002'
+  Label: '1'
+  ProduceID: '3ea2dadb-9047-4dcb-96f8-45eff2a45021'
+  PropagateID: '3ea2dadb-9047-4dcb-96f8-45eff2a45021'
+  ReservedCode1: '25a144ee-df1e-4410-b6da-b4db99f4f9f1'
+  ReservedCode2: '25a144ee-df1e-4410-b6da-b4db99f4f9f1'
+---
+
 # 新闻联播每日总结 - Windows 任务计划自动化方案
 
-> **版本**：v1.0.0  
-> **日期**：2026-09-13  
+> **版本**：v1.1.0  
+> **日期**：2026-09-16  
 > **适用系统**：Windows 10 / Windows 11
 
 ---
@@ -27,6 +38,7 @@ Windows 任务计划程序（Task Scheduler）是系统内置功能，完全可�
 
 - ✅ `gen_report_v2.py` — 全自动生成（正则提取六要素）
 - ✅ `gen_report_final.py` — 分阶段生成（AI 填写六要素）
+- ✅ `fill_elements_api.py` — 外部 AI API 自动填写六要素（不消耗 TeleAgent 积分）
 - ✅ `sync_gitee.ps1` — Git 同步脚本
 - ✅ `check_md_quality.py` — 质量检测脚本
 
@@ -36,16 +48,17 @@ Windows 任务计划程序（Task Scheduler）是系统内置功能，完全可�
 
 ### 2.1 模式对比表
 
-| 维度 | 模式一：全自动 v2 | 模式二：半自动分阶段 | 模式三：AI API 全自动 |
+| 维度 | 模式一：全自动 v2 | 模式二：半自动分阶段 | 模式三：AI API 全自动 ⭐推荐 |
 |------|-------------------|---------------------|----------------------|
 | **六要素质量** | 一般（正则提取） | 高（AI 手动填写） | 高（AI API 自动） |
 | **人工干预** | 零 | 每日需手动填写 JSON | 零 |
 | **生成耗时** | ~15 秒 | ~2 分钟 + 人工时间 | ~2 分钟 |
-| **API 成本** | 无 | 无 | 有（按调用量计费） |
+| **TeleAgent 积分** | 不消耗 | 不消耗 | 不消耗 |
+| **外部 API 成本** | 无 | 无 | 低（DeepSeek约0.01元/天） |
 | **稳定性** | 最高 | 中（依赖人工） | 较高（依赖 API） |
-| **推荐场景** | 日常自用、对六要素要求不高 | 对质量要求高、有人工维护 | 追求质量 + 全自动 |
+| **推荐场景** | 日常自用、对六要素要求不高 | 对质量要求高、有人工维护 | 追求质量 + 全自动 ✅ |
 
-### 2.2 模式一：全自动 v2（推荐入门）
+### 2.2 模式一：全自动 v2（入门）
 
 ```
 每天 06:30 自动触发
@@ -79,24 +92,34 @@ Windows 任务计划程序（Task Scheduler）是系统内置功能，完全可�
 - 每日需 5-10 分钟人工填写
 - 适合对报告质量要求高的场景
 
-### 2.4 模式三：AI API 全自动（预留扩展）
+### 2.4 模式三：AI API 全自动 ⭐推荐
 
 ```
-每天 06:30 自动触发 Phase 1
+每天 06:30 自动触发
     ↓
-生成 1-5 部分 + 六要素数据源 JSON
+Phase 1: 脚本生成1-5部分 + 六要素数据源JSON（~15秒）
     ↓
-调用 AI API 自动填写六要素 JSON
+Phase 2: 调用外部AI API自动填写六要素JSON（~30秒）
     ↓
-Phase 3 合并生成完整报告
+Phase 3: 脚本合并生成完整报告（<1秒）
     ↓
 质量检查 → Git 同步 → 完成
 ```
 
 **特点**：
-- 全自动 + 高质量
-- 需要 AI API Key（如 DeepSeek、通义千问、GPT 等）
-- 有 API 调用成本
+- 全自动 + 高质量（与 TeleAgent 手动生成质量一致）
+- **不消耗 TeleAgent 积分**
+- 使用外部 AI API（DeepSeek/通义千问等），每日成本约 0.01 元
+- 支持任何 OpenAI 兼容接口（含本地 Ollama）
+
+**支持的 AI API**：
+
+| API 提供商 | base_url | 推荐模型 | 费用 |
+|-----------|----------|---------|------|
+| DeepSeek（推荐） | `https://api.deepseek.com/v1` | `deepseek-chat` | ~0.01元/天 |
+| 通义千问 | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen-plus` | ~0.02元/天 |
+| Moonshot/Kimi | `https://api.moonshot.cn/v1` | `moonshot-v1-8k` | ~0.03元/天 |
+| 本地 Ollama | `http://localhost:11434/v1` | `qwen2.5:14b` | 免费 |
 
 ---
 
@@ -117,9 +140,48 @@ Phase 3 合并生成完整报告
 │   └── check_and_merge.ps1  # 半自动模式合并检测
 └── logs/                    # 日志目录（自动生成）
     └── task_YYYYMMDD.log
+
+分阶段生成方案/                # Python 脚本目录
+├── gen_report_v2.py         # 全自动正则版
+├── gen_report_final.py      # 分阶段生成版（Phase 1/3）
+├── fill_elements_api.py     # AI API 六要素填写（Phase 2）⭐新增
+├── fetch_xwlb.py            # 央视网抓取
+├── fetch_iqilu.py           # 齐鲁网抓取
+└── check_md_quality.py      # 质量检测
 ```
 
-### 3.2 三步上手（全自动 v2 模式）
+### 3.2 快速上手（AI API 全自动模式 ⭐推荐）
+
+#### 第一步：配置 AI API Key
+
+打开 `config\config.json`，填入你的 API Key：
+
+```json
+{
+  "mode": "ai_api",
+  "modes": {
+    "ai_api": {
+      "api_key": "你的API Key",
+      "api_base_url": "https://api.deepseek.com/v1",
+      "api_model": "deepseek-chat"
+    }
+  }
+}
+```
+
+> **获取 DeepSeek API Key**：访问 https://platform.deepseek.com 注册后创建 API Key，新用户有免费额度。
+
+#### 第二步：注册任务
+
+1. 进入 `scripts\` 文件夹
+2. **右键** `register_task.ps1` → **使用 PowerShell 运行**
+3. 等待提示"任务计划创建成功"
+
+#### 第三步：验证
+
+运行 `check_status.ps1` 查看任务状态，或运行 `run_now.ps1` 手动测试一次。
+
+### 3.3 快速上手（全自动 v2 模式）
 
 #### 第一步：确认配置
 
@@ -127,10 +189,7 @@ Phase 3 合并生成完整报告
 
 ```json
 {
-  "mode": "auto_v2",
-  "schedule": {
-    "time": "06:30"
-  }
+  "mode": "auto_v2"
 }
 ```
 
@@ -162,13 +221,25 @@ Phase 3 合并生成完整报告
     "run_if_missed": true                   // 错过时间后是否补跑
   },
   
-  "mode": "auto_v2",                        // 运行模式：auto_v2 / semi_auto / ai_api
+  "mode": "ai_api",                         // 运行模式：auto_v2 / semi_auto / ai_api
+  
+  "modes": {
+    "ai_api": {                              // AI API 全自动模式配置
+      "api_provider": "deepseek",             // API 提供商
+      "api_key": "",                          // API Key（必填）
+      "api_base_url": "https://api.deepseek.com/v1",  // API Base URL
+      "api_model": "deepseek-chat",           // 模型名称
+      "max_tokens": 4096,                    // 最大输出 token 数
+      "temperature": 0.3                     // 生成温度（越低越稳定）
+    }
+  },
   
   "paths": {
     "python_exe": "python",                 // Python 可执行文件路径
     "script_dir": "../分阶段生成方案",       // Python脚本目录
     "gen_v2_script": "gen_report_v2.py",    // v2全自动脚本
     "gen_final_script": "gen_report_final.py", // 分阶段脚本
+    "fill_elements_script": "fill_elements_api.py", // AI API填写脚本
     "output_dir": "../../归档",             // 输出目录
     "log_dir": "./logs"                     // 日志目录
   },
@@ -202,17 +273,60 @@ Phase 3 合并生成完整报告
 
 修改后**无需重新注册任务**，下次执行时自动读取新配置。
 
-### 4.3 切换半自动模式
+### 4.3 配置 AI API（ai_api 模式）
+
+#### 方式一：在 config.json 中配置
 
 ```json
 {
-  "mode": "semi_auto",
+  "mode": "ai_api",
   "modes": {
-    "semi_auto": {
-      "enabled": true
+    "ai_api": {
+      "api_key": "sk-xxxxxxxxxxxx",
+      "api_base_url": "https://api.deepseek.com/v1",
+      "api_model": "deepseek-chat"
     }
   }
 }
+```
+
+#### 方式二：通过环境变量配置（推荐，避免 Key 写入文件）
+
+```powershell
+# 在 PowerShell 中设置环境变量（持久化）
+[Environment]::SetEnvironmentVariable("XWLB_AI_API_KEY", "sk-xxxxxxxxxxxx", "User")
+[Environment]::SetEnvironmentVariable("XWLB_AI_BASE_URL", "https://api.deepseek.com/v1", "User")
+[Environment]::SetEnvironmentVariable("XWLB_AI_MODEL", "deepseek-chat", "User")
+```
+
+设置后 config.json 中的 api_key 可留空，脚本会自动读取环境变量。
+
+#### 方式三：使用本地 Ollama（完全免费）
+
+1. 安装 [Ollama](https://ollama.com)
+2. 下载模型：`ollama pull qwen2.5:14b`
+3. 配置：
+
+```json
+{
+  "modes": {
+    "ai_api": {
+      "api_key": "ollama",
+      "api_base_url": "http://localhost:11434/v1",
+      "api_model": "qwen2.5:14b"
+    }
+  }
+}
+```
+
+### 4.4 切换运行模式
+
+修改 `config.json` 中的 `mode` 字段：
+
+```json
+"mode": "auto_v2"     // 全自动正则模式（无需API）
+"mode": "semi_auto"   // 半自动分阶段模式
+"mode": "ai_api"      // AI API全自动模式（推荐）
 ```
 
 **半自动模式使用流程**：
@@ -332,11 +446,29 @@ logs/
 
 ### Q5: 半自动模式可以让 AI 自动填写吗？
 
-**A**: 可以。你可以用任意 AI 工具读取数据源 JSON 并填写结果，保存为指定文件名即可。脚本只检测文件是否存在，不关心填写方式。
+**A**: 可以。你可以用任意 AI 工具读取数据源 JSON 并填写结果，保存为指定文件名即可。脚本只检测文件是否存在，不关心填写方式。也可以使用 `ai_api` 模式全自动填写。
 
-### Q6: 后续会支持 AI API 全自动模式吗？
+### Q6: AI API 模式如何配置？
 
-**A**: 配置中已预留 `ai_api` 模式，如需接入可自行扩展或提需求。
+**A**: 三种方式：
+1. 在 `config.json` 的 `modes.ai_api.api_key` 中填写 API Key
+2. 设置环境变量 `XWLB_AI_API_KEY`
+3. 使用本地 Ollama（完全免费），详见 4.3 节
+
+推荐使用 DeepSeek（性价比最高，新用户有免费额度）。
+
+### Q7: AI API 模式生成质量如何？
+
+**A**: AI API 模式使用与 TeleAgent 相同的分阶段流程（Phase 1-3），六要素由外部 AI API 填写，质量与 TeleAgent 手动生成一致。仅消耗外部 API 费用（DeepSeek 约 0.01 元/天），不消耗 TeleAgent 积分。
+
+### Q8: AI API 调用失败怎么办？
+
+**A**: 脚本内置 3 次重试机制。如果全部失败：
+- 检查 API Key 是否正确
+- 检查网络连接
+- 查看 `logs/` 目录下的日志
+- 可手动填写六要素后运行 `check_and_merge.ps1` 合并
+- 或临时切换到 `auto_v2` 模式（正则提取，质量稍低但零依赖）
 
 ---
 
@@ -345,3 +477,6 @@ logs/
 | 版本 | 日期 | 变更 |
 |------|------|------|
 | v1.0.0 | 2026-09-13 | 初始版本：支持 auto_v2 / semi_auto 两种模式，任务计划注册/卸载，日志监控 |
+| v1.1.0 | 2026-09-16 | 新增 ai_api 模式：外部 AI API 全自动填写六要素，不消耗 TeleAgent 积分，支持 DeepSeek/通义千问/Ollama 等 OpenAI 兼容接口 |
+
+> AI生成

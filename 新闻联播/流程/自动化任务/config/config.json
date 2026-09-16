@@ -7,7 +7,7 @@
     "timezone": "China Standard Time",
     "run_if_missed": true
   },
-  "mode": "auto_v2",
+  "mode": "ai_api",
   "modes": {
     "auto_v2": {
       "description": "全自动模式（v2正则版）- 零人工干预，使用正则提取六要素",
@@ -20,12 +20,14 @@
       "merge_check_max_hours": 24
     },
     "ai_api": {
-      "description": "AI API全自动模式 - 调用AI API自动填写六要素（需配置API Key）",
-      "enabled": false,
-      "api_provider": "",
+      "description": "AI API全自动模式 - 调用外部AI API自动填写六要素，不消耗TeleAgent积分",
+      "enabled": true,
+      "api_provider": "deepseek",
       "api_key": "",
-      "api_model": "",
-      "api_base_url": ""
+      "api_base_url": "https://api.deepseek.com/v1",
+      "api_model": "deepseek-chat",
+      "max_tokens": 4096,
+      "temperature": 0.3
     }
   },
   "paths": {
@@ -33,6 +35,7 @@
     "script_dir": "../分阶段生成方案",
     "gen_v2_script": "gen_report_v2.py",
     "gen_final_script": "gen_report_final.py",
+    "fill_elements_script": "fill_elements_api.py",
     "output_dir": "../../归档",
     "log_dir": "./logs"
   },

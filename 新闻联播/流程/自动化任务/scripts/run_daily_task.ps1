@@ -1,14 +1,15 @@
-<#
+﻿<#
 .SYNOPSIS
 新闻联播每日总结 - 定时任务主执行脚本
 
 .DESCRIPTION
 根据配置文件自动执行新闻联播总结报告生成任务
-支持三种模式：auto_v2（全自动正则）、semi_auto（半自动分阶段）、ai_api（AI API全自动）
+支持三种模式：auto_v2（全自动正则）、semi_auto（半自动分阶段）、ai_api（外部AI API全自动）
 
 .NOTES
-版本: v1.0.0
-日期: 2026-09-13
+版本: v1.1.0
+日期: 2026-09-16
+变更: 新增 ai_api 模式（外部AI API填写六要素，不消耗TeleAgent积分）
 #>
 
 $ErrorActionPreference = "Continue"
@@ -384,8 +385,79 @@ function Main {
         }
         
         "ai_api" {
-            Write-Warning "AI API 模式暂未实现，请使用 auto_v2 或 semi_auto 模式"
-            $success = $false
+            # Phase 1: 生成1-5部分 + 数据源JSON
+            Write-Log "========== 模式: AI API 全自动 =========="
+            Write-Log "使用外部 AI API 填写六要素，不消耗 TeleAgent 积分"
+            
+            $phase1Success = Invoke-WithRetry -ScriptBlock {
+                param($d, $c) Invoke-SemiAutoPhase1 -DateStr $d -Config $c
+            } -MaxRetries $config.retry.max_retries -RetryIntervalSeconds $config.retry.retry_interval_seconds -ArgumentList $dateStr, $config
+            
+            if (-not $phase1Success) {
+                Write-Error "Phase 1 失败，无法继续 AI API 模式"
+                $success = $false
+                break
+            }
+            
+            # Phase 2: 调用 AI API 填写六要素
+            Write-Log "========== Phase 2: AI API 填写六要素 =========="
+            $fillScript = Join-Path (Join-Path $ProjectRoot $config.paths.script_dir) "fill_elements_api.py"
+            $pythonExe = $config.paths.python_exe
+            $configPath = Join-Path $ProjectRoot "config\config.json"
+            
+            if (-not (Test-Path $fillScript)) {
+                Write-Error "AI API 填写脚本不存在: $fillScript"
+                $success = $false
+                break
+            }
+            
+            $aiApiConfig = $config.modes.ai_api
+            $apiKey = $aiApiConfig.api_key
+            $apiBaseUrl = $aiApiConfig.api_base_url
+            $apiModel = $aiApiConfig.api_model
+            
+            # 构建命令参数
+            $fillArgs = @($fillScript, $dateStr, "--config", $configPath, "--force")
+            
+            try {
+                Write-Log "执行 AI API 填写脚本..."
+                $output = & $pythonExe @fillArgs 2>&1
+                $exitCode = $LASTEXITCODE
+                
+                foreach ($line in $output) {
+                    Write-Log "  [AI-API] $line"
+                }
+                
+                if ($exitCode -eq 0) {
+                    Write-Success "Phase 2 AI API 填写完成"
+                    
+                    # Phase 3: 合并生成完整报告
+                    Write-Log "========== Phase 3: 合并完整报告 =========="
+                    $mergeScript = Join-Path (Join-Path $ProjectRoot $config.paths.script_dir) $config.paths.gen_final_script
+                    
+                    $mergeOutput = & $pythonExe $mergeScript $dateStr --merge 2>&1
+                    $mergeExitCode = $LASTEXITCODE
+                    
+                    foreach ($line in $mergeOutput) {
+                        Write-Log "  [Merge] $line"
+                    }
+                    
+                    if ($mergeExitCode -eq 0) {
+                        Write-Success "Phase 3 合并完成，完整报告已生成"
+                        $success = $true
+                    } else {
+                        Write-Error "Phase 3 合并失败，退出码: $mergeExitCode"
+                        $success = $false
+                    }
+                } else {
+                    Write-Error "Phase 2 AI API 填写失败，退出码: $exitCode"
+                    Write-Log "降级提示: 可手动填写六要素后运行 check_and_merge.ps1"
+                    $success = $false
+                }
+            } catch {
+                Write-Error "AI API 模式执行异常: $_"
+                $success = $false
+            }
         }
         
         default {
