@@ -1,0 +1,62 @@
+﻿=== 自动化任务 目录树 ===
+C:\Users\Administrator\Documents\这是什么\JK-temp\新闻联播\流程\自动化任务\config
+C:\Users\Administrator\Documents\这是什么\JK-temp\新闻联播\流程\自动化任务\logs
+C:\Users\Administrator\Documents\这是什么\JK-temp\新闻联播\流程\自动化任务\scripts
+C:\Users\Administrator\Documents\这是什么\JK-temp\新闻联播\流程\自动化任务\README.md
+C:\Users\Administrator\Documents\这是什么\JK-temp\新闻联播\流程\自动化任务\config\config.json
+C:\Users\Administrator\Documents\这是什么\JK-temp\新闻联播\流程\自动化任务\logs\task_20260916.log
+C:\Users\Administrator\Documents\这是什么\JK-temp\新闻联播\流程\自动化任务\scripts\check_and_merge.ps1
+C:\Users\Administrator\Documents\这是什么\JK-temp\新闻联播\流程\自动化任务\scripts\check_status.ps1
+C:\Users\Administrator\Documents\这是什么\JK-temp\新闻联播\流程\自动化任务\scripts\register_task.ps1
+C:\Users\Administrator\Documents\这是什么\JK-temp\新闻联播\流程\自动化任务\scripts\run_daily_task.ps1
+C:\Users\Administrator\Documents\这是什么\JK-temp\新闻联播\流程\自动化任务\scripts\run_now.ps1
+C:\Users\Administrator\Documents\这是什么\JK-temp\新闻联播\流程\自动化任务\scripts\unregister_task.ps1
+
+=== 用户目录下可能的相关脚本 ===
+C:\Users\Administrator\.sheetagent
+C:\Users\Administrator\.trae-cn
+
+=== 桌面 ===
+C:\Users\Administrator\Desktop\Office
+C:\Users\Administrator\Desktop\zhishandushu_xz7.com
+C:\Users\Administrator\Desktop\【书刊】渤海小吏 电子书
+C:\Users\Administrator\Desktop\主机电脑
+C:\Users\Administrator\Desktop\哲学文学电子书
+C:\Users\Administrator\Desktop\定时任务脚本
+C:\Users\Administrator\Desktop\常用笔记模板 (可打印)
+C:\Users\Administrator\Desktop\红楼梦衣食住行词条
+C:\Users\Administrator\Desktop\起点总推荐榜TOP1-120名小说
+C:\Users\Administrator\Desktop\desktop.ini
+C:\Users\Administrator\Desktop\DirectX修复工具.lnk
+C:\Users\Administrator\Desktop\Docker Desktop.lnk
+C:\Users\Administrator\Desktop\DSH Desktop.lnk
+C:\Users\Administrator\Desktop\Excel.lnk
+C:\Users\Administrator\Desktop\FlyingMouse Format.lnk
+C:\Users\Administrator\Desktop\MangoDisk.lnk
+C:\Users\Administrator\Desktop\Mocreak.lnk
+C:\Users\Administrator\Desktop\Pavise_纯净版【宝藏星球屋】.7z
+C:\Users\Administrator\Desktop\Sucrose_Bundle_.NET_9.0_x64_25.1.20.0_Setup【宝藏星球屋】.7z
+C:\Users\Administrator\Desktop\Trae CN.lnk
+C:\Users\Administrator\Desktop\TRAE Work CN.lnk
+C:\Users\Administrator\Desktop\TraeWork每日自动签到.zip
+C:\Users\Administrator\Desktop\UU浏览器.lnk
+C:\Users\Administrator\Desktop\WinSCP.lnk
+C:\Users\Administrator\Desktop\Word.lnk
+C:\Users\Administrator\Desktop\WorkBuddy.lnk
+C:\Users\Administrator\Desktop\【win+mac】芒果磁盘清理 MangoDisk-v1.0.3-【宝藏星球屋】.7z
+C:\Users\Administrator\Desktop\万兴脑图.lnk
+C:\Users\Administrator\Desktop\夸克.lnk
+C:\Users\Administrator\Desktop\夸克网盘.lnk
+C:\Users\Administrator\Desktop\定时任务脚本.zip
+C:\Users\Administrator\Desktop\彩读.lnk
+C:\Users\Administrator\Desktop\彩读找书.lnk
+C:\Users\Administrator\Desktop\新建 Microsoft Excel 工作表.xlsx
+C:\Users\Administrator\Desktop\红楼梦.txt
+C:\Users\Administrator\Desktop\红楼梦衣食住行词条.zip
+C:\Users\Administrator\Desktop\至善读书.lnk
+C:\Users\Administrator\Desktop\西游记.txt
+C:\Users\Administrator\Desktop\豆包.lnk
+C:\Users\Administrator\Desktop\资治通鉴.txt
+C:\Users\Administrator\Desktop\金瓶梅1.txt
+C:\Users\Administrator\Desktop\飞鼠格式 FlyingMouse Format-v0.6.1-【宝藏星球屋】.7z
+

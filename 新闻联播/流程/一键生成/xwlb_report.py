@@ -38,6 +38,16 @@
                       （索引每页约 1.4 天，历史日期在第 10-80 页，旧实现只翻 5 页
                       导致逐条链接全退化成父页），并按 URL ID 还原播出顺序；
                       第四部分每条快讯改为独立成段（原先连续引用行会被渲染成一大坨）
+  v5.4.0  2026-09-16  脱敏收口：extract_six_elements 出口统一脱敏 + render_report
+                      出口整篇兜底。原因是「原因/方式」等列直接引用正文原文，
+                      而正文传入时是未脱敏的，批量重建时在 0622/0714/0720/0724/
+                      0907/0914 六份上漏出真实人名（习近平/特朗普/斯塔默）；
+                      主体抽取补三类：①「记者从X了解到」句式（0604 国铁集团、
+                      0615 人力资源社会保障部）；②机构常用简称（国铁集团/中国
+                      消费者协会/世界卫生组织/中广核等，词典原只收全称）；
+                      ③「我国…」开头与地名开头兜底（仅在前序规则全落空时生效，
+                      对已达标日期零影响：0915 逐列对比差异 0 行）。
+                      0604 主体覆盖率 70.8%→91.7%，0615 66.7%→85.7%
 """
 
 import argparse
@@ -990,6 +1000,26 @@ INSTITUTIONS = {
     "世界银行": "世界银行",
     "国际货币基金组织": "国际货币基金组织",
     "国际原子能机构": "国际原子能机构",
+    "世界卫生组织": "世界卫生组织",
+    "世卫组织": "世界卫生组织",
+    "世卫": "世界卫生组织",
+    # 高频实体与常用简称（2026-09-16 批量重建时定位到的漏抽项：
+    #   正文写的是简称，词典只收了全称 → 主体退化为「—」）
+    "国铁集团": "中国国家铁路集团有限公司",
+    "中国国家铁路集团有限公司": "中国国家铁路集团有限公司",
+    "中国消费者协会": "中国消费者协会",
+    "人力资源社会保障部": "中华人民共和国人力资源和社会保障部",
+    "中广核": "中国广核集团有限公司",
+    "中国船舶集团": "中国船舶集团有限公司",
+    "国家电网": "国家电网有限公司",
+    "南方电网": "中国南方电网有限责任公司",
+    "中国石油": "中国石油天然气集团有限公司",
+    "中国石化": "中国石油化工集团有限公司",
+    "国家电投": "国家电力投资集团有限公司",
+    "中国商飞": "中国商用飞机有限责任公司",
+    "中国铁建": "中国铁建股份有限公司",
+    "中国中铁": "中国中铁股份有限公司",
+    "三峡集团": "中国长江三峡集团有限公司",
 }
 
 # 机构类主体的结尾特征词（用于兜底判定）
@@ -1041,6 +1071,12 @@ COUNTRY_TO_PLACE = {
     "塞尔维亚": "塞尔维亚", "保加利亚": "保加利亚", "卡塔尔": "卡塔尔",
     "越南": "越南", "泰国": "泰国", "新加坡": "新加坡", "巴西": "巴西",
     "澳大利亚": "澳大利亚", "加拿大": "加拿大",
+    "蒙古": "蒙古", "蒙古国": "蒙古", "马来西亚": "马来西亚", "印尼": "印度尼西亚",
+    "巴基斯坦": "巴基斯坦", "阿富汗": "阿富汗", "叙利亚": "叙利亚", "伊拉克": "伊拉克",
+    "埃及": "埃及", "南非": "南非", "尼日利亚": "尼日利亚", "肯尼亚": "肯尼亚",
+    "刚果（金）": "刚果民主共和国", "刚果金": "刚果民主共和国", "苏丹": "苏丹",
+    "缅甸": "缅甸", "老挝": "老挝", "尼泊尔": "尼泊尔", "斯里兰卡": "斯里兰卡",
+    "哈萨克斯坦": "哈萨克斯坦", "乌兹别克斯坦": "乌兹别克斯坦", "阿联酋": "阿联酋",
 }
 
 # 事件核心对象类的特征词
@@ -1305,6 +1341,17 @@ def extract_subject(safe_title, text, category, is_brief=False):
     if hits:
         return hits[0]
 
+    # T4b 「记者从X了解到 / 据X介绍」——联播快讯最高频的消息来源句式
+    #   实测漏抽：0604"记者从国铁集团了解到"、0615"记者从人力资源社会保障部了解到"
+    m = re.search(
+        r"(?:记者从|据)([\u4e00-\u9fa5]{2,18}?)(?:了解到|获悉|得知|介绍|表示)",
+        (text or "")[:200],
+    )
+    if m:
+        cand = clean_org_name(m.group(1))
+        if cand and (cand in INSTITUTIONS or cand.endswith(_ORG_SUFFIX)):
+            return cand
+
     # T5 标题主干名词（切成片段取最长的合法名词短语）
     core = derive_event_core(title_plain)
     if core:
@@ -1336,6 +1383,18 @@ def extract_subject(safe_title, text, category, is_brief=False):
     hits = sorted((k for k in INSTITUTIONS if k in (text or "")), key=len, reverse=True)
     if hits:
         return hits[0]
+
+    # T9 标题以国家为主语（"我国3D打印产业进入快速发展新阶段"）
+    #   这类报道没有具体机构，留空反而丢信息；联播语境下「我国」是规范表述。
+    if re.match(r"^(?:我国|中国|全国)", title_plain):
+        return "我国"
+
+    # T9b 标题以地名起头（"新疆天山南北进入夏季牲畜转场高峰期"）
+    #   取最短前缀命中，避免「新疆天山」这种把词组切开的写法。
+    for n in (4, 3, 2):
+        head = title_plain[:n]
+        if head in PLACES:
+            return PLACES[head]
 
     return "—"
 
@@ -1492,7 +1551,18 @@ def extract_method(safe_title, category, text=""):
 
 
 def extract_six_elements(safe_title, raw_title, text, category, date_short, is_brief_domestic=False):
-    return {
+    """
+    六要素抽取。
+
+    出口统一脱敏：cause / method 等字段直接引用正文原文，而正文传入的是**未脱敏**的
+    抓取结果，若不在出口处脱敏，真实人名会顺着第六部分表格带出。
+    实测（rebuild 2026-09-16）漏在「原因」列的有：
+      · "为认真贯彻落实习近平总书记重要指示精神"（0914 / 0724）
+      · "随着斯塔默辞职"（0622）
+      · "为深入推动习近平生态文明思想进教材进课堂进头脑"（0907）
+    subject 若已是 <u>职务</u> 占位符，desensitize 不会破坏它。
+    """
+    raw = {
         "time": date_short,
         "location": extract_location(safe_title, text, category, is_brief_domestic),
         "subject": extract_subject(safe_title, text, category),
@@ -1500,6 +1570,7 @@ def extract_six_elements(safe_title, raw_title, text, category, date_short, is_b
         "cause": extract_cause(safe_title, text, category),
         "method": extract_method(safe_title, category, text),
     }
+    return {k: (desens(v) if isinstance(v, str) else v) for k, v in raw.items()}
 
 
 # ============================================================
@@ -1895,7 +1966,12 @@ def render_report(ds, contract):
     parts.append(_render_footer(ds, contract))
     # 分隔线前后各留一个空行：否则上一行会被 Markdown 解析成 setext 二级标题
     #（文首"**日期：…**"、第一部分"**当日亮点**…"、第四部分验证结论行都踩过这个坑）
-    return "\n\n---\n\n".join(p.rstrip("\n") for p in parts if p and p.strip()) + "\n"
+    text = "\n\n---\n\n".join(p.rstrip("\n") for p in parts if p and p.strip()) + "\n"
+    # 出口统一脱敏（兜底）：抽取层各字段已各自脱敏，但第七部分的数据/文档/机构
+    # 占位符是从正文片段直接摘出来的，历史上漏在「原因」列与 7.5 说明列
+    # （如 "习近平主席密集出席近10场活动"）。此处对整篇成品再做一次，
+    # 新增渲染分支也不可能绕过；对已含 <u>职务</u> 的文本无副作用。
+    return desens(text)
 
 
 def _intro(contract, no, fallback):
@@ -2690,7 +2766,7 @@ def resolve_output_path(date_str):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="新闻联播总结报告 —— 单一入口一键生成器 v5.3",
+        description="新闻联播总结报告 —— 单一入口一键生成器 v5.4",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "示例：\n"

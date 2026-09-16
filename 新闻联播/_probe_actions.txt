@@ -1,0 +1,57 @@
+﻿### check_report_img_daily
+State=Ready  Last=09/16/2026 19:12:01  Next=09/17/2026 19:12:00  LastResult=0
+  Exec : "C:\Program Files\Cloudbase Solutions\Cloudbase-Init\exe\ecloud_img_conf.exe"
+  Args : {"signalId":1,"command":25}
+  WorkDir : 
+  Triggers : MSFT_TaskDailyTrigger | 2026-09-12T19:12:00 | 
+
+### check_report_img_onstart
+State=Ready  Last=09/12/2026 08:53:13  Next=  LastResult=0
+  Exec : "C:\Program Files\Cloudbase Solutions\Cloudbase-Init\exe\ecloud_img_conf.exe"
+  Args : 
+  WorkDir : 
+  Triggers : MSFT_TaskLogonTrigger | 2026-09-12T06:19:00 | 
+
+### check_report_img_random
+State=Ready  Last=09/12/2026 10:20:00  Next=  LastResult=0
+  Exec : "C:\Program Files\Cloudbase Solutions\Cloudbase-Init\exe\ecloud_img_conf.exe"
+  Args : {"signalId":1,"command":25}
+  WorkDir : 
+  Triggers : MSFT_TaskTimeTrigger | 2026-09-12T10:20:00 | 
+
+### TeleAgent积分签到
+State=Ready  Last=09/16/2026 12:06:32  Next=09/17/2026 01:00:00  LastResult=0
+  Exec : cmd.exe
+  Args : /s /c ""C:\Users\Administrator\Desktop\定时任务脚本\run_teleagent_checkin.cmd" >> "C:\Users\Administrator\Desktop\定时任务脚本\checkin_teleagent.log" 2>&1"
+  WorkDir : 
+  Triggers : MSFT_TaskDailyTrigger | 2026-09-16T01:00:00+08:00 | 
+
+### 每日签到
+State=Ready  Last=09/16/2026 00:10:01  Next=09/17/2026 00:10:00  LastResult=0
+  Exec : cmd.exe
+  Args : /s /c "C:\Users\Administrator\Desktop\定时任务脚本\run_checkin.cmd >> C:\Users\Administrator\Desktop\定时任务脚本\checkin.log 2>&1"
+  WorkDir : 
+  Triggers : MSFT_TaskDailyTrigger | 2026-09-07T00:10:00+08:00 | 
+
+### XinWenLianBo_Sync_0600
+State=Ready  Last=09/16/2026 06:00:01  Next=09/17/2026 06:00:00  LastResult=0
+  Exec : powershell.exe
+  Args : -ExecutionPolicy Bypass -NoProfile -File C:\Users\Administrator\Desktop\定时任务脚本\sync_gitee.ps1
+  WorkDir : 
+  Triggers : MSFT_TaskDailyTrigger | 2026-09-05T06:00:00+08:00 | 
+
+### XinWenLianBo_Sync_30min
+State=Ready  Last=09/16/2026 18:57:01  Next=09/16/2026 19:27:00  LastResult=0
+  Exec : powershell.exe
+  Args : -ExecutionPolicy Bypass -NoProfile -File C:\Users\Administrator\Desktop\定时任务脚本\sync_gitee.ps1
+  WorkDir : 
+  Triggers : MSFT_TaskTimeTrigger | 2026-09-09T20:57:00 | PT30M
+
+### 新闻联播每日总结
+State=Ready  Last=11/30/1999 00:00:00  Next=09/17/2026 05:00:00  LastResult=267011
+  Exec : C:\Users\Administrator\AppData\Local\Programs\Python\Python312\python.exe
+  Args : "C:\Users\Administrator\Documents\这是什么\JK-temp\新闻联播\流程\一键生成\xwlb_report.py"
+  WorkDir : C:\Users\Administrator\Documents\这是什么\JK-temp\新闻联播\流程\一键生成
+  Triggers : MSFT_TaskDailyTrigger | 2026-09-16T05:00:00+08:00 | 
+
+
