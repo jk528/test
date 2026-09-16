@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 查看任务计划程序状态和最近日志
 
@@ -7,9 +7,16 @@
 以及查看最近的日志文件
 
 .NOTES
-版本: v1.0.0
-日期: 2026-09-13
+版本: v1.1.0
+日期: 2026-09-16
+变更: 新增「目标报告检查」（以报告文件判定执行结果）；
+      任务日志改为历史追溯（新版任务直接运行 xwlb_report.py，不再写 logs\task_*.log）；
+      新增 -NoPause，便于无人值守/管道调用
 #>
+
+param(
+    [switch]$NoPause
+)
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProjectRoot = Split-Path -Parent $ScriptDir
@@ -65,36 +72,44 @@ if ($task) {
 }
 
 # ============================================================
-# 最近日志
+# 本次应生成的报告是否已就位
+# 说明：计划任务现在直接运行 xwlb_report.py，不再写 logs\task_*.log，
+#       因此以「目标日期的报告文件是否存在」作为执行结果的第一判据。
 # ============================================================
-Write-Step "最近日志"
+Write-Step "目标报告检查"
 
+$archiveRoot = Join-Path $ProjectRoot "..\..\归档"
+$archiveRoot = [System.IO.Path]::GetFullPath($archiveRoot)
+
+$yesterday = (Get-Date).AddDays(-1)
+$expectName = "新闻联播总结_" + $yesterday.ToString("yyyyMMdd") + ".md"
+
+if (Test-Path $archiveRoot) {
+    $hit = Get-ChildItem $archiveRoot -Recurse -Filter $expectName -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($hit) {
+        $kb = [math]::Round($hit.Length / 1KB, 1)
+        Write-Ok "已就位: $expectName（${kb}KB，$($hit.LastWriteTime.ToString('yyyy-MM-dd HH:mm'))）"
+    } else {
+        Write-Warn "未找到 $expectName（对应 $($yesterday.ToString('yyyy-MM-dd')) 的报告尚未生成）"
+    }
+} else {
+    Write-Warn "归档目录不存在: $archiveRoot"
+}
+
+# ============================================================
+# 历史任务日志（旧版 run_daily_task.ps1 留下的记录，仅供追溯）
+# ============================================================
+$LogDir = Join-Path $ProjectRoot "logs"
 if (Test-Path $LogDir) {
-    $logFiles = Get-ChildItem $LogDir -Filter "task_*.log" | Sort-Object LastWriteTime -Descending | Select-Object -First 5
-    
+    $logFiles = Get-ChildItem $LogDir -Filter "task_*.log" -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending | Select-Object -First 3
     if ($logFiles) {
-        Write-Host "  最近的日志文件:"
+        Write-Step "历史任务日志"
         foreach ($f in $logFiles) {
             $sizeKB = [math]::Round($f.Length / 1KB, 1)
             Write-Host "    - $($f.Name) ($sizeKB KB, $($f.LastWriteTime))"
         }
-        
-        # 显示今天的日志最后几行
-        $todayLog = Join-Path $LogDir "task_$(Get-Date -Format 'yyyyMMdd').log"
-        if (Test-Path $todayLog) {
-            Write-Host ""
-            Write-Host "  今日日志最后 20 行:"
-            Write-Host "  --------------------"
-            $lines = Get-Content $todayLog -Tail 20 -Encoding UTF8
-            foreach ($line in $lines) {
-                Write-Host "  $line"
-            }
-        }
-    } else {
-        Write-Warn "暂无日志文件"
     }
-} else {
-    Write-Warn "日志目录不存在"
 }
 
 # ============================================================
@@ -122,5 +137,7 @@ if (Test-Path $archiveDir) {
 }
 
 Write-Host ""
-Write-Host "按任意键退出..."
-$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+if (-not $NoPause) {
+    Write-Host "按任意键退出..."
+    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+}

@@ -25,10 +25,21 @@ AIGC:
 > - 退出码：`0` 通过 / `1` 有 ERROR / `2` 有 CRITICAL（定时任务据此判成败）
 > - 批量重建历史归档：`python ../一键生成/rebuild_archives.py [--all] [--dry-run]`
 >
-> 定时任务入口仍为 `scripts/run_daily_task.ps1`（每日 06:30，默认生成"昨天"，
-> 也支持 `run_daily_task.ps1 20260915` 补跑指定日期）。
+> **计划任务绑定（2026-09-16 变更）**
 >
-> **版本**：v1.1.0  
+> - 任务名：`新闻联播每日总结`；触发：**每天 05:00**（错过时间后开机补跑）
+> - 任务动作**直接调用** `xwlb_report.py`，不再经过 `run_daily_task.ps1` 外壳：
+>   ```
+>   python.exe "流程\一键生成\xwlb_report.py"        # 不带日期参数 = 生成"昨天"
+>   ```
+> - 解释器在注册时自动探测（要求 `import requests` 可用），实际绑定为
+>   `C:\Users\Administrator\AppData\Local\Programs\Python\Python312\python.exe`
+> - 归档同步到 Gitee **默认不在任务里**；需要时用
+>   `register_task.ps1 -WithSync` 重新注册（会追加一条同步动作）
+> - 重新注册：`register_task.ps1 -NonInteractive`（改 `schedule.time` 后必须重跑）
+> - 手动验证：`run_now.ps1`（与任务动作完全一致）→ `check_status.ps1` 查结果
+>
+> **版本**：v1.2.0  
 > **日期**：2026-09-16  
 > **适用系统**：Windows 10 / Windows 11
 
@@ -147,24 +158,18 @@ Phase 3: 脚本合并生成完整报告（<1秒）
 ```
 自动化任务/
 ├── config/
-│   └── config.json          # 配置文件
+│   └── config.json          # 配置文件（schedule.time = 05:00）
 ├── scripts/
-│   ├── register_task.ps1    # 注册任务计划（右键运行）
-│   ├── unregister_task.ps1  # 卸载任务计划（右键运行）
-│   ├── run_daily_task.ps1   # 主执行脚本（被任务计划调用）
-│   ├── run_now.ps1          # 手动立即运行（右键运行）
-│   ├── check_status.ps1     # 查看状态和日志（右键运行）
-│   └── check_and_merge.ps1  # 半自动模式合并检测
-└── logs/                    # 日志目录（自动生成）
-    └── task_YYYYMMDD.log
+│   ├── register_task.ps1    # 注册任务计划（v2.0.0，绑定 xwlb_report.py）
+│   ├── unregister_task.ps1  # 卸载任务计划
+│   ├── run_now.ps1          # 手动立即运行（与任务动作一致）
+│   ├── check_status.ps1     # 查看任务状态 / 目标报告是否就位
+│   ├── run_daily_task.ps1   # [历史] 旧外壳脚本，任务已不再调用
+│   └── check_and_merge.ps1  # [历史] 半自动模式合并检测
+└── logs/                    # [历史] 旧外壳脚本的日志（新任务不再产生）
 
-分阶段生成方案/                # Python 脚本目录
-├── gen_report_v2.py         # 全自动正则版
-├── gen_report_final.py      # 分阶段生成版（Phase 1/3）
-├── fill_elements_api.py     # AI API 六要素填写（Phase 2）⭐新增
-├── fetch_xwlb.py            # 央视网抓取
-├── fetch_iqilu.py           # 齐鲁网抓取
-└── check_md_quality.py      # 质量检测
+一键生成/                     # 现行唯一入口
+└── xwlb_report.py           # 单一入口一键生成器
 ```
 
 ### 3.2 快速上手（AI API 全自动模式 ⭐推荐）
@@ -233,7 +238,7 @@ Phase 3: 脚本合并生成完整报告（<1秒）
   
   "schedule": {
     "enabled": true,                        // 是否启用
-    "time": "06:30",                        // 每日执行时间（24小时制）
+    "time": "05:00",                        // 每日执行时间（24小时制）
     "timezone": "China Standard Time",      // 时区
     "run_if_missed": true                   // 错过时间后是否补跑
   },
@@ -284,11 +289,16 @@ Phase 3: 脚本合并生成完整报告（<1秒）
 
 ```json
 "schedule": {
-  "time": "07:00"  // 改成你想要的时间，格式 HH:mm
+  "time": "05:00"   // 改成你想要的时间，格式 HH:mm
 }
 ```
 
-修改后**无需重新注册任务**，下次执行时自动读取新配置。
+⚠️ **修改时间后必须重新注册任务**：任务计划程序里的触发时间是在注册时写入的，
+不会随配置文件变化：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\register_task.ps1 -NonInteractive
+```
 
 ### 4.3 配置 AI API（ai_api 模式）
 
@@ -362,8 +372,14 @@ Phase 3: 脚本合并生成完整报告（<1秒）
 | 项目 | 说明 |
 |------|------|
 | 用途 | 将定时任务注册到 Windows 任务计划程序 |
-| 权限 | 需要管理员权限（自动请求提升） |
-| 运行方式 | 右键 → 使用 PowerShell 运行 |
+| 权限 | 需要管理员权限（交互模式自动请求提升；`-NonInteractive` 不提权） |
+| 运行方式 | 右键 → 使用 PowerShell 运行，或 `-File register_task.ps1 -NonInteractive` |
+| 参数 | `-Force` 覆盖同名任务；`-WithSync` 追加归档同步动作；`-NoPause` 不停留；`-NonInteractive` 无人值守 |
+
+注册后任务动作为：
+```
+python.exe "<流程>\一键生成\xwlb_report.py"
+```
 
 **注册后可在"任务计划程序"中看到**：
 - 开始菜单搜索"任务计划程序"
@@ -381,43 +397,43 @@ Phase 3: 脚本合并生成完整报告（<1秒）
 
 | 项目 | 说明 |
 |------|------|
-| 用途 | 手动触发一次任务执行（用于测试） |
-| 输出 | 实时显示执行过程和结果 |
+| 用途 | 手动触发一次，命令行与计划任务动作 1 完全相同（所见即 05:00 所得） |
+| 参数 | `-TargetDate 20260915` 补跑指定日期；`-WithSync` 顺带同步；`-NoPause` 不停留 |
+| 输出 | 实时显示执行过程与退出码含义（0 通过 / 1 致命错误 / 2 有 CRITICAL） |
 
 ### 5.4 check_status.ps1 — 查看状态
 
 显示内容包括：
-- 任务计划状态（启用/禁用、下次运行时间）
-- 最近执行结果
-- 今日日志最后 20 行
+- 任务计划状态（启用/禁用、下次运行时间、上次结果）
+- 目标报告检查：昨天的报告是否已生成、体积与时间
+- 历史任务日志（旧外壳脚本遗留）
 - 最近生成的 5 份报告
+- 参数 `-NoPause` 便于无人值守调用
 
-### 5.5 run_daily_task.ps1 — 主执行脚本
+### 5.5 run_daily_task.ps1 — [历史] 旧主执行脚本
 
-被任务计划程序调用，负责：
-1. 读取配置文件
-2. 根据模式执行对应生成逻辑
-3. 失败自动重试（最多 3 次）
-4. 质量检查
-5. Git 同步
-6. 记录完整日志
+**计划任务已不再调用它。** 保留原因：它实现了「读配置 → 按模式分发 →
+失败重试 → Git 同步 → 写日志」的完整外壳，半自动/`auto_v2` 模式仍可用。
+现行任务直接运行 `xwlb_report.py`，避免多一层外壳带来的参数丢失风险。
 
 ---
 
 ## 六、日志与监控
 
-### 6.1 日志文件
+### 6.1 日志来源
 
-日志保存在 `logs\` 目录下，按天生成：
+现行任务**直接运行 `xwlb_report.py`**，日志打到标准输出——由任务计划程序
+静默运行时不会落盘。因此判断"今早跑成功了吗"看这三处：
 
-```
-logs/
-├── task_20260913.log
-├── task_20260912.log
-└── ...
-```
+| 判据 | 位置 |
+|------|------|
+| 报告是否生成 | `归档/YYYY年M月/新闻联播总结_YYYYMMDD.md`（=昨天的日期） |
+| 任务退出码 | `check_status.ps1` 的"上次结果"，或任务计划程序 GUI |
+| 昨晚是否漏跑 | `run_now.ps1` 前台补跑，输出与自检清单直接可见 |
 
-### 6.2 日志格式
+`logs\task_*.log` 是**旧外壳脚本 `run_daily_task.ps1` 的遗留**，新任务不再写入。
+
+### 6.2 旧外壳日志格式（历史）
 
 ```
 [2026-09-13 06:30:01] [INFO] ============================================================
@@ -425,21 +441,17 @@ logs/
 [2026-09-13 06:30:01] [INFO] ============================================================
 [2026-09-13 06:30:01] [INFO] 目标日期: 20260912
 [2026-09-13 06:30:01] [INFO] 执行模式: auto_v2
-[2026-09-13 06:30:02] [INFO] ========== 模式: 全自动 v2（正则版） ==========
 [2026-09-13 06:30:15] [SUCCESS] v2 报告生成成功
-[2026-09-13 06:30:16] [SUCCESS] 质量检查通过
-[2026-09-13 06:30:20] [SUCCESS] Git同步完成
-[2026-09-13 06:30:20] [SUCCESS] 任务执行成功！
 ```
 
 ### 6.3 异常排查
 
 | 现象 | 可能原因 | 排查方法 |
 |------|---------|---------|
-| 任务没运行 | 任务未启用 / 电脑未开机 | 运行 check_status.ps1 查看下次运行时间 |
-| 运行失败 | Python 未安装 / 路径错误 | 查看 logs\ 下当天日志 |
-| 生成的报告很小 | 网络问题 / 数据源异常 | 检查日志中的错误信息 |
-| Git 同步失败 | 仓库配置问题 / 权限 | 手动运行 sync_gitee.ps1 查看错误 |
+| 任务没运行 | 任务未启用 / 电脑关机 / 未登录 | `check_status.ps1` 看下次运行时间；任务需用户处于登录状态 |
+| 昨天的报告没生成 | 抓取失败 / Python 环境变动 | `run_now.ps1` 前台跑一次，看退出码与自检清单 |
+| 生成的报告很小 | 数据源异常 | 前台跑一次看 WARNING；`rebuild_archives.py <日期> --force` 重出 |
+| 任务结果非 0 | 脚本退出码 1 或 2 | 退出码 2 = 报告已生成但自检有 CRITICAL，按清单修 |
 
 ---
 
@@ -447,11 +459,19 @@ logs/
 
 ### Q1: 任务计划程序需要一直开着电脑吗？
 
-**A**: 是的。任务计划程序只在电脑运行时触发。如果电脑关机，任务会在下次开机时自动补跑（`run_if_missed: true`）。
+**A**: 需要电脑处于运行且该用户已登录的状态（任务以 `Interactive` 方式运行，
+这样才能用到 Git 凭据等用户级资源）。若 05:00 时电脑关机，任务会在恢复后
+自动补跑（已设置 `StartWhenAvailable`）。
 
 ### Q2: 可以修改执行时间吗？
 
-**A**: 可以。编辑 `config.json` 中的 `schedule.time` 即可，无需重新注册任务。
+**A**: 可以。编辑 `config.json` 中的 `schedule.time`，然后**必须重新注册**：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\register_task.ps1 -NonInteractive
+```
+
+触发时间在注册时写入任务计划程序，不会自动跟随配置文件变化。
 
 ### Q3: 如何临时暂停任务？
 
@@ -495,5 +515,6 @@ logs/
 |------|------|------|
 | v1.0.0 | 2026-09-13 | 初始版本：支持 auto_v2 / semi_auto 两种模式，任务计划注册/卸载，日志监控 |
 | v1.1.0 | 2026-09-16 | 新增 ai_api 模式：外部 AI API 全自动填写六要素，不消耗 TeleAgent 积分，支持 DeepSeek/通义千问/Ollama 等 OpenAI 兼容接口 |
+| v1.2.0 | 2026-09-16 | 任务动作改为**直接调用 `xwlb_report.py`**（不再经 `run_daily_task.ps1` 外壳）；执行时间 06:30 → **05:00**；解释器自动探测（要求 requests 可导入）；`register_task.ps1` 新增 `-Force/-WithSync/-NoPause/-NonInteractive`；`run_now.ps1` 与任务动作对齐；`check_status.ps1` 新增目标报告检查；全部 PS 脚本统一 UTF-8 BOM |
 
 > AI生成

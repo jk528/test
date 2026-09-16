@@ -6,13 +6,16 @@
 读取 config.json，创建计划任务：每天在 config.schedule.time 指定的时刻
 直接调用「一键生成/xwlb_report.py」生成前一天的报告。
 
-任务动作（主）：
+任务动作（默认）：
     <python.exe> "流程\一键生成\xwlb_report.py"      # 不带日期参数 = 昨天
-任务动作（可选，config.sync.enabled 为 true 时追加）：
+可选追加（加 -WithSync 时）：
     powershell -File 流程\旧版本\sync_gitee.ps1      # 生成后同步归档到 Gitee
 
 .PARAMETER Force
     已存在同名任务时直接覆盖，不弹询问。
+.PARAMETER WithSync
+    在生成动作之后追加"同步归档到 Gitee"。默认不加，避免 05:00 在无人确认时
+    自动推送到远端仓库。
 .PARAMETER NoPause
     结束时不停留等待按键。
 .PARAMETER NonInteractive
@@ -32,6 +35,7 @@
 
 param(
     [switch]$Force,
+    [switch]$WithSync,
     [switch]$NoPause,
     [switch]$NonInteractive
 )
@@ -161,8 +165,8 @@ $actions += New-ScheduledTaskAction `
     -WorkingDirectory $OneShotDir
 Write-Ok "动作1: `"$PythonExe`" `"$ReportScript`"  (WD=$OneShotDir)"
 
-# 动作 2：可选，生成后同步归档
-if ($config.sync -and $config.sync.enabled) {
+# 动作 2：可选，生成后同步归档（仅在显式指定 -WithSync 时加入）
+if ($WithSync) {
     $syncScript = Join-Path $ProjectRoot $config.sync.sync_script
     $syncScript = [System.IO.Path]::GetFullPath($syncScript)
     if (Test-Path $syncScript) {
@@ -172,10 +176,10 @@ if ($config.sync -and $config.sync.enabled) {
             -WorkingDirectory (Split-Path -Parent $syncScript)
         Write-Ok "动作2: 同步归档 -> $syncScript"
     } else {
-        Write-Warn "配置启用了同步但脚本不存在，已跳过: $syncScript"
+        Write-Warn "-WithSync 已指定但同步脚本不存在，已跳过: $syncScript"
     }
 } else {
-    Write-Host "    （同步未启用，跳过动作2）"
+    Write-Host "    （未指定 -WithSync，仅执行报告生成）"
 }
 
 # ============================================================
