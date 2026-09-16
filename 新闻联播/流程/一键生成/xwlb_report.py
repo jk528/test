@@ -32,6 +32,12 @@
                       数值说明改为句读边界起收（消除断字/跨句残片）；补 个百分点 单位；
                       修掉 --- 前缺空行（会被解析成 setext 标题）并加入自检；
                       第七部分第七点五节取值上限 15→30 行
+  v5.3.0  2026-09-16  修复历史日期无法重建（日页给每条标题都加"完整版"前缀，
+                      旧实现拿它当过滤条件会把整页条目删空）；同日 21:00 完整版
+                      重播不再混入常规新闻；齐鲁网抓取改为按日期定位页码 + 跨页补全
+                      （索引每页约 1.4 天，历史日期在第 10-80 页，旧实现只翻 5 页
+                      导致逐条链接全退化成父页），并按 URL ID 还原播出顺序；
+                      第四部分每条快讯改为独立成段（原先连续引用行会被渲染成一大坨）
 """
 
 import argparse
@@ -362,6 +368,10 @@ def fetch_kuaixun_briefs(date_str):
 
 
 _DAY_PREFIX_RE = re.compile(r"^(?:\[视频\]\s*)?完整版\s*(?=[《\u4e00-\u9fa5A-Za-z0-9])")
+# "《新闻联播》 20260901 19:00 / 21:00" 这类**同日的完整版重播**条目：
+# 日页会在 19:00 正片之外再列一条 21:00 重播（时长可达 40 分钟），
+# 若不剔除会被当成一条"常规新闻"混进第六部分。
+_FULL_RERUN_RE = re.compile(r"《新闻联播》\s*\d{8}\s*\d{2}:\d{2}")
 
 
 def _normalize_day_title(title):
@@ -420,7 +430,10 @@ def fetch_videos(date_str):
                     "url": cand[0]["url"], "duration": cand[0]["duration"]}
     if full:
         logger.info(f"完整版链接：{full['url']}")
-    videos = [v for v in videos if v["url"] != (full or {}).get("url")]
+    # 从常规列表剔除：① 已选中的完整版；② 其余完整版重播条目（如同日 21:00 重播）
+    videos = [v for v in videos
+              if v["url"] != (full or {}).get("url")
+              and not _FULL_RERUN_RE.search(v["title"])]
     if full:
         videos.insert(0, full)
     return videos
@@ -616,51 +629,107 @@ def reconcile_brief_roster(ds, iqilu_entries, cctv_dom, cctv_intl):
     )
 
 
-def fetch_iqilu_entries(date_str):
-    """齐鲁网索引页 -> 目标日期的快讯子条目 [{title,url}]"""
-    target = datetime.strptime(date_str, "%Y%m%d").date()
-    entries, seen = [], set()
+_IQILU_DAYS_PER_PAGE = 1.4      # 索引页每页跨度（实测约 52 条 ≈ 1.4 天）
+_IQILU_MAX_PAGE = 140           # 安全上限（实测 index_80 已到 2026-05-29）
+_IQILU_LINK_RE = re.compile(
+    r'<a[^>]*href="(https://v\.iqilu\.com/jcdb/ysxwlb/[^"]+\.html)"[^>]*>(.*?)</a>',
+    re.IGNORECASE | re.DOTALL,
+)
 
-    for page in range(1, 6):
-        url = (
-            "https://v.iqilu.com/jcdb/ysxwlb/index.html"
-            if page == 1
-            else f"https://v.iqilu.com/jcdb/ysxwlb/index_{page - 1}.html"
-        )
-        html = http_get(url)
-        if not html:
+
+def _iqilu_page_url(page):
+    """页码 1 -> index.html；页码 n -> index_{n-1}.html"""
+    return ("https://v.iqilu.com/jcdb/ysxwlb/index.html" if page == 1
+            else f"https://v.iqilu.com/jcdb/ysxwlb/index_{page - 1}.html")
+
+
+def _iqilu_parse_page(html):
+    """索引页 -> ([(url_date, title, url)], {url_date, ...})"""
+    out, dates = [], set()
+    for link, title_raw in _IQILU_LINK_RE.findall(html or ""):
+        title = html_module.unescape(re.sub(r"<[^>]+>", "", title_raw)).strip()
+        if len(title) < 5:
             continue
+        dm = re.search(r"/(\d{6})/(\d{2})/", link)
+        if not dm:
+            continue
+        try:
+            url_date = datetime.strptime(f"{dm.group(1)}{dm.group(2)}", "%Y%m%d").date()
+        except ValueError:
+            continue
+        dates.add(url_date)
+        out.append((url_date, title, link))
+    return out, dates
 
-        pattern = re.compile(
-            r'<a[^>]*href="(https://v\.iqilu\.com/jcdb/ysxwlb/[^"]+\.html)"[^>]*>(.*?)</a>',
-            re.IGNORECASE | re.DOTALL,
-        )
-        for link, title_raw in pattern.findall(html):
-            title = re.sub(r"<[^>]+>", "", title_raw).strip()
-            title = html_module.unescape(title)
-            if not title or len(title) < 5:
-                continue
 
-            dm = re.search(r"/(\d{6})/(\d{2})/", link)
-            if not dm:
-                continue
-            try:
-                url_date = date(int(dm.group(1)[:4]), int(dm.group(1)[4:]), int(dm.group(2)))
-            except ValueError:
-                continue
-            if url_date != target:
-                continue
-            if "完整版" in title:
-                continue
+def _iqilu_find_page(target):
+    """
+    定位覆盖目标日期的索引页。
 
-            clean = re.sub(r"^\d{4}年\d{2}月\d{2}日\s*", "", title)
-            clean = clean.replace("【联播快讯】", "").replace("联播快讯", "").strip()
-            if not clean or link in seen:
+    齐鲁网栏目索引按时间倒序、每页跨度近似恒定（≈1.4 天），因此归档日期
+    散落在第 10-80 页。旧实现只翻前 5 页（≈7 天），历史日期必然 0 条。
+    这里先按跨度估算起点，读出该页真实日期范围后按差值修正页码，几步内收敛
+    （避免从第 1 页线性翻到第 80 页）。
+    """
+    back = (date.today() - target).days
+    page = 1 if back <= 2 else max(1, int(back / _IQILU_DAYS_PER_PAGE) - 1)
+
+    for _ in range(10):
+        html = http_get(_iqilu_page_url(page))
+        _items, dates = _iqilu_parse_page(html)
+        if not dates or target in dates:
+            return page
+        oldest, newest = min(dates), max(dates)
+        if target < oldest:                       # 目标更旧 → 页码增大
+            step = max(1, int((oldest - target).days / _IQILU_DAYS_PER_PAGE))
+            page = min(_IQILU_MAX_PAGE, page + step)
+        elif target > newest:                     # 目标更新 → 页码减小
+            step = max(1, int((target - newest).days / _IQILU_DAYS_PER_PAGE))
+            page = max(1, page - step)
+        else:
+            return page                           # 落在跨度内但当日无收录
+    return page
+
+
+def fetch_iqilu_entries(date_str):
+    """
+    齐鲁网索引页 -> 目标日期的快讯子条目 [{title, url, pos}]
+
+    取数范围：定位页 ±2 页（当日条目可能被拆到相邻页）。
+    排序：按 URL 末尾数字 ID 升序 —— 齐鲁网 ID 随播出顺序递增（实测 0915
+    为 5942169/5942171/…/5942191，与播出顺序完全一致），因此这是最可靠的
+    "还原播出顺序"依据。
+    """
+    target = datetime.strptime(date_str, "%Y%m%d").date()
+    base = _iqilu_find_page(target)
+
+    raw, seen = [], set()
+    for page in (base - 1, base, base + 1, base + 2):
+        if page < 1 or page > _IQILU_MAX_PAGE:
+            continue
+        html = http_get(_iqilu_page_url(page))
+        items, _dates = _iqilu_parse_page(html)
+        for url_date, title, link in items:
+            if url_date != target or "完整版" in title or link in seen:
                 continue
             seen.add(link)
-            entries.append({"title": clean, "url": link, "pos": len(entries) + 1})
+            raw.append((title, link))
 
-    logger.info(f"齐鲁网获取到 {len(entries)} 条目标日期子条目")
+    def _id_key(item):
+        m = re.search(r"/(\d+)\.html$", item[1])
+        return int(m.group(1)) if m else 0
+
+    raw.sort(key=_id_key)
+
+    entries = []
+    for title, link in raw:
+        clean = re.sub(r"^\d{4}年\d{2}月\d{2}日\s*", "", title)
+        clean = clean.replace("【联播快讯】", "").replace("联播快讯", "").strip()
+        if not clean:
+            continue
+        entries.append({"title": clean, "url": link, "pos": len(entries) + 1})
+
+    logger.info(f"齐鲁网获取到 {len(entries)} 条目标日期子条目（定位页 {base}）")
     return entries
 
 
@@ -2621,7 +2690,7 @@ def resolve_output_path(date_str):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="新闻联播总结报告 —— 单一入口一键生成器 v5.2",
+        description="新闻联播总结报告 —— 单一入口一键生成器 v5.3",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "示例：\n"

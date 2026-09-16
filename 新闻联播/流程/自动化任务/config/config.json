@@ -3,7 +3,7 @@
   "task_description": "每天自动生成新闻联播总结报告",
   "schedule": {
     "enabled": true,
-    "time": "06:30",
+    "time": "05:00",
     "timezone": "China Standard Time",
     "run_if_missed": true
   },
