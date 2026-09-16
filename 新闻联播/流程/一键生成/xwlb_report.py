@@ -361,22 +361,66 @@ def fetch_kuaixun_briefs(date_str):
     return out
 
 
+_DAY_PREFIX_RE = re.compile(r"^(?:\[视频\]\s*)?完整版\s*(?=[《\u4e00-\u9fa5A-Za-z0-9])")
+
+
+def _normalize_day_title(title):
+    """
+    归档日页的标题归一化。
+
+    央视网日页对历史日期会给每条标题统一加"完整版"前缀
+    （实测 20260601 / 20260715 / 20260901 / 20260910 全量如此），
+    这跟"该条是不是完整版"无关。这里剥掉前缀与残留的 [视频] 标记，
+    还原真实标题；真正的完整版由"《新闻联播》 + 日期 + 19:00"另行识别。
+    """
+    t = (title or "").replace("[视频]", "").strip()
+    t = _DAY_PREFIX_RE.sub("", t).strip()
+    return t
+
+
 def fetch_videos(date_str):
-    """视频列表 -> [{title, duration, url}]，首条为完整版"""
+    """
+    视频列表 -> [{title, duration, url}]，首条为完整版。
+
+    两条取数路径：
+      · CNTV 栏目接口（近 ~4 天）——标题干净，优先；
+      · 央视网日页（任意历史日期）——⚠️ 归档日页会给**每一条**标题都加
+        "完整版"前缀（实测 20260601 的 14 条、20260901 的 18 条全部如此），
+        这不是"这条是完整版"的意思。旧实现拿 "完整版" 当过滤条件，
+        结果把整页条目删空、直接抛"数据获取失败"——历史日期因此完全无法重建。
+        现在改为**归一化前缀**，而不是丢弃条目。
+    """
     videos = fetch_segments_from_api(date_str)
     if videos:
         logger.info(f"CNTV 栏目接口获取到 {len(videos)} 条分段")
     else:
-        logger.warning("CNTV 栏目接口无结果，退回央视网日页")
-        videos = fetch_xwlb_list(date_str)
-        for r in videos:
-            r["title"] = r["title"].replace("[视频]", "").strip()
+        logger.warning("CNTV 栏目接口无结果（历史日期超出接口回溯范围），退回央视网日页")
+        videos = []
+        for r in fetch_xwlb_list(date_str):
+            videos.append({
+                "title": _normalize_day_title(r.get("title", "")),
+                "duration": r.get("duration", ""),
+                "url": r.get("url", ""),
+            })
         logger.info(f"央视网日页获取到 {len(videos)} 条视频")
 
+    # 完整版：CNTV 接口优先；接口没覆盖到的历史日期，从归一化后的列表里认
     full = fetch_full_video(date_str)
+    if not full:
+        cand = [v for v in videos
+                if "《新闻联播》" in v["title"] and date_str in v["title"]]
+        if not cand:
+            cand = [v for v in videos
+                    if "《新闻联播》" in v["title"]
+                    and time_to_seconds(v["duration"]) > 1500]
+        if cand:
+            cand.sort(key=lambda c: ("19:00" in c["title"], time_to_seconds(c["duration"])),
+                      reverse=True)
+            full = {"title": f"完整版《新闻联播》 {date_str}",
+                    "url": cand[0]["url"], "duration": cand[0]["duration"]}
     if full:
         logger.info(f"完整版链接：{full['url']}")
-    videos = [v for v in videos if "完整版" not in v["title"]]
+    videos = [v for v in videos if v["url"] != (full or {}).get("url")]
     if full:
         videos.insert(0, full)
     return videos
@@ -1893,17 +1937,31 @@ def _brief_line(i, item):
     return f"> ({i}) [{title}]({item['link_url']})"
 
 
+def _brief_block(items):
+    """
+    快讯条目块：**每条独立成段**。
+
+    旧写法把 `> (1) …`、`> (2) …` 连续排下去，Markdown 会把它们合并成
+    同一个段落——渲染出来是一大坨文字，条目之间没有视觉边界。
+    这里在两条之间插入一个空的引用行（`>`），使每条快讯成为独立段落。
+    """
+    out = []
+    for i, item in enumerate(items, start=1):
+        if out:
+            out.append(">")          # 空引用行 = 段落分隔，保证每条独立成段
+        out.append(_brief_line(i, item))
+    return out
+
+
 def _render_part4(ds, contract):
     lines = [f"## {contract['section_titles']['四']}", "", "### 4.1 国内联播快讯", ""]
     if ds.domestic_briefs:
-        for i, item in enumerate(ds.domestic_briefs, start=1):
-            lines.append(_brief_line(i, item))
+        lines += _brief_block(ds.domestic_briefs)
     else:
         lines.append("> 暂无国内快讯数据")
     lines += ["", "### 4.2 国际联播快讯", ""]
     if ds.international_briefs:
-        for i, item in enumerate(ds.international_briefs, start=1):
-            lines.append(_brief_line(i, item))
+        lines += _brief_block(ds.international_briefs)
     else:
         lines.append("> 暂无国际快讯数据")
 
