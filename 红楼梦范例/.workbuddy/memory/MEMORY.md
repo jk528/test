@@ -24,6 +24,10 @@
 - **PowerShell 的 `Add-Type` 与 `New-Object -ComObject` 被安全策略拦截** → 回收站/COM 相关操作改用 Python ctypes。
 
 ## 五、设计方案载体与关键决策
-- 设计方案**现以 `红楼梦文本分析软件设计方案_V2.0.md` 为唯一载体**（HTML 版已全删）。
+- 设计方案有**两份载体，分工明确**：
+  - `红楼梦文本分析软件设计方案_V2.0.md` —— **析域施工底本**（S0–S9 步骤、八大模块、打包方案）。
+  - `红楼梦阅读分析一体化_设计方案_V1.0.md` —— **架构决策记录（ADR）**，参照 ColorTxt 回答「阅读与分析如何共用一套架构」。含：统一锚点模型、混合检索、Tauri+Python stdio JSON-RPC、模块融合表、路线图。
+  - 二者不互相取代：V2.0 仍有效，一体化方案在其上做架构修订（通信 HTTP→stdio、存储 文件→SQLite+导出、补读域 R1–R4）。
+- **统一锚点模型是本项目跨模块的硬约定**：一切位置统一为 `(bookId, chapterIndex, lineStart, lineEnd, charStart?, charEnd?)`；**物理行号是唯一权威，任何替换/简繁等加工只作用于展示层，不得改变物理行号**。
 - 分词锁定 **jieba**；情感分析用项目内置双引擎（`基础/emotion_analysis.py`），**不用 cnsenti**；120 章历史产物口径已锁定，词库扩展只做并集不覆盖。
 - 打包：**onedir + 不启用 UPX + Tauri 壳**；Tauri `externalBin` 实际文件名必须带目标三元组后缀；WebView2 用 `downloadBootstrapper`。
