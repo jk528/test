@@ -19,12 +19,19 @@
 
 退出码：
   0 = 成功（自检无问题）
-  1 = 致命错误（日期非法/数据抓取失败）
-  2 = 已生成但自检发现 CRITICAL 问题
+  1 = 自检存在 ERROR，或日期非法 / 数据抓取失败
+  2 = 自检存在 CRITICAL（定时任务据此判失败）
 
 版本历史：
   v5.0.0  2026-09-16  合并 Phase1/2/3 为单一入口；以模板为骨架；
                       修复九类输出质量缺陷；内置质量自检
+  v5.1.0  2026-09-16  抓取层改用 CNTV 栏目接口（mode=0 完整版 / mode=1 分段），
+                      解决央视网日页漂移导致快讯正文丢失；新增快讯条数交叉校验
+  v5.2.0  2026-09-16  取消对已抓取内容的二次省略：快讯正文不再 clip 到 80 字、
+                      抽取窗口放开到全文；「核心数据」按模板呈现为「数据点：数值」；
+                      数值说明改为句读边界起收（消除断字/跨句残片）；补 个百分点 单位；
+                      修掉 --- 前缺空行（会被解析成 setext 标题）并加入自检；
+                      第七部分第七点五节取值上限 15→30 行
 """
 
 import argparse
@@ -255,13 +262,124 @@ def http_get(url, use_cache=True):
 # ============================================================
 # 抓取层
 # ============================================================
+# ---- CNTV 栏目接口：比央视网日页更稳定的分段来源 ----
+#   mode=0 → 完整版列表（含"本期节目主要内容"brief，即当天全部分条标题）
+#   mode=1 → 分段列表（含每条分段独立 URL、时长 length、发布时间 focus_date）
+#
+# 为什么必须用它：央视网日页会随发布滞后而漂移。实测 20260915 日页把
+# "国内联播快讯"和"完整版"都指到了 09/16 路径，而 09/16 那个页面的
+# content_area 是空的（快讯 9 条正文一条都抓不到）；真正的正文在
+# 09/15 路径下。mode=1 会同时列出 09/15 与 09/16 两条"国内联播快讯"，
+# 按 URL 日期过滤即可取到带正文的那条。
+_CNTV_COLUMN_API = ("https://api.cntv.cn/NewVideo/getVideoListByColumn"
+                    "?id=TOPC1451528971114112&n={n}&sort=desc&p=1&mode={mode}"
+                    "&serviceId=tvcctv")
+_PATH_DATE_RE = re.compile(r"/(\d{4})/(\d{2})/(\d{2})/VIDE")
+_VIDEO_PREFIX_RE = re.compile(r"^\s*\[视频\]\s*")
+_BRIEF_ITEM_RE = re.compile(r"[（(]\d{1,2}[）)]\s*([^；;。]+)")
+
+
+def _cntv_column(mode, n=60):
+    """CNTV 栏目接口 -> [item]，失败返回 []"""
+    raw = http_get(_CNTV_COLUMN_API.format(n=n, mode=mode))
+    if not raw:
+        return []
+    try:
+        data = json.loads(raw)
+    except Exception:
+        logger.warning(f"CNTV 栏目接口返回非 JSON（mode={mode}）")
+        return []
+    items = ((data.get("data") or {}).get("list")) or []
+    return [it for it in items if isinstance(it, dict)]
+
+
+def _url_path_date(url):
+    """URL 里的发布路径日期，如 /2026/09/15/ → '20260915'"""
+    m = _PATH_DATE_RE.search(url or "")
+    return "".join(m.groups()) if m else ""
+
+
+def fetch_full_video(date_str):
+    """
+    完整版：优先 CNTV 接口（URL 日期稳定），返回 {title, url, duration}。
+    同一日期常有 19:00 / 21:00 两条，优先"路径日期 == 目标日期"且 19:00 的那条。
+    """
+    cands = []
+    for it in _cntv_column(0):
+        title = str(it.get("title") or "")
+        url = str(it.get("url") or "")
+        if not url or date_str not in title or "《新闻联播》" not in title:
+            continue
+        cands.append({
+            "title": f"完整版《新闻联播》 {date_str}",
+            "url": url,
+            "duration": str(it.get("length") or ""),
+            "same_day": _url_path_date(url) == date_str,
+            "is19": "19:00" in title,
+        })
+    if not cands:
+        return None
+    cands.sort(key=lambda c: (c["same_day"], c["is19"]), reverse=True)
+    return {k: cands[0][k] for k in ("title", "url", "duration")}
+
+
+def fetch_segments_from_api(date_str):
+    """分段列表：只保留 URL 日期 == 目标日期的条目，并还原播出顺序"""
+    rows, seen = [], set()
+    for it in _cntv_column(1):
+        url = str(it.get("url") or "")
+        if _url_path_date(url) != date_str:
+            continue
+        title = _VIDEO_PREFIX_RE.sub("", str(it.get("title") or "")).strip()
+        if not title or title in seen:
+            continue
+        seen.add(title)
+        rows.append({
+            "title": title, "url": url,
+            "duration": str(it.get("length") or ""),
+        })
+    rows.reverse()          # 接口按时间倒序 → 反转即播出顺序
+    return rows
+
+
+def fetch_kuaixun_briefs(date_str):
+    """
+    快讯父条目 brief 里自带的子条目清单，形如：
+      国际联播快讯：（1）也门胡塞武装称打击沙特空军基地；（2）俄称多方向推进…
+    用于交叉校验"齐鲁网名录 − 央视网常规新闻"对账出来的条数。
+    """
+    out = {}
+    for it in _cntv_column(1):
+        if _url_path_date(str(it.get("url") or "")) != date_str:
+            continue
+        title = _VIDEO_PREFIX_RE.sub("", str(it.get("title") or "")).strip()
+        if "联播快讯" not in title:
+            continue
+        items = [s.strip() for s in _BRIEF_ITEM_RE.findall(str(it.get("brief") or ""))]
+        if items:
+            out[title] = items
+    return out
+
+
 def fetch_videos(date_str):
-    """央视网视频列表 -> [{title, duration, url}]"""
-    results = fetch_xwlb_list(date_str)
-    for r in results:
-        r["title"] = r["title"].replace("[视频]", "").strip()
-    logger.info(f"央视网获取到 {len(results)} 条视频")
-    return results
+    """视频列表 -> [{title, duration, url}]，首条为完整版"""
+    videos = fetch_segments_from_api(date_str)
+    if videos:
+        logger.info(f"CNTV 栏目接口获取到 {len(videos)} 条分段")
+    else:
+        logger.warning("CNTV 栏目接口无结果，退回央视网日页")
+        videos = fetch_xwlb_list(date_str)
+        for r in videos:
+            r["title"] = r["title"].replace("[视频]", "").strip()
+        logger.info(f"央视网日页获取到 {len(videos)} 条视频")
+
+    full = fetch_full_video(date_str)
+    if full:
+        logger.info(f"完整版链接：{full['url']}")
+    videos = [v for v in videos if "完整版" not in v["title"]]
+    if full:
+        videos.insert(0, full)
+    return videos
 
 
 def fetch_video_detail(video_url):
@@ -1194,39 +1312,50 @@ def extract_event(safe_title, text):
 
 def extract_cause(safe_title, text, category):
     """
-    原因/目的：必须锚定在小句开头（避免把"为民初心"切成"为…"）。
+    原因/目的：必须锚定在小句开头，且保留目的标记（"为/推动/旨在"），
+    这样读起来是完整的目的状语（"为全球新兴产业规范有序发展提供标准支撑"），
+    而不是秃掉一截的名词短语。
 
     两个已知坑（实测于 20260915 数据）：
       1. "为"作介词引出受事时会被误当目的词 —— "、为民服务的情况，"
          "，为参观者带来沉浸式体验。" 都不是目的；
       2. 数据描述会被误当原因 —— "，为2007年以来最高水平。"
-    因此先跑强模式（旨在/为了/以…为目标/推动…），再跑弱模式"为X"，
-    且所有候选都要过 _CAUSE_REJECT 与"不得以数字开头"两道闸。
+    因此候选先剥掉目的标记再送去 _CAUSE_REJECT 判定。
     """
     body = "。" + (text or "")[:800]
-    for pat in [
-        r"(?:^|[，。；、])旨在(.{4,32}?)[，。；]",
-        r"(?:^|[，。；、])为了(.{4,32}?)[，。；]",
-        r"(?:^|[，。；、])以(.{4,32}?)为目标",
-        r"(?:^|[，。；、])(?:推动|促进|助力|带动|加快|深化|提升)(.{2,26}?)[，。；]",
-        r"(?:^|[，。；、])为(.{4,32}?)[，。；]",
-    ]:
+    for pat in _CAUSE_PATTERNS:
         for m in re.finditer(pat, body):
-            cand = clip_sentence(m.group(1), 30).strip("，。、； ")
-            if not cand or not (4 <= len(cand) <= 32):
+            cand = clip_sentence(m.group(1), 32).strip("，。、； ")
+            if not cand or not (4 <= len(cand) <= 34):
                 continue
-            if _CAUSE_REJECT.search(cand):
+            if _CAUSE_REJECT.search(_CAUSE_MARKER_RE.sub("", cand)):
                 continue
             return cand
     return "—"
 
 
+_CAUSE_PATTERNS = [
+    r"(?:^|[，。；、])(旨在.{4,32}?)[，。；]",
+    r"(?:^|[，。；、])(为了.{4,32}?)[，。；]",
+    r"(?:^|[，。；、])(以.{4,32}?)为目标",
+    r"(?:^|[，。；、])((?:推动|促进|助力|带动|加快|深化|提升).{2,26}?)[，。；]",
+    r"(?:^|[，。；、])(为.{4,32}?)[，。；]",
+    # 背景型原因：放在最后，优先级最低
+    r"(?:^|[，。；、])(由于.{4,32}?)[，。；]",
+    r"(?:^|[，。；、])(随着.{4,32}?)[，。；]",
+]
+
+# 目的标记：判定合法性前先剥掉，避免"为参观者带来…"里的"为"挡住受事识别
+_CAUSE_MARKER_RE = re.compile(
+    r"^(?:旨在|为了|为|以|推动|促进|助力|带动|加快|深化|提升|由于|随着)"
+)
+
 # 伪原因过滤器：受事短语 / 数据描述 / 名词性残片
 _CAUSE_REJECT = re.compile(
     r"(的情况|的方式|的问题|的方法|的水平|的能力|的体验|的感受|的需求|的举措|"
-    r"的目标|的成果|的成效|的进展|的数据|的信息|的内容|的成效)$"
+    r"的目标|的成果|的成效|的进展|的数据|的信息|的内容)$"
     r"|^\d"
-    r"|^.{0,3}(?:带来|送去|送上|提供|解决|办理|营造)"
+    r"|^.{0,4}(?:带来|送去|送上|提供|解决|办理|营造)"
 )
 
 
@@ -1345,8 +1474,12 @@ _DATA_SRC_RES = [
 
 
 def _data_source(text, elements):
-    """经济要闻的"数据来源"：锚定权威发布结构 → 机构词典 → 兜底 —"""
-    head = (text or "")[:300]
+    """
+    经济要闻的"数据来源"：锚定权威发布结构 → 机构词典 → 兜底 —。
+    两个正则都锚定在「机构 + 发布/统计 + 显示」结构上，全量扫描不会引入噪声，
+    故不再截前 300 字（原截断会漏掉靠后的"国家统计局数据显示"）。
+    """
+    head = text or ""
     for rx in _DATA_SRC_RES:
         m = rx.search(head)
         if m:
@@ -1395,8 +1528,10 @@ def build_section3_fields(category, safe_title, detail, date_display, elements):
 
     elif category == "经济要闻":
         out["datasrc"] = _data_source(text, elements)
-        nums = extract_numbers(text, limit=4)
-        out["keydata"] = "；".join(v for v, _ctx in nums) if nums else "—"
+        # 模板要求"核心数据"呈现为「数据点：数值」，因此用带语境的说明
+        # （说明里已含数值）而不是裸数值——裸的"34.6%"读者无法判断是什么指标。
+        picked = _merge_same_source([c for _v, c in extract_numbers(text, limit=8) if c])
+        out["keydata"] = "；".join(picked[:4]) if picked else "—"
 
     elif category == "社会/文化要闻":
         m = re.search(r"(\d{1,2}月\d{1,2}日)", text)
@@ -1418,15 +1553,72 @@ def build_section3_fields(category, safe_title, detail, date_display, elements):
 _NUM_UNITS = (
     "万亿千瓦时|亿千瓦时|万千瓦时|千瓦时|万亿元|亿美元|亿元|万元|亿吨|万吨|吨|"
     "万公里|公里|千米|米|架次|架|颗|艘|辆|人次|万人|万户|万名|万|"
+    # "个百分点"必须排在"个"前面：正则择先匹配，否则"0.7个百分点"会被截成"0.7个"
+    "个百分点|百分点|"
     "项|个|家|所|场|次|处|只|台|名|人|%|％|倍"
 )
 _NUM_RE = re.compile(rf"(\d+(?:[\.,]\d+)?\s*(?:{_NUM_UNITS}))")
 
 
-# 从停顿标点起头/收尾，保证说明是完整可读的短语而非残片
-_CTX_TAIL_SEP = ("，", "、", "；")
-# 顿号不参与"起头裁剪"，否则"…增长57.2%、34.6%"会被切成空串
-_CTX_HEAD_SEP = ("，", "：", "（")
+# 说明的右边界停顿符：**不含顿号**——
+# "…分别增长57.2%、34.6%" 属于同一条数据，被顿号截断就会丢掉后一个数值
+_CTX_TAIL_SEP = ("，", "；")
+# 说明的左边界：句末标点 / 逗号分号 / 括号 / 空白，一律可作为起头处
+_CTX_BOUND_RE = re.compile(r"[。！？；，：（）()\s]")
+_CTX_LOOKBACK = 40   # 左边界最多向前回溯多少字，保证起头落在边界上
+_CTX_MAX = 46        # 说明总长上限（数值 + 左右上下文）
+
+
+def _number_context(text, start, end, value):
+    """
+    取数值周边的说明窗口：**先找边界，再定长度**。
+
+    旧实现固定回看 26 字、超长就从左侧硬裁，产生两类残片：
+      · 断字起头 —— "子电池、工业机器人产品产量…"（从"锂离子电池"中间切开）
+      · 跨句起头 —— "…世界一流企业。产业研发投入强度达到3.5%"（把上一句也带进来）
+    现在左边界取"最近的一处句读边界"（回溯 40 字，足以越过长定语），
+    右边界取到下一个逗号/分号，从而把"57.2%、34.6%"这类并列数值留在同一条说明里；
+    若加上左文仍超长，则宁可不带左文，也不做断字硬裁。
+    """
+    right = re.split(r"[。；！？\n\s]", text[end:end + 20])[0]
+    for sep in _CTX_TAIL_SEP:
+        if sep in right:
+            right = right[:right.find(sep)]
+            break
+
+    seg = text[max(0, start - _CTX_LOOKBACK):start]
+    last = None
+    for mm in _CTX_BOUND_RE.finditer(seg):
+        last = mm
+    if last:
+        left = seg[last.end():]
+        if len(left) + len(value) + len(right) > _CTX_MAX:
+            left = ""                     # 超长就不带左文，绝不硬裁出断字残片
+    else:
+        # 40 字内没有任何句读 → 整段作左文（长标题里的数值即属此类，
+        # 如"…规上企业营业收入将突破30万亿元"，丢掉左文只剩一个光秃秃的数值）
+        left = seg if len(seg) + len(value) + len(right) <= _CTX_MAX else ""
+    return (left + value + right).strip()
+
+
+def _merge_same_source(items):
+    """
+    同一句话里同源的多个数值（"…产品产量同比分别增长57.2%、34.6%"）只留信息最全的一条，
+    避免"核心数据"出现两条几乎相同、只是数字不同的说明。
+    判据：去掉所有数字与百分号后文本相同 → 视为同源。
+    """
+    key = lambda s: re.sub(r"[\d\.,、%％]+", "", s)
+    out = []
+    for ctx in items:
+        k = key(ctx)
+        for i, kept in enumerate(out):
+            if k == key(kept):
+                if len(ctx) > len(kept):
+                    out[i] = ctx
+                break
+        else:
+            out.append(ctx)
+    return out
 
 
 def extract_numbers(text, limit=12):
@@ -1436,8 +1628,8 @@ def extract_numbers(text, limit=12):
     说明必须**包含数值本身**：旧实现从片段开头累积到超限就停，
     结果数据列出现"134.2公里 | 经钦州市灵山县陆屋镇，沿钦江进入北部湾"
     这种"说明里找不到数值"的错位观感（甚至退化成"密"）。现改为
-    以数值为中心取左右窗口、收到自然停顿边界，超长时只从左侧裁，
-    确保数值始终留在说明里。
+    以数值为中心取左右窗口、收到自然停顿边界，超长时只从左侧按标点裁，
+    确保数值始终留在说明里、说明也始终是完整短语。
     """
     out, seen = [], set()
     text = text or ""
@@ -1450,22 +1642,7 @@ def extract_numbers(text, limit=12):
             continue
         seen.add(val)
 
-        left = re.split(r"[。；！？\n\s]", text[max(0, m.start() - 26):m.start()])[-1]
-        for sep in _CTX_HEAD_SEP:
-            if sep in left:
-                left = left[left.rfind(sep) + 1:]
-                break
-        right = re.split(r"[。；！？\n\s]", text[m.end():m.end() + 16])[0]
-        for sep in _CTX_TAIL_SEP:
-            if sep in right:
-                right = right[:right.find(sep)]
-                break
-
-        ctx = left + val + right
-        if len(ctx) > 30:                     # 只从左边裁，数值不会被切掉
-            drop = len(ctx) - 30
-            ctx = (left[drop:] + val + right) if drop < len(left) else ctx[:30]
-        ctx = ctx.strip() or val
+        ctx = _number_context(text, m.start(), m.end(), val) or val
         out.append((val, ctx))
         if len(out) >= limit:
             break
@@ -1603,7 +1780,9 @@ def render_report(ds, contract):
     parts.append(_render_part6(ds, contract))
     parts.append(_render_part7(ds, contract))
     parts.append(_render_footer(ds, contract))
-    return "\n---\n\n".join(p.rstrip("\n") for p in parts if p and p.strip()) + "\n"
+    # 分隔线前后各留一个空行：否则上一行会被 Markdown 解析成 setext 二级标题
+    #（文首"**日期：…**"、第一部分"**当日亮点**…"、第四部分验证结论行都踩过这个坑）
+    return "\n\n---\n\n".join(p.rstrip("\n") for p in parts if p and p.strip()) + "\n"
 
 
 def _intro(contract, no, fallback):
@@ -1701,8 +1880,13 @@ def _render_part3(ds, contract):
 
 
 def _brief_line(i, item):
-    """快讯行：有正文才附概要，否则只给可点击标题（不拿标题冒充概要）"""
-    ctx = clip_sentence(desens(item.get("summary", "")), 80)
+    """
+    快讯行：正文**原样呈现，不再截断**。
+    央视网快讯页给出的每条子快讯正文本身就是官方定稿的一句话（实测 93-177 字），
+    原先再 clip 到 80 字属于对已抓取内容的二次省略，这里直接全量输出，
+    只做括号闭合与脱敏。
+    """
+    ctx = _close_brackets(re.sub(r"\s+", " ", desens(item.get("summary", "")).strip()))
     title = item["title"]
     if ctx and ctx.strip("。 ") != title.strip("。 "):
         return f"> ({i}) [{title}]({item['link_url']}) — {ctx}"
@@ -1922,8 +2106,8 @@ def _render_part7(ds, contract):
             _title or "", (item or {}).get("summary", ""),
             ((item or {}).get("detail") or {}).get("full_text", ""),
         ])
-        # 每条最多取 4 个，避免单条长稿把 7.5 整张表占满
-        for val, ctx in extract_numbers(scan, limit=4):
+        # 每条最多取 6 个（原先 4 个），避免单条长稿把 7.5 整张表占满
+        for val, ctx in extract_numbers(scan, limit=6):
             if val not in numbers:
                 numbers[val] = (ctx, pos)
         for name, kind_desc in extract_documents([_title or "", (item or {}).get("summary", "")]):
@@ -1978,7 +2162,8 @@ def _render_part7(ds, contract):
               "| 序号 | 占位符 | 说明 | 出现位置 |",
               "|------|--------|------|---------|"]
     if numbers:
-        for i, (val, (ctx, pos)) in enumerate(list(numbers.items())[:15], start=1):
+        # 上限放到 30 条：原先硬截 15 条，等于把已抓到的数据占位符丢掉一半
+        for i, (val, (ctx, pos)) in enumerate(list(numbers.items())[:30], start=1):
             lines.append(f"| {i} | {val} | {ctx} | {pos} |")
     else:
         lines.append("| — | — | 本日无数据占位符 | — |")
@@ -2213,6 +2398,14 @@ def self_check(ds, report, contract):
     if re.search(r"[，、：；]\s*\.\.\.", report):
         add("WARNING", "存在句中硬截断残留（...）")
 
+    # 13) 分隔线前必须留空行，否则上一行会被解析成 setext 二级标题
+    _all = report.split("\n")
+    _bad_hr = [i for i in range(1, len(_all))
+               if _all[i].strip() == "---" and _all[i - 1].strip()]
+    if _bad_hr:
+        _pos = "、".join(str(i + 1) for i in _bad_hr[:5])
+        add("ERROR", f"分隔线 --- 前缺空行 {len(_bad_hr)} 处（第 {_pos} 行）")
+
     return issues
 
 
@@ -2303,6 +2496,18 @@ def build_dataset(date_str, use_cache=True):
         f"国内 {len(dom_rows)} / 国际 {len(intl_rows)}"
     )
 
+    # 与 CNTV 接口 brief 里的子条目清单交叉校验条数（只告警，不阻断）
+    briefs = fetch_kuaixun_briefs(date_str)
+    for bname, rows in (("国内联播快讯", dom_rows), ("国际联播快讯", intl_rows)):
+        expect = briefs.get(bname)
+        if expect and len(expect) != len(rows):
+            logger.warning(
+                f"  {bname} 子条目数与央视网清单不一致："
+                f"央视网 {len(expect)} 条 / 对账后 {len(rows)} 条"
+            )
+            logger.warning(f"    央视网清单：{'；'.join(expect)}")
+            logger.warning(f"    对账结果：{'；'.join(r['title'] for r in rows)}")
+
     dom_url = next((n["url"] for n in ds.news if n["is_dir"] and "国内" in n["title"]), "")
     intl_url = next((n["url"] for n in ds.news if n["is_dir"] and "国际" in n["title"]), "")
 
@@ -2358,7 +2563,7 @@ def resolve_output_path(date_str):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="新闻联播总结报告 —— 单一入口一键生成器 v5.0",
+        description="新闻联播总结报告 —— 单一入口一键生成器 v5.2",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "示例：\n"
@@ -2486,6 +2691,11 @@ def _check_existing(report, contract, date_str):
             issues.append(("ERROR", f"新闻主体覆盖率 {cov:.1f}%（要求≥70%）"))
     if re.search(r"\n---\n\s*\n---\n", report):
         issues.append(("ERROR", "存在连续重复分隔符 ---"))
+    _all = report.split("\n")
+    _bad_hr = [i for i in range(1, len(_all))
+               if _all[i].strip() == "---" and _all[i - 1].strip()]
+    if _bad_hr:
+        issues.append(("ERROR", f"分隔线 --- 前缺空行 {len(_bad_hr)} 处（旧流程产物常见）"))
     return issues
 
 
