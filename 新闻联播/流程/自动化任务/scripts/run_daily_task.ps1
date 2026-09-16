@@ -3,13 +3,15 @@
 新闻联播每日总结 - 定时任务主执行脚本
 
 .DESCRIPTION
-根据配置文件自动执行新闻联播总结报告生成任务
-支持三种模式：auto_v2（全自动正则）、semi_auto（半自动分阶段）、ai_api（外部AI API全自动）
+根据配置文件自动执行新闻联播总结报告生成任务。
+推荐模式：oneshot（一键生成，单一 Python 脚本完成全流程）
+兼容模式：auto_v2（旧正则版）、semi_auto（半自动分阶段）、ai_api（外部AI API）
 
 .NOTES
-版本: v1.1.0
+版本: v2.0.0
 日期: 2026-09-16
-变更: 新增 ai_api 模式（外部AI API填写六要素，不消耗TeleAgent积分）
+变更: 新增 oneshot 模式（指向 流程/一键生成/xwlb_report.py）；
+      新增 Python 解释器自动探测（PATH → 候选路径），避免定时任务环境缺 PATH 时失败
 #>
 
 $ErrorActionPreference = "Continue"
@@ -76,6 +78,97 @@ function Get-TargetDate {
 }
 
 # ============================================================
+# Python 解释器探测
+#   定时任务以服务账户运行时 PATH 可能与交互式登录不同，
+#   因此按「配置值 → 候选路径」顺序探测，并要求 requests 可用
+#   （requests 是本流程唯一的第三方依赖）。
+# ============================================================
+function Resolve-PythonExe {
+    param([psobject]$Config)
+
+    $candidates = @($Config.paths.python_exe)
+    if ($Config.paths.python_fallbacks) {
+        $candidates += $Config.paths.python_fallbacks
+    }
+
+    foreach ($cand in $candidates) {
+        if (-not $cand) { continue }
+
+        $exe = $null
+        if (Test-Path $cand) {
+            $exe = $cand
+        } else {
+            $cmd = Get-Command $cand -ErrorAction SilentlyContinue
+            if ($cmd) { $exe = $cmd.Source }
+        }
+        if (-not $exe) { continue }
+
+        try {
+            & $exe -c "import requests" 2>&1 | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                Write-Log "Python 解释器: $exe"
+                return $exe
+            }
+            Write-Warning "候选解释器缺少 requests，跳过: $exe"
+        } catch {
+            Write-Warning "候选解释器探测异常，跳过: $exe"
+        }
+    }
+
+    Write-Error "未找到可用的 Python 解释器（需已安装 requests）"
+    return $null
+}
+
+# ============================================================
+# 模式零（推荐）：一键生成
+#   单一脚本完成 抓取 → 分类 → 六要素 → 渲染 → 自检，
+#   按日期自动落 归档/YYYY年M月/新闻联播总结_YYYYMMDD.md
+# ============================================================
+function Invoke-OneShotMode {
+    param(
+        [string]$DateStr,
+        [psobject]$Config
+    )
+
+    Write-Log "========== 模式: oneshot（一键生成） =========="
+
+    $scriptPath = Join-Path (Join-Path $ProjectRoot $Config.paths.oneshot_dir) $Config.paths.oneshot_script
+
+    if (-not (Test-Path $scriptPath)) {
+        Write-Error "脚本不存在: $scriptPath"
+        return $false
+    }
+
+    $pythonExe = Resolve-PythonExe -Config $Config
+    if (-not $pythonExe) {
+        return $false
+    }
+
+    Write-Log "执行脚本: $scriptPath"
+    Write-Log "目标日期: $DateStr"
+
+    try {
+        $output = & $pythonExe $scriptPath $DateStr 2>&1
+        $exitCode = $LASTEXITCODE
+
+        foreach ($line in $output) {
+            Write-Log "  [Python] $line"
+        }
+
+        if ($exitCode -eq 0) {
+            Write-Success "一键生成完成，内置自检全部通过"
+            return $true
+        }
+
+        Write-Error "一键生成失败，退出码 $exitCode（1=有 ERROR，2=有 CRITICAL）"
+        return $false
+    } catch {
+        Write-Error "执行脚本异常: $_"
+        return $false
+    }
+}
+
+# ============================================================
 # 模式一：全自动 v2（正则提取六要素）
 # ============================================================
 function Invoke-AutoV2Mode {
@@ -96,7 +189,7 @@ function Invoke-AutoV2Mode {
     Write-Log "执行脚本: $scriptPath"
     Write-Log "目标日期: $DateStr"
     
-    $pythonExe = $Config.paths.python_exe
+    $pythonExe = Resolve-PythonExe -Config $Config
     
     try {
         $output = & $pythonExe $scriptPath $DateStr 2>&1
@@ -141,7 +234,7 @@ function Invoke-SemiAutoPhase1 {
     Write-Log "执行 Phase 1: 生成1-5部分 + 数据源JSON"
     Write-Log "目标日期: $DateStr"
     
-    $pythonExe = $Config.paths.python_exe
+    $pythonExe = Resolve-PythonExe -Config $Config
     
     try {
         $output = & $pythonExe $scriptPath $DateStr 2>&1
@@ -200,7 +293,7 @@ function Invoke-SemiAutoPhase3Check {
     Write-Log "检测到六要素结果JSON，开始 Phase 3 合并..."
     
     $scriptPath = Join-Path (Join-Path $ProjectRoot $Config.paths.script_dir) $Config.paths.gen_final_script
-    $pythonExe = $Config.paths.python_exe
+    $pythonExe = Resolve-PythonExe -Config $Config
     
     try {
         $output = & $pythonExe $scriptPath $DateStr --merge 2>&1
@@ -258,18 +351,28 @@ function Invoke-QualityCheck {
         return $false
     }
     
-    # 运行质量检查脚本（如果存在）
-    $checkScript = Join-Path (Join-Path $ProjectRoot $Config.paths.script_dir) $Config.quality.quality_check_script
-    if (Test-Path $checkScript) {
-        Write-Log "运行质量检查脚本..."
-        $pythonExe = $Config.paths.python_exe
-        try {
-            $output = & $pythonExe $checkScript $reportMd 2>&1
-            foreach ($line in $output) {
-                Write-Log "  [Quality] $line"
+    # 运行外部质量检查脚本（可选）
+    #   一键生成模式已在渲染阶段跑完内置自检（结构/表头/脱敏/链接/覆盖率/一致性），
+    #   并把结论映射成退出码，因此 config 里 quality_check_script 留空即跳过。
+    if (-not $Config.quality.quality_check_script) {
+        Write-Log "未配置外部质量检查脚本（一键生成模式已内置自检），跳过"
+    } else {
+        $checkScript = Join-Path (Join-Path $ProjectRoot $Config.paths.script_dir) $Config.quality.quality_check_script
+        if (Test-Path -PathType Leaf $checkScript) {
+            Write-Log "运行质量检查脚本..."
+            $pythonExe = Resolve-PythonExe -Config $Config
+            if ($pythonExe) {
+                try {
+                    $output = & $pythonExe $checkScript $reportMd 2>&1
+                    foreach ($line in $output) {
+                        Write-Log "  [Quality] $line"
+                    }
+                } catch {
+                    Write-Warning "质量检查脚本执行异常: $_"
+                }
             }
-        } catch {
-            Write-Warning "质量检查脚本执行异常: $_"
+        } else {
+            Write-Warning "质量检查脚本不存在，跳过: $checkScript"
         }
     }
     
@@ -312,10 +415,14 @@ function Invoke-GitSync {
 
 # ============================================================
 # 重试机制
+#   注意：必须显式声明并转发 -ArgumentList。
+#   旧版函数没有该参数，调用方传进来的 -ArgumentList 被静默丢弃，
+#   脚本块里的 param($d, $c) 全是 $null，等于带着空日期去执行。
 # ============================================================
 function Invoke-WithRetry {
     param(
         [scriptblock]$ScriptBlock,
+        [object[]]$ArgumentList = @(),
         [int]$MaxRetries = 3,
         [int]$RetryIntervalSeconds = 300
     )
@@ -325,7 +432,7 @@ function Invoke-WithRetry {
         $attempt++
         Write-Log "执行尝试 $attempt / $MaxRetries"
         
-        $result = & $ScriptBlock
+        $result = & $ScriptBlock @ArgumentList
         
         if ($result) {
             return $true
@@ -345,6 +452,8 @@ function Invoke-WithRetry {
 # 主函数
 # ============================================================
 function Main {
+    param([string]$DateOverride = "")
+    
     Write-Log "============================================================"
     Write-Log "  新闻联播每日总结 - 定时任务开始执行"
     Write-Log "============================================================"
@@ -356,9 +465,14 @@ function Main {
         exit 1
     }
     
-    # 获取目标日期
-    $dateStr = Get-TargetDate
-    Write-Log "目标日期: $dateStr"
+    # 获取目标日期（支持命令行指定，便于补跑历史日期）
+    if ($DateOverride -and $DateOverride -match '^\d{8}$') {
+        $dateStr = $DateOverride
+        Write-Log "目标日期（命令行指定）: $dateStr"
+    } else {
+        $dateStr = Get-TargetDate
+        Write-Log "目标日期: $dateStr"
+    }
     Write-Log "执行模式: $($config.mode)"
     Write-Log ""
     
@@ -366,6 +480,12 @@ function Main {
     
     # 根据模式执行
     switch ($config.mode) {
+        "oneshot" {
+            # 不套 PS 层重试：网络重试由 Python 脚本自己负责（请求失败会自动重试 3 次），
+            # 而自检不通过属于内容质量问题，重试既无意义又会把失败掩盖成成功。
+            $success = Invoke-OneShotMode -DateStr $dateStr -Config $config
+        }
+
         "auto_v2" {
             $success = Invoke-WithRetry -ScriptBlock {
                 param($d, $c) Invoke-AutoV2Mode -DateStr $d -Config $c
@@ -402,7 +522,7 @@ function Main {
             # Phase 2: 调用 AI API 填写六要素
             Write-Log "========== Phase 2: AI API 填写六要素 =========="
             $fillScript = Join-Path (Join-Path $ProjectRoot $config.paths.script_dir) "fill_elements_api.py"
-            $pythonExe = $config.paths.python_exe
+            $pythonExe = Resolve-PythonExe -Config $config
             $configPath = Join-Path $ProjectRoot "config\config.json"
             
             if (-not (Test-Path $fillScript)) {
@@ -488,4 +608,6 @@ function Main {
 }
 
 # 执行主函数
-Main
+#   用法: powershell -File run_daily_task.ps1            # 生成昨天
+#         powershell -File run_daily_task.ps1 20260915   # 补跑指定日期
+Main -DateOverride $args[0]

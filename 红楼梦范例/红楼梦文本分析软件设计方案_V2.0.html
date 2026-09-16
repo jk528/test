@@ -1,0 +1,1889 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>红楼梦范例全量分析 · 文本分析软件设计方案 V2.0（附具体实施步骤与工具地址）</title>
+<style>
+/* ========== Reset & Base ========== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { min-height: 100%; }
+body {
+  position: relative;
+  font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", "Noto Sans SC", sans-serif;
+  color: #1f2d3d;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 40px 24px;
+  background: linear-gradient(160deg, #f8fafc 0%, #ffffff 45%, #cfe0f5 100%);
+  min-height: 100vh;
+}
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 45% 35% at 12% 8%, rgba(255,255,255,0.55) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 30% at 88% 90%, rgba(255,255,255,0.45) 0%, transparent 55%);
+}
+body > * { position: relative; z-index: 1; }
+
+/* ========== 封面 Hero ========== */
+.title {
+  position: relative;
+  overflow: hidden;
+  padding: 56px 40px;
+  text-align: center;
+  background: linear-gradient(135deg, #1e3a5f 0%, #3b82f6 50%, #4f8ef7 100%);
+  color: #ffffff;
+  border-radius: 16px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+}
+.title::before {
+  content: '';
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse 70% 55% at 18% 82%, rgba(255,255,255,0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 55% 40% at 82% 18%, rgba(255,255,255,0.08) 0%, transparent 55%);
+  pointer-events: none;
+}
+.title > * { position: relative; z-index: 1; }
+.title h1 { font-size: 27px; font-weight: 800; margin: 0 0 14px 0; letter-spacing: 1px; color: #ffffff; }
+.title .accent-line {
+  width: 48px; height: 3px; background: rgba(255,255,255,0.85);
+  margin: 0 auto 18px; border-radius: 2px;
+}
+.title p { font-size: 15px; color: rgba(255,255,255,0.88); margin: 0; line-height: 1.75; }
+.title .ver {
+  display: inline-block; margin-bottom: 14px; padding: 3px 12px; border-radius: 20px;
+  background: rgba(255,255,255,0.18); font-size: 12px; letter-spacing: 1px; color: #fff;
+}
+
+/* ========== 章节标题 ========== */
+h1.heading {
+  font-size: 26px;
+  color: #0f1e33;
+  margin: 40px 0 16px 0;
+  font-weight: 700;
+  border-left: 4px solid #3b82f6;
+  padding-left: 16px;
+}
+h2.heading {
+  font-size: 21px;
+  color: #0f1e33;
+  margin: 28px 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #c9d6f3;
+  font-weight: 600;
+}
+h3.sub {
+  font-size: 17px;
+  color: #0f1e33;
+  margin: 22px 0 10px;
+  font-weight: 600;
+}
+h4.sub4 {
+  font-size: 15px;
+  color: #1e3a5f;
+  margin: 16px 0 8px;
+  font-weight: 700;
+}
+
+/* ========== 正文 / 列表 ========== */
+.paragraph { font-size: 15px; color: #1f2d3d; line-height: 1.85; margin: 0 0 16px 0; text-indent: 2em; }
+.paragraph.no-indent { text-indent: 0; }
+.list { margin: 0 0 16px 0; padding-left: 24px; font-size: 15px; color: #1f2d3d; line-height: 1.85; }
+.list li { margin-bottom: 8px; }
+.list li::marker { color: #3b82f6; }
+.list.compact { font-size: 14px; line-height: 1.75; }
+
+/* ========== 正文区卡片化容器 ========== */
+.doc-section {
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 24px 28px;
+  margin: 0 0 16px 0;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+}
+.doc-section.alt { background: #e6edf6; box-shadow: none; }
+
+/* ========== callout ========== */
+.callout {
+  margin: 0 0 16px 0;
+  padding: 16px 24px;
+  background: #e8f0fe;
+  border-left: 4px solid #3b82f6;
+  border-radius: 8px;
+}
+.callout[data-variant="warning"] { background: #FFF3E0; border-left-color: #d97706; }
+.callout[data-variant="quote"]   { background: #f0fdfa; border-left-color: #14b8a6; }
+.callout[data-variant="tip"]     { background: #f0fdf4; border-left-color: #16a34a; }
+.callout p { font-size: 14.5px; color: #1f2d3d; margin: 0; line-height: 1.85; }
+.callout p + p { margin-top: 8px; }
+
+/* ========== 表格 ========== */
+.table-wrap {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+  overflow: hidden;
+  margin: 0 0 16px 0;
+}
+.table-caption {
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #c9d6f3, #e8f0fe);
+  color: #0f1e33;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  border-bottom: 1px solid #dbe4ef;
+}
+table.table { width: 100%; border-collapse: collapse; font-size: 13.5px; table-layout: fixed; }
+table.table thead th {
+  padding: 11px 14px;
+  text-align: left;
+  background: #c9d6f3;
+  color: #0f1e33;
+  font-weight: 700;
+  border-bottom: 2px solid #dbe4ef;
+  word-break: break-word;
+}
+table.table tbody td { padding: 11px 14px; border-bottom: 1px solid #dbe4ef; color: #1f2d3d; word-break: break-word; vertical-align: top; }
+table.table tbody tr:last-child td { border-bottom: none; }
+table.table tbody tr:hover { background: #e8f0fe; }
+table.table td.mono, table.table th.mono { font-family: 'Cascadia Code', Consolas, monospace; font-size: 12.5px; }
+
+/* ========== 数据来源引用标记 ========== */
+.cite {
+  font-size: 11px;
+  color: #3b82f6;
+  font-weight: 600;
+  vertical-align: super;
+  margin-left: 2px;
+  text-decoration: none;
+  cursor: pointer;
+}
+.cite:hover { color: #0f1e33; text-decoration: underline; }
+
+/* ========== 来源列表 ========== */
+.source-list { margin: 0 0 16px 0; }
+.source-list ol { padding-left: 20px; font-size: 13px; color: #5b6b80; line-height: 2.0; }
+.source-list ol li { margin-bottom: 6px; }
+.source-list .src-id { display: inline-block; width: 30px; font-weight: 700; color: #3b82f6; }
+
+/* ========== stat ========== */
+.stat-grid { display: flex; gap: 16px; margin: 0 0 16px 0; }
+.stat {
+  flex: 1;
+  text-align: center;
+  padding: 22px 16px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  border-top: 3px solid #3b82f6;
+}
+.stat .num { font-size: 26px; color: #3b82f6; font-weight: 800; line-height: 1.1; }
+.stat .label { font-size: 12px; color: #5b6b80; margin-top: 6px; }
+
+/* ========== timeline ========== */
+.timeline { list-style: none; padding: 0; margin: 0 0 16px 0; }
+.timeline li {
+  position: relative;
+  padding-left: 28px;
+  padding-bottom: 18px;
+  border-left: 2px solid #e8f0fe;
+  margin-left: 6px;
+}
+.timeline li:last-child { border-left-color: transparent; padding-bottom: 0; }
+.timeline li::before {
+  content: '';
+  position: absolute;
+  left: -7px; top: 5px;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: #3b82f6;
+  border: 2px solid #f4f7fb;
+  box-shadow: 0 0 0 2px #e8f0fe;
+}
+.timeline strong { font-size: 14.5px; color: #3b82f6; }
+.timeline p { font-size: 14.5px; color: #1f2d3d; margin: 4px 0 0 0; line-height: 1.8; }
+
+/* ========== code ========== */
+.code {
+  background: #1e293b;
+  color: #e2e8f0;
+  padding: 16px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.65;
+  overflow-x: auto;
+  margin: 0 0 16px 0;
+  font-family: 'Cascadia Code', 'Fira Code', 'SF Mono', 'Source Code Pro', Consolas, monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+code {
+  background: #eef2f7; color: #1e3a5f; padding: 1px 6px; border-radius: 4px;
+  font-size: 13px; font-family: 'Cascadia Code', Consolas, monospace; word-break: break-all;
+}
+.code code { background: transparent; color: inherit; padding: 0; font-size: inherit; }
+
+/* ========== card ========== */
+.card-grid { display: flex; gap: 16px; margin: 0 0 16px 0; flex-wrap: wrap; }
+.card {
+  flex: 1;
+  min-width: 220px;
+  background: #ffffff;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  border-top: 3px solid #3b82f6;
+}
+.card h3 { font-size: 16px; color: #0f1e33; margin: 0 0 8px 0; font-weight: 700; }
+.card p  { font-size: 13.5px; color: #5b6b80; margin: 0; line-height: 1.7; }
+.card .tag {
+  display: inline-block;
+  font-size: 11px;
+  color: #2563eb;
+  background: #eef5ff;
+  border-radius: 4px;
+  padding: 2px 8px;
+  margin-bottom: 8px;
+}
+
+/* ========== divider ========== */
+.divider { margin: 32px 0; text-align: center; user-select: none; }
+.divider .line {
+  display: inline-block;
+  width: 36px;
+  height: 1px;
+  vertical-align: middle;
+  background: linear-gradient(to right, transparent, #e8f0fe);
+}
+.divider .line:last-child { background: linear-gradient(to left, transparent, #e8f0fe); }
+.divider .diamond {
+  display: inline-block;
+  width: 8px; height: 8px;
+  margin: 0 12px;
+  vertical-align: middle;
+  transform: rotate(45deg);
+  background: #3b82f6;
+  border-radius: 1px;
+  box-shadow: 0 0 0 2px #f4f7fb;
+}
+
+/* ========== 实施步骤专用 ========== */
+.step-block {
+  border-left: 3px solid #3b82f6;
+  padding-left: 18px;
+  margin: 0 0 18px 0;
+}
+.step-block:last-child { margin-bottom: 0; }
+.step-title { font-size: 15.5px; font-weight: 700; color: #0f1e33; margin: 0 0 8px 0; }
+.io { font-size: 13.5px; color: #4b5b70; margin: 0 0 10px 0; line-height: 1.75; }
+.io b { color: #1f2d3d; }
+.badge {
+  display: inline-block; font-size: 11px; padding: 2px 9px; border-radius: 10px;
+  margin-right: 6px; font-weight: 700; letter-spacing: .3px;
+}
+.badge.p0 { background: #fee2e2; color: #b91c1c; }
+.badge.p1 { background: #fef3c7; color: #b45309; }
+.badge.p2 { background: #e0e7ff; color: #3730a3; }
+.badge.free { background: #dcfce7; color: #15803d; }
+.badge.plan { background: #e2e8f0; color: #475569; }
+.linkbox {
+  background: #f7f9fc; border: 1px solid #e2e9f3; border-radius: 8px;
+  padding: 14px 18px; margin: 0 0 14px 0; font-size: 13.5px; line-height: 1.95;
+}
+.linkbox .k { color: #5b6b80; display: inline-block; min-width: 92px; }
+.linkbox .row { margin-bottom: 2px; }
+a.ln { color: #2563eb; text-decoration: none; border-bottom: 1px dashed #93b4f0; word-break: break-all; }
+a.ln:hover { color: #0f1e33; border-bottom-style: solid; }
+.checklist { list-style: none; padding-left: 0; margin: 0 0 14px 0; }
+.checklist li { position: relative; padding-left: 22px; font-size: 14px; margin-bottom: 6px; line-height: 1.7; }
+.checklist li::before { content: '✓'; position: absolute; left: 2px; top: 0; color: #16a34a; font-weight: 700; }
+.warnlist { list-style: none; padding-left: 0; margin: 0 0 14px 0; }
+.warnlist li { position: relative; padding-left: 22px; font-size: 14px; margin-bottom: 6px; line-height: 1.7; }
+.warnlist li::before { content: '!'; position: absolute; left: 5px; top: 0; color: #d97706; font-weight: 800; }
+
+/* ========== 尾页 ========== */
+.end_page {
+  margin-top: 24px;
+  padding: 56px 24px;
+  text-align: center;
+  background: linear-gradient(135deg, #c9d6f3 0%, #e8f0fe 100%);
+  border-radius: 16px;
+}
+.end_page h1 { font-size: 26px; color: #0f1e33; margin: 0 0 16px 0; font-weight: 800; }
+.end_page p  { font-size: 15px; color: #4b5b70; margin: 0; line-height: 1.85; }
+
+/* ========== 响应式 ========== */
+@media screen and (max-width: 600px) {
+  body { padding: 16px !important; }
+  h1.heading { font-size: 21px !important; }
+  h2.heading { font-size: 18px !important; }
+  h3.sub { font-size: 16px !important; }
+  .stat-grid, .card-grid { flex-direction: column; }
+}
+
+/* ========== 打印优化 ========== */
+@media print {
+  body {
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #f4f7fb;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  body::before { display: none; }
+  .title, .end_page { border-radius: 0; box-shadow: none; }
+  .doc-section, .card, .stat, .table-wrap { box-shadow: none; border: 1px solid #dbe4ef; }
+  section { break-inside: auto !important; }
+}
+</style>
+</head>
+<body class="mode-doc" data-palette="ink-blue">
+
+  <!-- ===== 封面 ===== -->
+  <section class="title">
+    <span class="ver">V2.0 · 实施版</span>
+    <h1>红楼梦范例全量分析<br>文本分析软件设计方案（附具体实施步骤）</h1>
+    <div class="accent-line"></div>
+    <p>在 V1.0 架构设计基础上，为每个模块补齐<b>可执行的实施步骤</b>：选型理由 / 安装命令 / 核心代码 / 验收标准 / 官方地址链接<br>分析日期：2026-09-16 · 分析对象：红楼梦范例目录（全部文件）</p>
+  </section>
+
+  <!-- ===== 0. 本版新增说明 ===== -->
+  <div class="callout">
+    <p><b>V2.0 相对 V1.0 的增量：</b>V1.0 已完成"资产盘点 → 机制剖析 → 架构设计 → 路线图"的规划层工作；V2.0 把这套规划落成"能照着做"的施工图 —— 新增<b>第五章 逐模块实施步骤</b>（8 个模块 × 6 要素：目标 / 选型 / 安装 / 代码 / 验收 / 链接），并新增<b>附录 A 外部资源地址总表</b>与<b>附录 B 依赖清单</b>。</p>
+    <p>以分词为例，V1.0 只写了"jieba 分词 + 用户词典 + 停用词过滤"；V2.0 给出：jieba 官方仓库与 PyPI 地址、安装命令、用户词典文件格式、精确模式的调用代码、备选加速方案（jieba-fast）、繁体词典地址、验收口径（"宝玉"不得被切成"宝/玉"）。</p>
+  </div>
+
+  <!-- ===== 一、范例全貌盘点 ===== -->
+  <h1 class="heading">一、范例全貌盘点（数据盘点结果）</h1>
+
+  <div class="stat-grid">
+    <div class="stat">
+      <div class="num">120</div>
+      <div class="label">章节拆分文件（红楼梦_拆分/）</div>
+    </div>
+    <div class="stat">
+      <div class="num">240+</div>
+      <div class="label">分词结果文件（JSON + TXT 双格式）</div>
+    </div>
+    <div class="stat">
+      <div class="num">120+</div>
+      <div class="label">逐章情感分析 JSON</div>
+    </div>
+    <div class="stat">
+      <div class="num">260</div>
+      <div class="label">去重人物（宽口径，含间接提及）</div>
+    </div>
+  </div>
+
+  <div class="doc-section">
+    <p class="paragraph no-indent">"红楼梦范例"目录是一套"数据资产 + 处理脚本 + 提示词规范 + 分析产物"四位一体的<b>完整文本分析工作集</b>。全目录按 11 个一级目录/文件组织：</p>
+    <table class="table" data-caption="范例目录结构与内容规模">
+      <colgroup>
+        <col style="width:18%">
+        <col style="width:40%">
+        <col style="width:42%">
+      </colgroup>
+      <thead>
+        <tr><th>目录 / 文件</th><th>内容说明</th><th>规模</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>红楼梦.txt</td><td>全书原文</td><td>1 份全文（约 2.57MB）</td></tr>
+        <tr><td>红楼梦_拆分/</td><td>按章拆分原文，命名"章号_字数_章名.txt"，段落以全角空格开头</td><td>120 份</td></tr>
+        <tr><td>红楼梦_分词结果/</td><td>jieba 分词后的 JSON 词列表</td><td>120 份</td></tr>
+        <tr><td>红楼梦_分词结果_txt/</td><td>分词结果的 TXT 视图</td><td>120 份</td></tr>
+        <tr><td>情感分析结果/</td><td>逐章情绪 JSON（DUTIR 七类 + Hownet 极性 + 高频词）</td><td>120+ 份</td></tr>
+        <tr><td>基础/</td><td>情感词典（DUTIR 27,414 词 / Hownet 19,472 词）、停用词、否定词、递进词、人物名表、分词词典</td><td>9 文件 + 3 子目录</td></tr>
+        <tr><td>情感词库资源统合/</td><td>5 个公开情感词典资源调研 + cnsenti/cntext 评估 + 扩展建议</td><td>8 份调研文档</td></tr>
+        <tr><td>skill/</td><td>提示词工程规范体系：任务说明书、流程 v2.0、模板 V3.4、归档规范、前置条件文档</td><td>约 23 份文档</td></tr>
+        <tr><td>脚本工具/</td><td>6 大类自动化脚本（分析生成 / 验证检查 / 升级迁移 / 修复维护 / 人物档案 / 索引归档）</td><td>38 个 .py</td></tr>
+        <tr><td>分析结果/</td><td>V3.0/V3.2/V3.3/V3.4 各版本逐章报告 + 全局归档索引（7 大部分）+ 结构化提取 JSON</td><td>267 份 MD + 4 JSON</td></tr>
+        <tr><td>红楼梦_V3.3_全章分析报告存档.zip</td><td>V3.3 报告打包存档</td><td>1 份</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 class="heading">1.1 分析报告资产与版本迭代</h2>
+  <div class="doc-section">
+    <table class="table" data-caption="分析报告版本资产">
+      <colgroup>
+        <col style="width:14%">
+        <col style="width:26%">
+        <col style="width:60%">
+      </colgroup>
+      <thead>
+        <tr><th>版本</th><th>覆盖章节</th><th>框架特点</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>V3.0</td><td>1-18 章</td><td>双轨六要素基础框架</td></tr>
+        <tr><td>V3.2</td><td>1-19 章</td><td>增加冲突动机 / 叙事手法 / 情感趋势（七类情绪分析）</td></tr>
+        <tr><td>V3.3</td><td>1-80 章</td><td>归档索引细化（逐章统计、人物档案、伏笔线索）</td></tr>
+        <tr><td>V3.4</td><td>1-80 + 81-120 章</td><td>事件颗粒度细化、字段格式统一、DUTIR 七类情绪回填、预言人物表</td></tr>
+      </tbody>
+    </table>
+    <p class="paragraph no-indent">全局归档索引 <b>_归档索引_V3.4.md</b> 共 1200+ 行，包含 7 大部分：归档索引表、人物出场档案、逐章累计统计、伏笔线索追踪、七类情绪分析汇总、情感基调演变趋势、全局统计摘要。<a class="cite" href="#source-1">[1]</a></p>
+  </div>
+
+  <!-- ===== 二、现有机制剖析 ===== -->
+  <h1 class="heading">二、现有机制剖析：四层可复用体系</h1>
+
+  <p class="paragraph">整个范例事实上已经是一套"人工编排 + 脚本辅助 + LLM 生成"的半自动流水线，抽象为四层，每一层都已有可复用实现或规范 —— 这正是软件化的基础。</p>
+
+  <div class="card-grid">
+    <div class="card">
+      <span class="tag">层 1 · 数据资产</span>
+      <h3>词库与词典</h3>
+      <p>DUTIR 七类情绪词、Hownet 极性词、停用词、否定词、程度词、人物名表、分词词典、同义/反义词表</p>
+    </div>
+    <div class="card">
+      <span class="tag">层 2 · 预处理管线</span>
+      <h3>拆分 → 分词 → 情感</h3>
+      <p>章节拆分、jieba 分词、双词典情感统计，全部已有可用 Python 脚本（无第三方依赖）</p>
+    </div>
+    <div class="card">
+      <span class="tag">层 3 · 深度分析</span>
+      <h3>LLM 提示词体系</h3>
+      <p>"双轨六要素 V3.4"九大模块模板 + 流程规范 + 任务说明书，驱动 LLM 生成逐章分析</p>
+    </div>
+    <div class="card">
+      <span class="tag">层 4 · 归集索引</span>
+      <h3>结构化提取与归档</h3>
+      <p>从 MD 报告提取结构化数据（JSON）→ 人物归并 / 基调归一 → 生成 7 部分全局索引</p>
+    </div>
+  </div>
+
+  <h2 class="heading">2.1 层 1：数据资产（可直接随软件分发）</h2>
+  <div class="doc-section">
+    <table class="table" data-caption="基础词库资产清单">
+      <colgroup>
+        <col style="width:24%">
+        <col style="width:16%">
+        <col style="width:60%">
+      </colgroup>
+      <thead>
+        <tr><th>资源</th><th>规模</th><th>用途</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>情感词典_DUTIR</td><td>27,414 词</td><td>好 / 乐 / 哀 / 怒 / 惧 / 恶 / 惊 七类情绪词，用于七类情绪分布统计</td></tr>
+        <tr><td>情感词典_Hownet</td><td>19,472 词</td><td>正 / 负极性词 + 程度副词（very/extreme/more/ish）+ deny 否定词</td></tr>
+        <tr><td>停用词库</td><td>3,884 词</td><td>过滤虚词，保证高频词统计质量（4 表并集 + 主表）</td></tr>
+        <tr><td>否定词.txt</td><td>1,517 词</td><td>否定翻转规则（奇数次翻转、偶数次还原）</td></tr>
+        <tr><td>递进词.txt</td><td>28 词</td><td>程度副词加权（默认权重 1.5）</td></tr>
+        <tr><td>红楼梦人物名.txt</td><td>362 行</td><td>人物识别名单（直接出场 + 间接提及）</td></tr>
+        <tr><td>红楼梦分词词典.txt</td><td>663 行</td><td>jieba 自定义用户词典（专名、人名、词语）</td></tr>
+        <tr><td>同义词 / 反义词</td><td>91 万 / 35 万</td><td>同义词词林扩展版 / 反义词对表（非情感词典，仅作规模统计）</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 class="heading">2.2 层 2：预处理管线（可直接复用）</h2>
+  <div class="doc-section">
+    <ol class="timeline">
+      <li>
+        <strong>① 章节拆分</strong>
+        <p>原文按"第X章"标题拆分为 120 个文件；文件名携带元数据：<code>081_06893_第81章　占旺相四美钓游鱼　奉严词两番入家塾.txt</code>；段落以全角空格开头，末行为"(本章完)"。</p>
+      </li>
+      <li>
+        <strong>② jieba 分词</strong>
+        <p><code>jieba.load_userdict(红楼梦分词词典)</code> + 停用词过滤，输出 JSON 词列表（120 份）与 TXT 视图（120 份）。</p>
+      </li>
+      <li>
+        <strong>③ 双轨情感统计</strong>
+        <p>EmotionAnalyzer（DUTIR 七类计数与占比） + SentimentAnalyzer（Hownet 极性 + 否定词翻转 + 程度副词加权，窗口=5），输出 <code>{章号}_emotion.json</code>。<a class="cite" href="#source-2">[2]</a></p>
+      </li>
+    </ol>
+  </div>
+
+  <h2 class="heading">2.3 层 3：LLM 深度分析机制</h2>
+  <div class="doc-section">
+    <table class="table" data-caption="skill 文档体系清单">
+      <colgroup>
+        <col style="width:32%">
+        <col style="width:68%">
+      </colgroup>
+      <thead>
+        <tr><th>文档</th><th>作用</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>V3.4分析任务说明书.md</td><td>LLM 直接调用的"任务书"：八大部分，含章节简称表、事件要求（≥字数÷500）、情感数据取数规则、预言人物表</td></tr>
+        <tr><td>红楼梦专用版_前置条件与生成规范.md</td><td>76KB 完整规范：路径参数、九大模块规则、字段格式、质量阈值、模型调用流程、批处理示例、§13.8 完整数据管线一键脚本、叙事阶段预分类表</td></tr>
+        <tr><td>通用版_前置条件与生成规范.md</td><td>去红楼化的通用版本（可复用于任意长文本）</td></tr>
+        <tr><td>章节内容分析流程.md</td><td>流程 v2.0：事件拆分颗粒度规则、A轨提取规则、B轨六要素、情感词三维统计、否定翻转规则、双轨交叉校验、归档索引维护流程</td></tr>
+        <tr><td>章节分析空白模板.md</td><td>V3.4 九大模块空模板（41 个三级标题），作为每次生成的格式基准</td></tr>
+        <tr><td>章节分析归档规范.md</td><td>归档 v1.3：索引表/人物档案/统计/伏笔/情绪/趋势 7 部分规范</td></tr>
+      </tbody>
+    </table>
+    <aside class="callout" data-variant="tip">
+      <p><b>关键洞察：</b>逐章分析报告（V3.4）的九大模块 = 软件内"分析任务"的目标 Schema：§一 版本定位 → §二 事件接入清单（事件 ID E{章}-{序号}、★/◆/◇ 三级、段落索引）→ §三 新闻六要素 A 轨（5W1H）→ §四 叙事六要素 B 轨（人物基准六要素表 11 列）→ §五 情感词三维统计 + 七类情绪 → §六 人物关系 + 伏笔追踪 → §七 占位符统合 → §八 双轨校验与完整性检测 → §九 后续分析建议。</p>
+    </aside>
+  </div>
+
+  <h2 class="heading">2.4 层 4：结构提取与全局索引（已高度软件化）</h2>
+  <div class="doc-section">
+    <ol class="timeline">
+      <li>
+        <strong>extract_v34_v2.py（结构提取）</strong>
+        <p>从 80 份 MD 报告正则提取字数、情感基调、三维统计、事件数、冲突数、人物出场档案、伏笔数等，容错增强（约数/小数/缺失 fallback），输出 <code>v34_extract_v2.json</code>（17,320 行）。<a class="cite" href="#source-3">[3]</a></p>
+      </li>
+      <li>
+        <strong>gen_index.py（全局索引）</strong>
+        <p>用 ALIAS 人物别名归并字典（黛玉→林黛玉、凤姐→王熙凤等 40+ 条）+ TONE_MAP 情感基调归一（14 种表述 → 6 标准标签），生成 7 大部分归档索引。<a class="cite" href="#source-4">[4]</a></p>
+      </li>
+      <li>
+        <strong>人物档案 / 验证 / 升级类脚本</strong>
+        <p>extract_all_persons、analyze_persons_v2（别名检测/去重/频次）；verify_v32 / deep_verify / verify_alignment / check_dicts；v34_convert（V3.3→V3.4 80 章批量升级）。</p>
+      </li>
+    </ol>
+  </div>
+
+  <!-- ===== 三、软件化可行性 ===== -->
+  <h1 class="heading">三、软件化可行性评估</h1>
+
+  <div class="doc-section">
+    <table class="table" data-caption="现有机制 → 软件模块映射与改造量">
+      <colgroup>
+        <col style="width:28%">
+        <col style="width:22%">
+        <col style="width:50%">
+      </colgroup>
+      <thead>
+        <tr><th>现有资产</th><th>改造量</th><th>说明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>情感分析双引擎（emotion_analysis.py）</td><td>直接复用（≈0 改造）</td><td>封装为类库，仅需补输出格式与异常处理</td></tr>
+        <tr><td>jieba 分词 + 词典/停用词</td><td>直接复用</td><td>依赖库打包（jieba 体积可接受）</td></tr>
+        <tr><td>拆分规则（章节标题/全角空格）</td><td>低改造</td><td>改为"正则 + 配置化"引擎，支持任意小说章节格式</td></tr>
+        <tr><td>情感词库资产</td><td>直接随包分发</td><td>加入"词库热更新/扩展"管理界面</td></tr>
+        <tr><td>LLM 提示词规范（九大模块/双轨）</td><td>中改造（核心工作量）</td><td>封装为：模板引擎 + LLM API 调度 + 任务队列 + 断点续跑</td></tr>
+        <tr><td>报告结构提取（extract_v34_v2）</td><td>低改造</td><td>改为"结构化输出"优先（LLM 直接返回 JSON），正则提取作为 fallback</td></tr>
+        <tr><td>索引生成（gen_index + ALIAS/TONE_MAP）</td><td>低改造</td><td>ALIAS/TONE_MAP 配置化，可编辑、可导入导出</td></tr>
+        <tr><td>校验脚本（verify / deep / check_dicts）</td><td>中改造</td><td>迁移为"质量门禁"服务，分析完成后自动执行</td></tr>
+      </tbody>
+    </table>
+    <aside class="callout" data-variant="quote">
+      <p><b>结论：</b>范例机制已覆盖软件全部核心功能域（拆分/情感/事件/人物/索引/校验/词库），多数模块可直接复用或低改造。主要工程化工作在于"编排"与"界面"。</p>
+    </aside>
+  </div>
+
+  <!-- ===== 四、软件架构设计 ===== -->
+  <h1 class="heading">四、软件架构设计</h1>
+
+  <h2 class="heading">4.1 总体架构（五层）</h2>
+  <div class="doc-section">
+    <ul class="list">
+      <li><b>接入层：</b>拖拽导入 TXT/MD 全文 → 自动识别章节 → 写入项目库</li>
+      <li><b>数据层：</b>SQLite（元数据、任务状态、索引）+ 文件系统（原文、分词、情感 JSON、报告 MD、导出文件）</li>
+      <li><b>引擎层：</b>拆分引擎 / 分词引擎 / 情感引擎 / LLM 分析调度引擎 / 提取与索引引擎</li>
+      <li><b>服务层：</b>FastAPI 提供 REST API（任务提交、进度、结果、配置）；任务队列 + 断点续跑 + 增量跳过</li>
+      <li><b>呈现层：</b>Web 工作台（Vue3 + ECharts）+ 报告阅读器（MD/HTML 渲染 + 导出 Word/PDF）</li>
+    </ul>
+  </div>
+
+  <h2 class="heading">4.2 八大核心模块</h2>
+  <div class="card-grid">
+    <div class="card">
+      <span class="tag">M1</span>
+      <h3>导入与章节拆分引擎</h3>
+      <p>章节识别规则（"第X回/第X章"）+ 段落切割（全角空格/空行）；输出 <code>{章号}_{字数}_{章名}.txt</code>，支持任意中文小说。</p>
+    </div>
+    <div class="card">
+      <span class="tag">M2</span>
+      <h3>分词与词频引擎</h3>
+      <p>jieba 用户词典（可编辑）+ 停用词过滤（可编辑）；输出分词 JSON/TXT 双格式 + 每章 Top30 高频词。</p>
+    </div>
+    <div class="card">
+      <span class="tag">M3</span>
+      <h3>情感分析引擎</h3>
+      <p>EmotionAnalyzer + SentimentAnalyzer：DUTIR 七类 + Hownet 极性 + 否定翻转 + 程度加权；词库可热更新。</p>
+    </div>
+    <div class="card">
+      <span class="tag">M4</span>
+      <h3>LLM 深度分析引擎</h3>
+      <p>V3.4 任务说明书 + 空白模板封装为提示词模板库；多 LLM 后端；任务队列、并发批量、断点续跑、增量跳过。</p>
+    </div>
+    <div class="card">
+      <span class="tag">M5</span>
+      <h3>事件挖掘模块</h3>
+      <p>事件拆分规则引擎（起因→行动→结果、ID E{章}-{序号}、★/◆/◇ 三级、段落索引）→ 5W1H 结构化事件表 → 事件时间线。</p>
+    </div>
+    <div class="card">
+      <span class="tag">M6</span>
+      <h3>人物挖掘模块</h3>
+      <p>人物库（362 行）+ 别名归并（ALIAS 可配置）+ 首次出场/出场次数/人物关系 + 人物情感档案 + 共现网络图。</p>
+    </div>
+    <div class="card">
+      <span class="tag">M7</span>
+      <h3>报告与全局索引引擎</h3>
+      <p>LLM 输出 JSON → 双格式渲染（Markdown 报告 + 全局索引 7 部分）；extract 正则提作为校验/降级；TONE_MAP 基调归一。</p>
+    </div>
+    <div class="card">
+      <span class="tag">M8</span>
+      <h3>可视化与导出</h3>
+      <p>章节情感曲线、事件时间线、人物关系图谱、高频词云；报告导出 MD/HTML/Word/PDF；索引导出 Excel。</p>
+    </div>
+  </div>
+
+  <h2 class="heading">4.3 完整数据流</h2>
+  <div class="doc-section">
+    <pre class="code" data-lang="text">原文 TXT
+   │  M1 章节拆分（自动识别 + 元数据命名）
+   ▼
+红楼梦_拆分/{章号}_{字数}_{章名}.txt
+   │  M2 jieba 分词（用户词典 + 停用词）
+   ▼
+红楼梦_分词结果/{章号}.json + _txt
+   │  M3 情感分析（DUTIR 七类 + Hownet 极性）
+   ▼
+情感分析结果/{章号}_emotion.json
+   │  M4 LLM 深度分析（九大模块模板 + 任务队列 + 断点）
+   ▼
+分析结果/{章号}_{简称}_V3.5_分析报告.md（九大模块）
+   │  M5 事件挖掘（结构化提取：事件表 + 5W1H + 分级）
+   ▼
+结构化 JSON（事件 / 人物 / 情绪 / 冲突 / 伏笔）
+   │  M6 人物挖掘 + M7 全局索引（ALIAS / TONE_MAP）
+   ▼
+_归档索引.md（7 大部分）+ 人物档案.json
+   │  M8 可视化 & 导出
+   ▼
+情感曲线 · 关系图谱 · 事件时间线 · 报告 Word/PDF</pre>
+  </div>
+
+  <div class="divider"><span class="line"></span><span class="diamond"></span><span class="line"></span></div>
+
+  <!-- ===== 五、逐模块实施步骤（本版核心） ===== -->
+  <h1 class="heading">五、逐模块具体实施步骤（V2.0 新增 · 核心章节）</h1>
+
+  <p class="paragraph">本章把架构图翻译成施工步骤。每个模块统一按六要素展开：<b>① 目标与输入输出 → ② 选型与理由 → ③ 安装命令 → ④ 核心代码 → ⑤ 验收标准 → ⑥ 官方链接</b>。优先级标记：<span class="badge p0">P0 必做</span><span class="badge p1">P1 重要</span><span class="badge p2">P2 增强</span></p>
+
+  <!-- S0 环境 -->
+  <h2 class="heading">5.0 环境准备与依赖安装（所有模块的前置）</h2>
+  <div class="doc-section">
+
+    <div class="step-block">
+      <p class="step-title">S0-1　建立隔离的 Python 环境</p>
+      <p class="io"><b>目标：</b>为项目创建独立虚拟环境，避免污染系统 Python；<b>要求：</b>Python ≥ 3.10（项目脚本已在 3.10 验证，<code>__pycache__</code> 中存在 cpython-310.pyc）。</p>
+      <pre class="code"># 1) 确认 Python 版本
+python --version           # 需 >= 3.10
+
+# 2) 在项目根目录创建虚拟环境
+cd "红楼梦范例"
+python -m venv .venv
+
+# 3) 激活（Windows / Git Bash）
+source .venv/Scripts/activate
+#    激活（Windows / CMD 或 PowerShell）
+#   .venv\Scripts\activate.bat     或   .venv\Scripts\Activate.ps1
+
+# 4) 升级 pip
+python -m pip install --upgrade pip</pre>
+      <div class="linkbox">
+        <div class="row"><span class="k">Python 官网</span><a class="ln" href="https://www.python.org/downloads/">https://www.python.org/downloads/</a></div>
+        <div class="row"><span class="k">venv 文档</span><a class="ln" href="https://docs.python.org/zh-cn/3/library/venv.html">https://docs.python.org/zh-cn/3/library/venv.html</a></div>
+      </div>
+    </div>
+
+    <div class="step-block">
+      <p class="step-title">S0-2　安装依赖（分三档，按需选择）</p>
+      <p class="io"><b>说明：</b>层 1-2（拆分/分词/情感）依赖极轻；层 3（LLM）需要一个 API SDK 或本地模型；层 4 后端/前端另计。</p>
+      <pre class="code"># —— 档 A：预处理管线（必需，仅 1 个库）——
+pip install jieba
+
+# —— 档 B：LLM 深度分析与服务端 ——
+pip install openai jinja2 pydantic python-dotenv loguru
+pip install fastapi "uvicorn[standard]" sqlmodel aiosqlite
+
+# —— 档 C：可视化与导出 ——
+pip install networkx pyvis wordcloud pyecharts openpyxl python-docx
+
+# 一键生成锁定清单（便于复现）
+pip freeze > requirements.lock.txt</pre>
+      <div class="callout" data-variant="tip">
+        <p><b>注意：</b>项目现有 38 个脚本<b>零第三方依赖</b>（仅标准库 os / re / json / glob / collections / subprocess），可直接迁移进软件而无需改造依赖 —— 这是本次软件化的最大红利。</p>
+      </div>
+    </div>
+
+    <div class="step-block">
+      <p class="step-title">S0-3　目录约定与配置外置</p>
+      <p class="io"><b>目标：</b>把现有脚本里硬编码的绝对路径抽成配置，便于软件打包与多项目复用。</p>
+      <pre class="code"># config.py —— 全部路径集中管理，取代硬编码
+import os
+ROOT       = os.path.dirname(os.path.abspath(__file__))
+SPLIT_DIR  = os.path.join(ROOT, "红楼梦_拆分")        # 输入：章节原文
+TOKEN_DIR  = os.path.join(ROOT, "红楼梦_分词结果")    # 输出：分词 JSON
+TOKEN_TXT  = os.path.join(ROOT, "红楼梦_分词结果_txt")# 输出：分词 TXT
+EMO_DIR    = os.path.join(ROOT, "情感分析结果")        # 输出：情绪 JSON
+REPORT_DIR = os.path.join(ROOT, "分析结果")            # 输出：报告 MD
+BASE_DIR   = os.path.join(ROOT, "基础")                # 词库资产
+SEG_DICT   = os.path.join(BASE_DIR, "红楼梦分词词典.txt")
+STOP_FILES = [os.path.join(BASE_DIR, "停用词.txt")] + \
+             [os.path.join(BASE_DIR, "停用词库", f)
+              for f in os.listdir(os.path.join(BASE_DIR, "停用词库"))]</pre>
+      <ul class="checklist">
+        <li>所有模块均从 <code>config.py</code> 取路径，脚本内不再出现绝对路径</li>
+        <li>配置支持 .env 覆盖（便于打包为桌面软件后由用户指定数据目录）</li>
+      </ul>
+      <div class="linkbox">
+        <div class="row"><span class="k">python-dotenv</span><a class="ln" href="https://github.com/theskumar/python-dotenv">https://github.com/theskumar/python-dotenv</a></div>
+        <div class="row"><span class="k">loguru 日志</span><a class="ln" href="https://github.com/Delgan/loguru">https://github.com/Delgan/loguru</a></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- S1 章节拆分 -->
+  <h2 class="heading">5.1　S1 章节拆分引擎（对应 M1）</h2>
+  <div class="doc-section">
+
+    <div class="step-block">
+      <p class="step-title">S1-1　目标与输入输出 <span class="badge p0">P0</span></p>
+      <p class="io"><b>输入：</b>整本 <code>红楼梦.txt</code>（或任意中文小说 TXT）<br>
+      <b>输出：</b><code>红楼梦_拆分/{章号:03d}_{字数}_{章名}.txt</code>，共 120 份<br>
+      <b>已锁定口径：</b>文件名 3 段式；段落以全角空格（U+3000）开头；末行"(本章完)"</p>
+    </div>
+
+    <div class="step-block">
+      <p class="step-title">S1-2　选型与理由</p>
+      <table class="table" data-caption="章节拆分选型">
+        <colgroup><col style="width:24%"><col style="width:40%"><col style="width:36%"></colgroup>
+        <thead><tr><th>候选方案</th><th>能力</th><th>采用建议</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">自研正则（re）</td><td>完全可控，零依赖，可覆盖"第X回/第X章/卷X"</td><td><b>首选</b>。项目既有规则即由此实现，成本最低</td></tr>
+          <tr><td class="mono">cn2an</td><td>"第壹佰贰拾回"→"第120回"，中文数字转阿拉伯数字</td><td>推荐引入，解决章号排序与文件命名</td></tr>
+          <tr><td class="mono">chardet</td><td>自动探测 TXT 编码（UTF-8/GBK/GB18030）</td><td>推荐引入，解决外部小说导入乱码</td></tr>
+          <tr><td class="mono">ebooklib / mobi</td><td>解析 EPUB / MOBI</td><td>P2 扩展，若要支持电子书导入再加</td></tr>
+        </tbody>
+      </table>
+      <div class="linkbox">
+        <div class="row"><span class="k">cn2an</span><a class="ln" href="https://github.com/Ailln/cn2an">https://github.com/Ailln/cn2an</a> · <a class="ln" href="https://pypi.org/project/cn2an/">https://pypi.org/project/cn2an/</a></div>
+        <div class="row"><span class="k">chardet</span><a class="ln" href="https://github.com/chardet/chardet">https://github.com/chardet/chardet</a></div>
+        <div class="row"><span class="k">ebooklib</span><a class="ln" href="https://github.com/aerkalov/ebooklib">https://github.com/aerkalov/ebooklib</a></div>
+      </div>
+    </div>
+
+    <div class="step-block">
+      <p class="step-title">S1-3　安装命令</p>
+      <pre class="code">pip install cn2an chardet</pre>
+    </div>
+
+    <div class="step-block">
+      <p class="step-title">S1-4　核心代码（可直接运行）</p>
+      <pre class="code"># split_chapters.py —— 通用章节拆分器（配置化正则 + 编码自适配）
+import os, re, json
+import chardet
+import cn2an
+from config import ROOT, SPLIT_DIR
+
+# 章节标题正则：第X回 / 第X章 / 卷X（X 支持中文数字与阿拉伯数字）
+CHAP_RE = re.compile(
+    r'^[　\s]*(第[零一二三四五六七八九十百千两壹贰叁肆伍陆柒捌玖拾0-9]+[回章节卷])'
+    r'[　\s]*(?P<title>[^\n]{0,60})$', re.M)
+
+def read_text(path):
+    raw = open(path, 'rb').read()
+    enc = chardet.detect(raw)['encoding'] or 'utf-8'
+    return raw.decode(enc, errors='ignore')
+
+def split_by_title(text, keep_blank=True):
+    """按章节标题切分，返回 [(标题, 正文), ...]"""
+    marks = list(CHAP_RE.finditer(text))
+    if not marks:
+        return []
+    out = []
+    for i, m in enumerate(marks):
+        start = m.start()
+        end = marks[i + 1].start() if i + 1 < len(marks) else len(text)
+        out.append((m.group(0).strip(), text[start:end].strip('\n')))
+    return out
+
+def normalize(body):
+    """段落归一：统一换行、段首补全角空格、去空白行"""
+    body = body.replace('\r\n', '\n').replace('\r', '\n')
+    lines = []
+    for ln in body.split('\n'):
+        ln = ln.strip()
+        if not ln:
+            continue
+        lines.append('　' + ln)          # 段首全角空格（与既有口径一致）
+    return '\n'.join(lines) + '\n(本章完)'
+
+def chapter_no(title):
+    """从标题提取章号（中文数字 → 阿拉伯数字）"""
+    m = re.match(r'^第([零一二三四五六七八九十百千两壹贰叁肆伍陆柒捌玖拾0-9]+)[回章节卷]', title)
+    if not m:
+        return 0
+    s = m.group(1)
+    try:
+        return int(cn2an.cn2an(s, 'smart'))
+    except Exception:
+        return int(s) if s.isdigit() else 0
+
+def run(src='红楼梦.txt'):
+    text = read_text(os.path.join(ROOT, src))
+    chapters = split_by_title(text)
+    os.makedirs(SPLIT_DIR, exist_ok=True)
+    manifest = []
+    for title, body in chapters:
+        no = chapter_no(title)
+        body = normalize(body)
+        name = f"{no:03d}_{len(body)}_{title}.txt"
+        with open(os.path.join(SPLIT_DIR, name), 'w', encoding='utf-8') as f:
+            f.write(body)
+        manifest.append({"no": no, "title": title, "chars": len(body), "file": name})
+    with open(os.path.join(ROOT, '拆分清单.json'), 'w', encoding='utf-8') as f:
+        json.dump(manifest, f, ensure_ascii=False, indent=2)
+    print(f"✅ 共拆分 {len(manifest)} 章")
+    return manifest
+
+if __name__ == '__main__':
+    run()</pre>
+    </div>
+
+    <div class="step-block">
+      <p class="step-title">S1-5　验收标准</p>
+      <ul class="checklist">
+        <li>产出 <code>红楼梦_拆分/</code> 下正好 <b>120</b> 个 .txt（V3.4 口径为 120 回）</li>
+        <li>文件名严格匹配 <code>^\d{3}_\d+_.+\.txt$</code>，章号连续 001–120 无缺号</li>
+        <li>每章末行为 <code>(本章完)</code>；正文段首均为全角空格</li>
+        <li>与既有文件对照：第 81 章应为 <code>081_06893_第81章　占旺相四美钓游鱼　奉严词两番入家塾.txt</code></li>
+      </ul>
+      <ul class="warnlist">
+        <li>回目里的全角空格（U+3000）易被编辑器转成半角，需在写文件时显式使用 <code>'\u3000'</code></li>
+        <li>章名若超过 60 字符会被正则截断，Windows 路径长度上限另需注意（建议 <code>\\?\</code> 前缀或缩短项目根路径）</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <!-- S2 分词 -->
+  <h2 class="heading">5.2　S2 分词与词频引擎（对应 M2）· 重点示例</h2>
+  <div class="doc-section">
+
+    <div class="step-block">
+      <p class="step-title">S2-1　目标与输入输出 <span class="badge p0">P0</span></p>
+      <p class="io"><b>输入：</b><code>红楼梦_拆分/{章号}_{字数}_{章名}.txt</code>（120 份）<br>
+      <b>输出：</b>① <code>红楼梦_分词结果/{章号}.json</code>（词列表数组）② <code>红楼梦_分词结果_txt/{章号}.txt</code>（分词视图）③ 每章 Top30 高频词（供 M3 复用）<br>
+      <b>既有产物口径：</b>JSON 为 <code>list[str]</code>，直接 <code>json.dump(words, ensure_ascii=False)</code></p>
+    </div>
+
+    <div class="step-block">
+      <p class="step-title">S2-2　选型与理由：为什么是 jieba</p>
+      <table class="table" data-caption="中文分词工具选型对比">
+        <colgroup><col style="width:18%"><col style="width:20%"><col style="width:62%"></colgroup>
+        <thead><tr><th>工具</th><th>类型</th><th>特点与适用判断</th></tr></thead>
+        <tbody>
+          <tr><td>jieba</td><td>词典 + HMM</td><td><b>首选。</b>纯 Python、MIT 协议、<code>load_userdict</code> 可加载项目已有的 663 行红楼梦词典、支持词性标注与关键词抽取；项目 120 份分词结果即由它产出，口径已锁定</td></tr>
+          <tr><td>jieba-fast</td><td>jieba 的 C 加速版</td><td>接口与 jieba 基本兼容，速度提升数倍；<b>仅在 120 章全量重跑耗时明显时启用</b></td></tr>
+          <tr><td>pkuseg</td><td>领域自适应</td><td>可针对领域微调，精度可能更高，但对本项目需重跑全部结果、破坏既有口径，<b>不建议替换</b></td></tr>
+          <tr><td>HanLP / LTP / THULAC</td><td>NLP 全流程</td><td>提供分词 + 词性 + NER，对 M6 人物识别、M5 事件要素抽取有增益；适合作为<b>补充引擎</b>而非替代</td></tr>
+          <tr><td>SnowNLP</td><td>轻量中文处理</td><td>内置情感打分（自训语料，非词典法），可作为 M3 的交叉参考，<b>不作为主引擎</b></td></tr>
+        </tbody>
+      </table>
+      <div class="linkbox">
+        <div class="row"><span class="k">jieba 仓库</span><a class="ln" href="https://github.com/fxsjy/jieba">https://github.com/fxsjy/jieba</a></div>
+        <div class="row"><span class="k">jieba PyPI</span><a class="ln" href="https://pypi.org/project/jieba/">https://pypi.org/project/jieba/</a></div>
+        <div class="row"><span class="k">jieba 中文文档</span><a class="ln" href="https://github.com/fxsjy/jieba/blob/master/README.md">https://github.com/fxsjy/jieba/blob/master/README.md</a></div>
+        <div class="row"><span class="k">繁体/大词典</span><a class="ln" href="https://github.com/fxsjy/jieba/raw/master/extra_dict/dict.txt.big">https://github.com/fxsjy/jieba/raw/master/extra_dict/dict.txt.big</a></div>
+        <div class="row"><span class="k">jieba-fast</span><a class="ln" href="https://pypi.org/project/jieba-fast/">https://pypi.org/project/jieba-fast/</a> · <a class="ln" href="https://github.com/deepcs233/jieba_fast">https://github.com/deepcs233/jieba_fast</a></div>
+        <div class="row"><span class="k">其他语言版</span><a class="ln" href="https://github.com/yanyiwu/cppjieba">cppjieba</a> · <a class="ln" href="https://github.com/huaban/jieba-analysis">jieba-analysis (Java)</a> · <a class="ln" href="https://github.com/yanyiwu/gojieba">gojieba</a></div>
+        <div class="row"><span class="k">备选引擎</span><a class="ln" href="https://github.com/lancopku/pkuseg-python">pkuseg</a> · <a class="ln" href="https://github.com/hankcs/HanLP">HanLP</a> · <a class="ln" href="https://github.com/HIT-SCIR/ltp">LTP</a> · <a class="ln" href="https://github.com/thunlp/THULAC-Python">THULAC</a> · <a class="ln" href="https://github.com/isnowfy/snownlp">SnowNLP</a></div>
+      </div>
+    </div>
+
+    <div class="step-block">
+      <p class="step-title">S2-3　安装命令</p>
+      <pre class="code"># 首选
+pip install jieba
+
+# 若需加速（可选，接口兼容）
+pip install jieba-fast
+#   代码中改为：import jieba_fast as jieba
+
+# 若需领域分词（备选，会改变既有口径，谨慎）
+pip install pkuseg</pre>
+    </div>
+
+    <div class="step-block">
+      <p class="step-title">S2-4　用户词典格式（项目已有 663 行，可继续扩写）</p>
+      <p class="io"><b>文件：</b><code>基础/红楼梦分词词典.txt</code>　<b>格式：</b>一行一词，三段式 <code>词语 词频 词性</code>，后两段可省略，用空格分隔、顺序不可颠倒、必须 UTF-8 编码。</p>
+      <pre class="code"># 基础/红楼梦分词词典.txt（示例）
+宝玉 100 nz
+黛玉 100 nz
+凤姐 80 nz
+大观园 60 ns
+栊翠庵 40 ns
+沁芳闸 30 ns
+蓼汀花溆 20 ns
+冷子兴 20 nr
+焙茗 15 nr
+好了歌 10 nz</pre>
+      <pre class="code"># 补充新词（三种方式）
+import jieba
+jieba.add_word('蓼汀花溆', freq=200, tag='ns')      # 单条追加
+jieba.del_word('宝玉')                              # 删除误切
+jieba.suggest_freq(('中', '将'), True)              # 调整组合词频，纠正歧义</pre>
+    </div>
+
+    <div class="step-block">
+      <p class="step-title">S2-5　核心代码（精确模式 + 停用词过滤 + 双格式输出）</p>
+      <pre class="code"># tokenize.py —— jieba 分词引擎（完整可运行）
+import os, json, glob
+from collections import Counter
+import jieba
+
+from config import SPLIT_DIR, TOKEN_DIR, TOKEN_TXT, SEG_DICT, STOP_FILES
+
+# ---------- 1. 一次性初始化（务必在循环外调用，避免重复加载词典）----------
+jieba.initialize()                       # 手动初始化，1~3 秒
+jieba.load_userdict(SEG_DICT)            # 载入红楼梦专名/人名词典
+# jieba.set_dictionary('data/dict.txt.big')   # 若原文含繁体，切换大词典
+
+# ---------- 2. 停用词（主表 + 停用词库 4 表并集）----------
+def load_stopwords(paths):
+    sw = set()
+    for p in paths:
+        if os.path.isfile(p):
+            with open(p, 'r', encoding='utf-8') as f:
+                sw.update(l.strip() for l in f if l.strip())
+    return sw
+
+STOPWORDS = load_stopwords(STOP_FILES)
+
+# ---------- 3. 单章分词 ----------
+def tokenize_text(text):
+    """精确模式；过滤空白与纯标点"""
+    words = [w.strip() for w in jieba.lcut(text, cut_all=False) if w.strip()]
+    return [w for w in words if any('\u4e00' <= c <= '\u9fff' for c in w)]
+
+def tokenize_chapter(path):
+    with open(path, 'r', encoding='utf-8') as f:
+        text = f.read()
+    return tokenize_text(text)
+
+# ---------- 4. 批量跑 120 章 ----------
+def run():
+    os.makedirs(TOKEN_DIR, exist_ok=True)
+    os.makedirs(TOKEN_TXT, exist_ok=True)
+    for path in sorted(glob.glob(os.path.join(SPLIT_DIR, '*.txt'))):
+        ch = os.path.basename(path)[:3]
+        words = tokenize_chapter(path)
+
+        # 输出 JSON（与既有 120 份产物口径一致：list[str]）
+        with open(os.path.join(TOKEN_DIR, f'{ch}.json'), 'w', encoding='utf-8') as f:
+            json.dump(words, f, ensure_ascii=False)
+
+        # 输出 TXT 视图
+        with open(os.path.join(TOKEN_TXT, f'{ch}.txt'), 'w', encoding='utf-8') as f:
+            f.write(' '.join(words))
+
+        # Top30 高频词（去停用词后）
+        wc = Counter(w for w in words if w not in STOPWORDS)
+        top = wc.most_common(30)
+        print(f'  {ch}: {len(words)}词   Top3={[w for w, _ in top[:3]]}')
+    print('✅ 分词完成')
+
+if __name__ == '__main__':
+    run()</pre>
+      <div class="callout" data-variant="warning">
+        <p><b>性能提示：</b>jieba 首次加载词典需 1–3 秒且会生成缓存。若软件以服务方式常驻，应<b>进程内只初始化一次</b>；若每次调用独立进程，请设置 <code>jieba.dt.tmp_dir</code> 到可写目录，否则受限文件系统下会反复重建缓存。</p>
+      </div>
+    </div>
+
+    <div class="step-block">
+      <p class="step-title">S2-6　词性标注与关键词抽取（为 M5/M6 预埋）<span class="badge p1">P1</span></p>
+      <p class="io"><b>用途：</b>A 轨 5W1H 需要识别"谁 / 哪里 / 何时"（对应 nr / ns / nt 词性）；M6 人物识别需要人名候选。</p>
+      <pre class="code">import jieba.posseg as pseg
+import jieba.analyse
+
+text = "黛玉在潇湘馆里听宝玉说笑了半日。"
+
+# 词性标注（ictclas 兼容标记）
+for w, flag in pseg.cut(text):
+    print(w, flag)         # 黛玉/nr 在/p 潇湘馆/ns ...
+
+# 关键词抽取（TF-IDF 与 TextRank 两种）
+jieba.analyse.set_stop_words('基础/停用词.txt')
+kw_tfidf = jieba.analyse.extract_tags(text, topK=10, withWeight=True)
+kw_tr    = jieba.analyse.textrank(text, topK=10, withWeight=True, allowPOS=('ns','n','vn','v'))
+
+# 提取全部人名候选（与 红楼梦人物名.txt 取交集做校验）
+persons = {w for w, fl in pseg.cut(text) if fl == 'nr'}</pre>
+      <div class="linkbox">
+        <div class="row"><span class="k">词性标记说明</span><a class="ln" href="https://github.com/fxsjy/jieba#%E8%AF%8D%E6%80%A7%E6%A0%87%E6%B3%A8">jieba README · 词性标注章节</a></div>
+        <div class="row"><span class="k">TF-IDF / TextRank</span><a class="ln" href="https://github.com/fxsjy/jieba/blob/master/test/extract_tags.py">jieba 关键词抽取示例</a></div>
+      </div>
+    </div>
+
+    <div class="step-block">
+      <p class="step-title">S2-7　验收标准</p>
+      <ul class="checklist">
+        <li><code>红楼梦_分词结果/</code> 与 <code>红楼梦_分词结果_txt/</code> 各 <b>120</b> 个文件，均非空</li>
+        <li>抽查专名切分正确：<code>宝玉</code> / <code>黛玉</code> / <code>凤姐</code> / <code>大观园</code> / <code>栊翠庵</code> 未被打散成单字</li>
+        <li>JSON 可被 <code>json.load()</code> 正常解析，元素均为 <code>str</code>（<code>emotion_analysis.py</code> 的 <code>_extract_words</code> 可直接消费）</li>
+        <li>单章词数与原文字数比例合理（经验值：词数约为字数的 55%–70%），异常章节需人工抽查</li>
+        <li>Top30 高频词中不应出现"的 / 了 / 是 / 一个"等停用词</li>
+      </ul>
+      <div class="callout" data-variant="warning">
+        <p><b>古白话专项风险：</b>《红楼梦》为清代古白话，"梯己 / 打谅 / 行动 / 嗔着"等词现代词典覆盖不足。建议增加一道<b>未登录词巡检</b>：统计出现频次 ≥ 5 但仍被切成单字的二字串，人工筛出后写入 <code>红楼梦分词词典.txt</code> 并重跑该章。</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- S3 情感分析 -->
+  <h2 class="heading">5.3　S3 情感分析引擎（对应 M3）</h2>
+  <div class="doc-section">
+
+    <div class="step-block">
+      <p class="step-title">S3-1　目标与输入输出 <span class="badge p0">P0</span></p>
+      <p class="io"><b>输入：</b><code>红楼梦_分词结果/{章号}.json</code><br>
+      <b>输出：</b><code>情感分析结果/{章号}_emotion.json</code>，字段：<code>dutir_{好乐哀怒惧恶惊}</code>(count/pct/words)、<code>dutir_total/pos/neg/neu</code>、<code>hownet_pos/neg/pct</code>、<code>top_words</code>(30)<br>
+      <b>引擎：</b>直接复用 <code>基础/emotion_analysis.py</code>（EmotionAnalyzer + SentimentAnalyzer，零第三方依赖）</p>
+    </div>
+
+    <div class="step-block">
+      <p class="step-title">S3-2　选型与理由</p>
+      <table class="table" data-caption="情感分析方案对比">
+        <colgroup><col style="width:26%"><col style="width:34%"><col style="width:40%"></colgroup>
+        <thead><tr><th>方案</th><th>原理</th><th>采用建议</th></tr></thead>
+        <tbody>
+          <tr><td>项目内置双引擎</td><td>DUTIR 七类 + Hownet 极性 + 否定翻转 + 程度加权</td><td><b>首选主引擎。</b>已有 120 章产物、口径明确、可解释性强（返回具体匹配词）</td></tr>
+          <tr><td>cnsenti（已并入 cntext）</td><td>词典法，封装 Hownet + DUTIR</td><td><b>词典来源</b>可借鉴；注意其<b>不做否定翻转与程度加权</b>，项目引擎在这一点上更强</td></tr>
+          <tr><td>SnowNLP</td><td>自训语料的情感打分</td><td>作为交叉参考（P2），与词典法口径不同，不宜混用</td></tr>
+          <tr><td>BERT 类模型</td><td>预训练语言模型微调</td><td>P2 远期方向；古白话语料微调成本高，且丧失"可解释的词级证据"</td></tr>
+        </tbody>
+      </table>
+      <div class="linkbox">
+        <div class="row"><span class="k">cnsenti</span><a class="ln" href="https://github.com/hiDaDeng/cnsenti">https://github.com/hiDaDeng/cnsenti</a> · <a class="ln" href="https://pypi.org/project/cnsenti/">PyPI</a></div>
+        <div class="row"><span class="k">cntext（升级版）</span><a class="ln" href="https://github.com/hiDaDeng/cntext">https://github.com/hiDaDeng/cntext</a></div>
+        <div class="row"><span class="k">DUTIR 词汇本体</span><a class="ln" href="http://ir.dlut.edu.cn/info/1013/1142.htm">http://ir.dlut.edu.cn/info/1013/1142.htm</a></div>
+        <div class="row"><span class="k">Hownet 词语集</span><a class="ln" href="http://www.keenage.com/html/c_bulletin_2007.htm">http://www.keenage.com/html/c_bulletin_2007.htm</a>（原站可能失效）</div>
+      </div>
+    </div>
+
+    <div class="step-block">
+      <p class="step-title">S3-3　核心代码（复用既有引擎 + 停用词过滤 + 结构化落盘）</p>
+      <pre class="code"># emotion_pipeline.py —— 双轨情感统计（DUTIR 七类 + Hownet 极性）
+import os, sys, json, glob
+from collections import Counter
+
+from config import BASE_DIR, TOKEN_DIR, EMO_DIR, STOP_FILES
+sys.path.insert(0, BASE_DIR)
+from emotion_analysis import EmotionAnalyzer, SentimentAnalyzer   # 既有模块
+
+EMOTIONS = ['好', '乐', '哀', '怒', '惧', '恶', '惊']
+
+def load_stopwords(paths):
+    sw = set()
+    for p in paths:
+        if os.path.isfile(p):
+            with open(p, 'r', encoding='utf-8') as f:
+                sw.update(l.strip() for l in f if l.strip())
+    return sw
+
+def run():
+    ea = EmotionAnalyzer(dict_dir=os.path.join(BASE_DIR, '情感词典_DUTIR'))
+    sa = SentimentAnalyzer(dict_dir=os.path.join(BASE_DIR, '情感词典_Hownet'),
+                           negation_file=os.path.join(BASE_DIR, '否定词.txt'),
+                           degree_file=os.path.join(BASE_DIR, '递进词.txt'))
+    stopwords = load_stopwords(STOP_FILES)
+    os.makedirs(EMO_DIR, exist_ok=True)
+
+    for path in sorted(glob.glob(os.path.join(TOKEN_DIR, '*.json'))):
+        ch = os.path.basename(path)[:3]
+        with open(path, 'r', encoding='utf-8') as f:
+            words = [w for w in json.load(f) if w and w not in stopwords]
+
+        emo  = ea.analyze_words(words)
+        sent = sa.analyze_words(words)
+        wc   = Counter(w for w in words if w)
+        total = emo['total_emotion_words']
+
+        out = {"chapter": ch}
+        for e in EMOTIONS:
+            c = emo['emotion_counts'].get(e, 0)
+            out[f'dutir_{e}'] = {
+                "count": c,
+                "pct": round(c / total * 100, 1) if total else 0,
+                "words": ', '.join(emo['emotion_words'].get(e, [])[:15]),
+            }
+        out.update({
+            "dutir_total": total,
+            "dutir_pos": emo['positive_emotion_count'],
+            "dutir_neg": emo['negative_emotion_count'],
+            "dutir_neu": emo['neutral_emotion_count'],
+            "hownet_pos": sent['pos_count'],
+            "hownet_neg": sent['neg_count'],
+            "hownet_pos_pct": sent['pos_percentage'],
+            "hownet_neg_pct": sent['neg_percentage'],
+            "hownet_total": sent['total_sentiment_words'],
+            "top_words": [{"word": w, "count": c} for w, c in wc.most_common(30)],
+        })
+        with open(os.path.join(EMO_DIR, f'{ch}_emotion.json'), 'w', encoding='utf-8') as f:
+            json.dump(out, f, ensure_ascii=False, indent=2)
+        print(f"  {ch}: total={total} pos={emo['positive_emotion_count']} neg={emo['negative_emotion_count']}")
+    print('✅ 情绪 JSON 生成完成')
+
+if __name__ == '__main__':
+    run()</pre>
+      <p class="io"><b>核心算法口径（务必与既有报告保持一致）：</b>否定词在窗口 = 5 的范围内<b>奇数次翻转、偶数次还原</b>；程度副词权重：<code>very=2.0 / extreme=2.5 / more=1.5 / ish=0.75</code>，项目递进词表默认 <code>1.5</code>；一个词只归入一个情绪类别（<code>break</code> 提前跳出）。<a class="cite" href="#source-2">[2]</a></p>
+    </div>
+
+    <div class="step-block">
+      <p class="step-title">S3-4　词库扩展路径（古白话覆盖率提升）</p>
+      <table class="table" data-caption="外部情感词典资源与获取地址">
+        <colgroup><col style="width:30%"><col style="width:70%"></colgroup>
+        <thead><tr><th>资源</th><th>地址与说明</th></tr></thead>
+        <tbody>
+          <tr><td>ppzhenghua / SentimentAnalysisDictionary</td><td><a class="ln" href="https://github.com/ppzhenghua/SentimentAnalysisDictionary">github.com/ppzhenghua/SentimentAnalysisDictionary</a><br>8 类词典汇总（NTUSD／清华褒贬义／Hownet／大工本体／否定词／极值表／近义词），更新至 2025-03</td></tr>
+          <tr><td>Shimon-Guo / chinese_sentiment_dictionary</td><td><a class="ln" href="https://github.com/Shimon-Guo/chinese_sentiment_dictionary">github.com/Shimon-Guo/chinese_sentiment_dictionary</a><br>4 个主流词典精简包（Hownet／NTUSD／清华／BosonNLP）</td></tr>
+          <tr><td>DavionWu2018 / Sentiment_dictionary</td><td><a class="ln" href="https://github.com/DavionWu2018/Sentiment_dictionary">github.com/DavionWu2018/Sentiment_dictionary</a><br>通用 + 金融情感词典 + 程度副词 + 否定词 + 停用词 + Python 示例代码</td></tr>
+          <tr><td>大连理工情感词汇本体（DUTIR）</td><td><a class="ln" href="http://ir.dlut.edu.cn/info/1013/1142.htm">ir.dlut.edu.cn/info/1013/1142.htm</a><br>七大类情绪本体，被引 437 次；项目 <code>基础/情感词典_DUTIR/</code> 即基于此</td></tr>
+          <tr><td>中文停用词表聚合（4 表并集）</td><td><a class="ln" href="https://github.com/goto456/stopwords">github.com/goto456/stopwords</a><br>哈工大／百度／川大／中文停用词表，项目 <code>基础/停用词库/</code> 已收录</td></tr>
+          <tr><td>台湾大学 NTUSD</td><td><a class="ln" href="http://nlg.csie.ntu.edu.tw/nlpresource/NTUSD-Fin/">nlg.csie.ntu.edu.tw/nlpresource/NTUSD-Fin/</a>（原站可能失效，建议走 GitHub 镜像）</td></tr>
+          <tr><td>清华大学李军褒贬义词典</td><td><a class="ln" href="http://nlp.csai.tsinghua.edu.cn/site2/index.php/13-sms">nlp.csai.tsinghua.edu.cn/site2/index.php/13-sms</a>（原站可能失效）</td></tr>
+          <tr><td>BosonNLP 情感词典</td><td><a class="ln" href="https://bosonnlp.com/dev/resource">bosonnlp.com/dev/resource</a>（服务已停止，可用镜像）</td></tr>
+        </tbody>
+      </table>
+      <ul class="warnlist">
+        <li>词典版权：仅供科研教学使用，商用需联系原作者（项目调研文档已明确标注）</li>
+        <li>编码差异：中文词典可能为 GBK，合并入 UTF-8 词库前需统一转码</li>
+        <li>合并策略：<b>新词只做并集、不覆盖既有词</b>，避免改变已发布报告的口径</li>
+      </ul>
+    </div>
+
+    <div class="step-block">
+      <p class="step-title">S3-5　验收标准</p>
+      <ul class="checklist">
+        <li><code>情感分析结果/</code> 下 <b>120</b> 个 <code>{章号}_emotion.json</code>，字段齐全</li>
+        <li>每章 <code>dutir_total &gt; 0</code>；七类 count 之和 = <code>dutir_total</code>；pct 之和 ≈ 100%</li>
+        <li><code>dutir_pos + dutir_neg + dutir_neu == dutir_total</code>（极性映射一致性）</li>
+        <li>运行 <code>python check_dicts.py</code> 通过：DUTIR 去重后 27,389 词、Hownet pos+neg 17,690 词</li>
+        <li>抽查第 1 章：<code>hownet_pos_pct + hownet_neg_pct</code> 应接近 100%，偏差 &gt; 2% 需排查</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <!-- S4 LLM -->
+  <h2 class="heading">5.4　S4 LLM 深度分析引擎（对应 M4）· 工作量核心</h2>
+  <div class="doc-section">
+
+    <div class="step-block">
+      <p class="step-title">S4-1　目标与输入输出 <span class="badge p0">P0</span></p>
+      <p class="io"><b>输入：</b>① 章节原文 ② <code>{章号}_emotion.json</code> ③ 提示词模板（V3.4 九大模块）④ 章节简称表 / 叙事阶段预分类表<br>
+      <b>输出：</b><code>分析结果/{章号}_{简称}_V3.5_分析报告.md</code>（九大模块），并附带一份结构化 JSON（事件/人物/情绪/冲突/伏笔）</p>
+    </div>
+
+    <div class="step-block">
+      <p class="step-title">S4-2　选型与理由</p>
+      <table class="table" data-caption="LLM 调度方案选型">
+        <colgroup><col style="width:24%"><col style="width:34%"><col style="width:42%"></colgroup>
+        <thead><tr><th>组件</th><th>选型</th><th>理由与地址</th></tr></thead>
+        <tbody>
+          <tr><td>API SDK</td><td>openai（OpenAI 兼容协议）</td><td>一套代码可切换任意兼容后端（云端或本地），<a class="ln" href="https://github.com/openai/openai-python">github.com/openai/openai-python</a></td></tr>
+          <tr><td>本地模型（数据不出机）</td><td>Ollama / vLLM / LM Studio</td><td><a class="ln" href="https://ollama.com/">ollama.com</a> · <a class="ln" href="https://github.com/vllm-project/vllm">github.com/vllm-project/vllm</a> · <a class="ln" href="https://lmstudio.ai/">lmstudio.ai</a>（后两者暴露 OpenAI 兼容端点）</td></tr>
+          <tr><td>模板引擎</td><td>Jinja2</td><td>把"任务说明书 + 空白模板"参数化为模板，<a class="ln" href="https://jinja.palletsprojects.com/">jinja.palletsprojects.com</a></td></tr>
+          <tr><td>结构化输出</td><td>JSON Schema + Pydantic 校验</td><td>让 LLM 直接返回 JSON 并做 schema 校验，<a class="ln" href="https://docs.pydantic.dev/">docs.pydantic.dev</a></td></tr>
+          <tr><td>任务编排</td><td>asyncio + aiosqlite（自建 TaskQueue）</td><td>断点续跑/增量跳过靠文件系统与 DB 双记录，无需引入 Celery 等重组件</td></tr>
+          <tr><td>长任务调度（可选）</td><td>APScheduler</td><td>若需"夜间批量跑全书"，<a class="ln" href="https://github.com/agronholm/apscheduler">github.com/agronholm/apscheduler</a></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="step-block">
+      <p class="step-title">S4-3　安装命令</p>
+      <pre class="code">pip install openai jinja2 pydantic python-dotenv
+
+# 本地模型（可选，二选一即可）
+# 方式 A：Ollama
+#   curl -fsSL https://ollama.com/install.sh | sh
+#   ollama pull qwen2.5:14b
+# 方式 B：vLLM 部署 OpenAI 兼容服务
+#   pip install vllm && vllm serve Qwen/Qwen2.5-14B-Instruct</pre>
+    </div>
+
+    <div class="step-block">
+      <p class="step-title">S4-4　核心代码（模板化提示词 + 断点续跑 + JSON 校验）</p>
+      <pre class="code"># analyze.py —— LLM 深度分析调度器
+import os, glob, json, time
+from jinja2 import Template
+from openai import OpenAI
+from config import ROOT, SPLIT_DIR, EMO_DIR, REPORT_DIR
+
+client = OpenAI(
+    api_key=os.getenv("LLM_API_KEY", "sk-local"),
+    base_url=os.getenv("LLM_BASE_URL", "https://api.openai.com/v1"),
+)
+MODEL = os.getenv("LLM_MODEL", "gpt-4o-mini")
+
+# ---------- 1. 提示词模板：由 V3.4 任务说明书 + 空白模板合成 ----------
+PROMPT = Template("""你是《红楼梦》文本分析专家。请严格按「双轨六要素 V3.4」九大模块，
+为第{{ no }}章（{{ title }}，{{ chars }} 字）生成分析报告。
+
+【硬性规则】
+1. 事件数下限 ≥ {{ chars // 500 }} 件；事件 ID 规则 E{{ no }}-{序号}；分级 ★/◆/◇。
+2. §五 情感数据必须直接引用下方 JSON，不得自行估算。
+3. §六 人物出场须标注段落索引。
+4. 输出格式：先输出 ```json 结构化块（见 SCHEMA），再输出完整 Markdown 报告。
+
+【本章情绪数据 JSON】
+{{ emotion_json }}
+
+【结构化输出 SCHEMA】
+{"chapter":int,"events":[{"id":str,"level":str,"summary":str,"para":int}],
+ "persons":[{"name":str,"level":str,"para":int}],
+ "emotion":{"tone":str,"dutir":{"好":int,"乐":int,"哀":int,"怒":int,"惧":int,"恶":int,"惊":int}},
+ "foreshadows":[...],"conflicts":int}
+
+【本章原文】
+{{ text }}""")
+
+# ---------- 2. 断点续跑：已生成且体积达标则跳过 ----------
+def pending(range_=(1, 120)):
+    todo = []
+    for ch in range(range_[0], range_[1] + 1):
+        hits = glob.glob(os.path.join(REPORT_DIR, f'{ch:03d}_*_V3.5_分析报告.md'))
+        if hits and os.path.getsize(hits[0]) > 1000:
+            continue                                    # 已完成 → 跳过
+        if not os.path.exists(os.path.join(EMO_DIR, f'{ch:03d}_emotion.json')):
+            print(f'⚠️ 第{ch}章: 情绪 JSON 不存在，跳过')
+            continue
+        todo.append(ch)
+    return todo
+
+# ---------- 3. 单章分析 ----------
+def analyze_one(no):
+    ch = f'{no:03d}'
+    src = glob.glob(os.path.join(SPLIT_DIR, f'{ch}_*.txt'))[0]
+    text = open(src, 'r', encoding='utf-8').read()
+    title = os.path.basename(src).split('_', 2)[2].replace('.txt', '')
+    emo = open(os.path.join(EMO_DIR, f'{ch}_emotion.json'), 'r', encoding='utf-8').read()
+
+    prompt = PROMPT.render(no=no, title=title, chars=len(text),
+                           emotion_json=emo, text=text)
+    for attempt in range(3):                            # 失败重试 3 次
+        try:
+            resp = client.chat.completions.create(
+                model=MODEL, temperature=0.2, max_tokens=8000,
+                messages=[{"role": "user", "content": prompt}])
+            md = resp.choices[0].message.content
+            out = os.path.join(REPORT_DIR,
+                               f'{ch}_{title.split("　")[0]}_V3.5_分析报告.md')
+            open(out, 'w', encoding='utf-8').write(md)
+            return True
+        except Exception as e:
+            print(f'  第{no}章 第{attempt+1}次失败: {e}')
+            time.sleep(2 ** attempt)                    # 指数退避
+    return False
+
+if __name__ == '__main__':
+    todo = pending((1, 120))
+    print(f'待处理 {len(todo)} 章')
+    for no in todo:
+        ok = analyze_one(no)
+        print(f'  第{no}章 {"✅" if ok else "❌"}')</pre>
+    </div>
+
+    <div class="step-block">
+      <p class="step-title">S4-5　质量门禁（生成后自动校验）</p>
+      <p class="io">把现有 4 个验证脚本挂到分析流程之后，作为软件内的"质量门禁"服务：</p>
+      <pre class="code"># 每章生成后依次执行，任一失败即标记该章待重跑
+python 脚本工具/验证检查类/verify_v32.py        # 大章节/子章节数、关键小节存在性
+python 脚本工具/验证检查类/deep_verify.py       # 版本号一致性、占位符数量、完整性检测项
+python 脚本工具/验证检查类/verify_alignment.py  # 全章节结构与最新模板对齐
+python 脚本工具/验证检查类/check_dicts.py       # 情感词典完备性</pre>
+      <ul class="checklist">
+        <li>事件数 ≥ 字数 ÷ 500（低于阈值自动重跑，并在日志中记录）</li>
+        <li>九大模块齐全，41 个三级标题无缺失</li>
+        <li>§五 七类情绪数值与 <code>{章号}_emotion.json</code> 完全一致（不可 LLM 自行编造）</li>
+        <li>版本号三处一致（标题 / 头部信息块 / 页脚）</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <!-- S5 事件 -->
+  <h2 class="heading">5.5　S5 事件挖掘模块（对应 M5）</h2>
+  <div class="doc-section">
+
+    <div class="step-block">
+      <p class="step-title">S5-1　目标与规则口径 <span class="badge p1">P1</span></p>
+      <p class="io"><b>目标：</b>把 LLM 输出的事件条目规范化成可查询、可统计的事件表，并生成时间线。<br>
+      <b>已锁定规则：</b>① 事件 = 起因 → 行动 → 结果 的完整单元；② ID 规则 <code>E{章号}-{序号}</code>；③ 三级分级 ★（核心）/ ◆（重要）/ ◇（一般）；④ 必须标注原文段落索引；⑤ 事件数下限 = 字数 ÷ 500。</p>
+    </div>
+
+    <div class="step-block">
+      <p class="step-title">S5-2　核心代码（结构化落盘 + 统计校验）</p>
+      <pre class="code"># events.py —— 事件表构建与合规校验
+import json, os
+from collections import Counter
+from config import REPORT_DIR
+
+def parse_events(structured):
+    """从 LLM 结构化输出中取出事件表"""
+    rows = []
+    for ev in structured.get('events', []):
+        rows.append({
+            'event_id': ev['id'],                 # E{章}-{序号}
+            'chapter': structured['chapter'],
+            'level': ev['level'],                 # ★ / ◆ / ◇
+            'summary': ev['summary'],
+            'para': ev.get('para'),               # 段落索引
+            'five_w_one_h': ev.get('5w1h', {}),   # who/what/when/where/why/how
+        })
+    return rows
+
+def check_events(rows, chars):
+    """合规校验：数量下限 + 分级分布 + 段落索引完整"""
+    low = chars // 500
+    problems = []
+    if len(rows) < low:
+        problems.append(f'事件数 {len(rows)} < 下限 {low}')
+    if any(r['para'] is None for r in rows):
+        problems.append('存在缺少段落索引的事件')
+    dist = Counter(r['level'] for r in rows)
+    if not dist:
+        problems.append('事件分级为空')
+    return {'count': len(rows), 'lower_bound': low, 'level_dist': dict(dist),
+            'problems': problems}</pre>
+    </div>
+
+    <div class="step-block">
+      <p class="step-title">S5-3　可视化：事件时间线</p>
+      <div class="linkbox">
+        <div class="row"><span class="k">ECharts（推荐）</span><a class="ln" href="https://echarts.apache.org/zh/index.html">https://echarts.apache.org/zh/index.html</a> —— 时间线 / 关系图 / 曲线均由它统一承载</div>
+        <div class="row"><span class="k">vis-timeline</span><a class="ln" href="https://github.com/visjs/vis-timeline">https://github.com/visjs/vis-timeline</a> —— 专门做交互式时间轴，适合事件密度高的章节</div>
+        <div class="row"><span class="k">pyecharts</span><a class="ln" href="https://github.com/pyecharts/pyecharts">https://github.com/pyecharts/pyecharts</a> —— 若想从 Python 侧直接产出 HTML 图表</div>
+      </div>
+      <ul class="checklist">
+        <li>每章事件数 ≥ 字数 ÷ 500，且 ★ 级事件占比在 10%–30% 之间（过高说明分级失效）</li>
+        <li>事件 ID 全书唯一、无重复、章内序号连续</li>
+        <li>时间线可按 ★/◆/◇ 分层筛选，点击事件可跳转到原文段落</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <!-- S6 人物 -->
+  <h2 class="heading">5.6　S6 人物挖掘模块（对应 M6）</h2>
+  <div class="doc-section">
+
+    <div class="step-block">
+      <p class="step-title">S6-1　目标与输入输出 <span class="badge p1">P1</span></p>
+      <p class="io"><b>输入：</b>① <code>基础/红楼梦人物名.txt</code>（362 行）② 各章报告的人物占位符 ③ 全文分词结果（nr 词性候选）<br>
+      <b>输出：</b>人物档案 JSON（首次出场章号 / 出场次数 / 层级 / 关系）+ 人物共现网络图 + 人物情感曲线</p>
+    </div>
+
+    <div class="step-block">
+      <p class="step-title">S6-2　别名归并（ALIAS）—— 本模块的最大难点</p>
+      <p class="io">同一人物在书中有多种称法（黛玉 / 林黛玉 / 林妹妹 / 颦儿），必须归一。项目已有 40+ 条 ALIAS 字典，需<b>配置化、可编辑、可导入导出</b>。</p>
+      <pre class="code"># alias.py —— 别名归并字典（可外置为 alias.json 供界面编辑）
+ALIAS = {
+    # 别名 → 标准名
+    "黛玉": "林黛玉", "林妹妹": "林黛玉", "颦儿": "林黛玉", "颦颦": "林黛玉",
+    "凤姐": "王熙凤", "凤辣子": "王熙凤", "琏二奶奶": "王熙凤",
+    "宝钗": "薛宝钗", "宝姐姐": "薛宝钗",
+    "宝玉": "贾宝玉", "宝二爷": "贾宝玉", "怡红公子": "贾宝玉",
+    "焙茗": "茗烟", "茗烟": "茗烟",
+    "史太君": "贾母", "老太太": "贾母", "老祖宗": "贾母",
+    "探春": "贾探春", "三姑娘": "贾探春", "蕉下客": "贾探春",
+    # ... 40+ 条，建议抽成外部 JSON
+}
+
+def canon(name, alias=ALIAS):
+    return alias.get(name.strip(), name.strip())</pre>
+      <div class="callout" data-variant="tip">
+        <p><b>自动建议别名：</b>对"名字被包含"的候选对（如"宝玉"⊂"贾宝玉"、"黛玉"⊂"林黛玉"）自动生成待确认清单，人工勾选后写回 ALIAS —— 这比纯手工维护 40+ 条更可靠。项目 <code>analyze_persons_v2.py</code> 已实现别名检测的雏形，可直接扩展。</p>
+      </div>
+    </div>
+
+    <div class="step-block">
+      <p class="step-title">S6-3　人名识别增强（可选）</p>
+      <div class="linkbox">
+        <div class="row"><span class="k">HanLP</span><a class="ln" href="https://github.com/hankcs/HanLP">https://github.com/hankcs/HanLP</a> —— 中文 NER 效果好，内置人名/地名/机构名</div>
+        <div class="row"><span class="k">LTP</span><a class="ln" href="https://github.com/HIT-SCIR/ltp">https://github.com/HIT-SCIR/ltp</a> —— 哈工大语言技术平台，含 NER 与依存句法</div>
+        <div class="row"><span class="k">百度 LAC</span><a class="ln" href="https://github.com/baidu/lac">https://github.com/baidu/lac</a> —— 词法分析，含人名标注</div>
+        <div class="row"><span class="k">UER-py / 预训练模型</span><a class="ln" href="https://huggingface.co/bert-base-chinese">huggingface.co/bert-base-chinese</a> —— 需要更高精度时的微调起点</div>
+      </div>
+      <div class="callout" data-variant="warning">
+        <p><b>先用词典、后上模型：</b>项目已有 362 行人物名表 + 663 行分词词典，词典法在《红楼梦》这类封闭人物集上已能覆盖绝大多数出场；NER 模型作为"发现漏网人物"的补充手段，不必作为主路径。</p>
+      </div>
+    </div>
+
+    <div class="step-block">
+      <p class="step-title">S6-4　人物关系网络</p>
+      <pre class="code"># persons.py —— 共现网络 + 关系图导出
+import json, itertools
+from collections import Counter
+import networkx as nx
+
+def build_graph(chapter_persons, alias=None):
+    """chapter_persons: {章号: [人物, ...]}；同章共现即连边"""
+    alias = alias or {}
+    G = nx.Graph()
+    for ch, names in chapter_persons.items():
+        std = sorted({alias.get(n, n) for n in names})
+        for a, b in itertools.combinations(std, 2):
+            if G.has_edge(a, b):
+                G[a][b]['weight'] += 1
+                G[a][b]['chapters'].append(ch)
+            else:
+                G.add_edge(a, b, weight=1, chapters=[ch])
+    return G
+
+# 关键指标：度中心性（社交广度）、介数中心性（关系枢纽）
+def key_metrics(G):
+    return {
+        'degree':  dict(nx.degree_centrality(G)),
+        'between': dict(nx.betweenness_centrality(G)),
+    }
+
+# 导出交互式关系图（HTML）
+from pyvis.network import Network
+def export_html(G, path='人物关系图.html'):
+    net = Network(height='720px', width='100%', bgcolor='#ffffff', font_color='#1f2d3d')
+    for n in G.nodes:
+        net.add_node(n, label=n, size=10 + 2 * G.degree(n))
+    for a, b, d in G.edges(data=True):
+        net.add_edge(a, b, value=d['weight'], title=f"共现 {d['weight']} 次")
+    net.show(path, notebook=False)</pre>
+      <div class="linkbox">
+        <div class="row"><span class="k">NetworkX</span><a class="ln" href="https://networkx.org/">https://networkx.org/</a></div>
+        <div class="row"><span class="k">pyvis</span><a class="ln" href="https://github.com/WestHealth/pyvis">https://github.com/WestHealth/pyvis</a>（Python 侧快速出关系图）</div>
+        <div class="row"><span class="k">AntV G6</span><a class="ln" href="https://github.com/antvis/G6">https://github.com/antvis/G6</a>（前端侧关系图，交互更强）</div>
+      </div>
+      <ul class="checklist">
+        <li>人物档案去重后条目数与既有归档索引 §二 一致（宽口径约 260 人）</li>
+        <li>抽查 10 组别名，归并准确率 100%（黛玉/林妹妹/颦儿 → 林黛玉）</li>
+        <li>关系图节点度分布合理：贾宝玉 / 林黛玉 / 王熙凤 / 薛宝钗 应处于度中心性前列</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <!-- S7 报告与索引 -->
+  <h2 class="heading">5.7　S7 报告与全局索引引擎（对应 M7）</h2>
+  <div class="doc-section">
+
+    <div class="step-block">
+      <p class="step-title">S7-1　实现路径：结构化输出优先，正则提取兜底 <span class="badge p0">P0</span></p>
+      <p class="io"><b>主路径：</b>LLM 直接返回 JSON（S4-4 的 SCHEMA 块）→ 入库 → 生成索引；<br>
+      <b>兜底路径：</b>对历史 MD 报告沿用 <code>extract_v34_v2.py</code> 正则提取 → <code>gen_index.py</code> 生成索引（已有 17,320 行产物验证）。</p>
+      <pre class="code"># 完整索引生成流程（两步走，与既有实践一致）
+python 脚本工具/索引归档类/extract_v34_v2.py   # MD 报告 → v34_extract_v2.json
+python 脚本工具/索引归档类/gen_index.py        # JSON → _归档索引_V3.4.md（7 大部分）</pre>
+      <p class="io"><b>两个核心配置表（务必外置为可编辑 JSON）：</b></p>
+      <pre class="code"># TONE_MAP：情感基调 14 种表述 → 6 个标准标签
+TONE_MAP = {
+    "悲凉": "悲", "凄婉": "悲", "哀伤": "悲", "沉郁": "悲",
+    "欢愉": "喜", "喜庆": "喜", "轻松": "喜", "诙谐": "喜",
+    "平和": "平", "恬淡": "平", "日常": "平",
+    "紧张": "紧张", "激烈": "紧张", "肃杀": "紧张",
+    "温馨": "温馨", "温情": "温馨",
+    "荒诞": "荒诞", "诡谲": "荒诞",
+}</pre>
+    </div>
+
+    <div class="step-block">
+      <p class="step-title">S7-2　验收标准</p>
+      <ul class="checklist">
+        <li><code>v34_extract_v2.json</code> 行数与历史一致（17,320 行量级），无解析异常章节</li>
+        <li><code>_归档索引_V3.4.md</code> 含完整 7 大部分，行数 1200+ 量级</li>
+        <li>抽查第 1/40/80/120 章的索引行，字数 / 事件数 / 主导情绪与报告正文一致</li>
+        <li>TONE_MAP 归一后标准标签只出现 6 类，无"其他"残差</li>
+        <li>人物出场档案按首次出场章号升序排列（<code>fix_person_order.py</code> 校验通过）</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <!-- S8 可视化 -->
+  <h2 class="heading">5.8　S8 可视化与导出（对应 M8）</h2>
+  <div class="doc-section">
+
+    <div class="step-block">
+      <p class="step-title">S8-1　四类可视化的实现方案 <span class="badge p1">P1</span></p>
+      <table class="table" data-caption="可视化与导出选型">
+        <colgroup><col style="width:22%"><col style="width:30%"><col style="width:48%"></colgroup>
+        <thead><tr><th>可视化</th><th>推荐库</th><th>数据来源与地址</th></tr></thead>
+        <tbody>
+          <tr><td>章节情感曲线</td><td>ECharts（折线 + 面积）</td><td>逐章 <code>hownet_pos_pct / neg_pct</code> + 七类情绪堆叠；<a class="ln" href="https://echarts.apache.org/zh/index.html">echarts.apache.org/zh/index.html</a></td></tr>
+          <tr><td>事件时间线</td><td>ECharts timeline / vis-timeline</td><td>事件表（chapter + level + summary）；<a class="ln" href="https://github.com/visjs/vis-timeline">github.com/visjs/vis-timeline</a></td></tr>
+          <tr><td>人物关系图谱</td><td>AntV G6 / pyvis</td><td>共现网络图；<a class="ln" href="https://github.com/antvis/G6">github.com/antvis/G6</a></td></tr>
+          <tr><td>高频词云</td><td>wordcloud</td><td>各章 <code>top_words</code> 字段；<a class="ln" href="https://github.com/amueller/word_cloud">github.com/amueller/word_cloud</a></td></tr>
+        </tbody>
+      </table>
+      <div class="callout" data-variant="warning">
+        <p><b>中文词云必读：</b>wordcloud 默认字体不含中文，必须显式指定中文字体路径（否则全部显示为方框）。推荐思源黑体 —— <a class="ln" href="https://github.com/adobe-fonts/source-han-sans">github.com/adobe-fonts/source-han-sans</a>。</p>
+      </div>
+      <pre class="code">from wordcloud import WordCloud
+wc = WordCloud(font_path='fonts/SourceHanSansSC-Regular.otf',   # ← 关键，勿省略
+               width=1200, height=800, background_color='white',
+               max_words=200).generate_from_frequencies(
+                   {d['word']: d['count'] for d in top_words})
+wc.to_file('词云_第001章.png')</pre>
+    </div>
+
+    <div class="step-block">
+      <p class="step-title">S8-2　导出方案</p>
+      <table class="table" data-caption="导出格式与工具">
+        <colgroup><col style="width:18%"><col style="width:26%"><col style="width:56%"></colgroup>
+        <thead><tr><th>目标格式</th><th>工具</th><th>说明与地址</th></tr></thead>
+        <tbody>
+          <tr><td>Word (.docx)</td><td>python-docx</td><td>从结构化 JSON 直接生成，格式最可控；<a class="ln" href="https://github.com/python-openxml/python-docx">github.com/python-openxml/python-docx</a></td></tr>
+          <tr><td>PDF</td><td>WeasyPrint / Pandoc + wkhtmltopdf</td><td>本报告即"HTML → PDF"思路；<a class="ln" href="https://weasyprint.org/">weasyprint.org</a> · <a class="ln" href="https://pandoc.org/">pandoc.org</a> · <a class="ln" href="https://wkhtmltopdf.org/">wkhtmltopdf.org</a></td></tr>
+          <tr><td>Excel (.xlsx)</td><td>openpyxl</td><td>索引导出（逐章统计 / 人物档案 / 情绪汇总 多 sheet）；<a class="ln" href="https://openpyxl.readthedocs.io/">openpyxl.readthedocs.io</a></td></tr>
+          <tr><td>HTML</td><td>markdown-it / python-markdown</td><td>报告阅读器渲染；<a class="ln" href="https://github.com/markdown-it/markdown-it">github.com/markdown-it/markdown-it</a> · <a class="ln" href="https://python-markdown.github.io/">python-markdown.github.io</a></td></tr>
+        </tbody>
+      </table>
+      <ul class="checklist">
+        <li>导出的 PDF 页眉页脚含项目名与版本号；中文不出现方框或缺字</li>
+        <li>Excel 导出的索引表中，数值列均为数字类型（非文本），可直接做数据透视</li>
+        <li>Word 导出保留标题层级（Heading 1/2/3），可用导航窗格跳转</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <!-- 五、界面工作台 -->
+  <h2 class="heading">5.9　界面工作台设计（6 个）</h2>
+  <div class="doc-section">
+    <table class="table" data-caption="工作台与模块映射">
+      <colgroup><col style="width:18%"><col style="width:44%"><col style="width:38%"></colgroup>
+      <thead><tr><th>工作台</th><th>主要功能</th><th>对应模块 / 步骤</th></tr></thead>
+      <tbody>
+        <tr><td>① 导入与项目</td><td>导入 TXT → 自动拆分 → 项目配置（词库、模型、模板）</td><td>M1、M2 / S1</td></tr>
+        <tr><td>② 预处理</td><td>一键分词 + 情感统计，显示逐章进度与失败重试</td><td>M2、M3 / S2、S3</td></tr>
+        <tr><td>③ 深度分析</td><td>任务队列（批量章节）、模板选择、LLM 参数、断点续跑</td><td>M4 / S4</td></tr>
+        <tr><td>④ 事件视图</td><td>事件列表（E ID / 级别 / 段落索引 / 摘要）、5W1H 明细、事件时间线</td><td>M5 / S5</td></tr>
+        <tr><td>⑤ 人物视图</td><td>人物卡片（首次出场/次数/关系）、人物关系图、人物情感曲线</td><td>M6 / S6</td></tr>
+        <tr><td>⑥ 索引与导出</td><td>全局索引 7 部分预览、报告阅读器、导出（MD/HTML/Word/PDF/Excel）</td><td>M7、M8 / S7、S8</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ===== 六、技术选型 ===== -->
+  <h1 class="heading">六、技术选型（附官方地址）</h1>
+
+  <div class="doc-section">
+    <table class="table" data-caption="技术选型一览（含官方地址）">
+      <colgroup>
+        <col style="width:16%">
+        <col style="width:24%">
+        <col style="width:60%">
+      </colgroup>
+      <thead>
+        <tr><th>组件</th><th>选型</th><th>理由与官方地址</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>桌面形态</td>
+          <td>本地 Web App（FastAPI + 浏览器前端）</td>
+          <td>数据留在本地、无需上传；可打包为桌面壳 —— <a class="ln" href="https://tauri.app/zh-cn/">Tauri</a> / <a class="ln" href="https://www.electronjs.org/zh/">Electron</a></td>
+        </tr>
+        <tr>
+          <td>后端</td>
+          <td>Python 3.10 + FastAPI</td>
+          <td>直接复用现有全部 Python 脚本与词库 —— <a class="ln" href="https://fastapi.tiangolo.com/zh/">fastapi.tiangolo.com</a> · <a class="ln" href="https://www.uvicorn.org/">uvicorn.org</a> · <a class="ln" href="https://docs.pydantic.dev/">docs.pydantic.dev</a></td>
+        </tr>
+        <tr>
+          <td>前端</td>
+          <td>Vue3 + ECharts + Element Plus</td>
+          <td>ECharts 覆盖情感曲线/关系图/时间线全部可视化 —— <a class="ln" href="https://cn.vuejs.org/">cn.vuejs.org</a> · <a class="ln" href="https://cn.vitejs.dev/">cn.vitejs.dev</a> · <a class="ln" href="https://echarts.apache.org/zh/index.html">echarts</a> · <a class="ln" href="https://element-plus.org/zh-CN/">element-plus</a></td>
+        </tr>
+        <tr>
+          <td>存储</td>
+          <td>SQLite + 文件系统</td>
+          <td>结构化索引与原始资产分离 —— <a class="ln" href="https://www.sqlite.org/">sqlite.org</a> · <a class="ln" href="https://github.com/fastapi/sqlmodel">SQLModel</a></td>
+        </tr>
+        <tr>
+          <td>中文分词</td>
+          <td>jieba（+ 用户词典）</td>
+          <td>纯 Python、MIT、可加载 663 行专名词典 —— <a class="ln" href="https://github.com/fxsjy/jieba">github.com/fxsjy/jieba</a></td>
+        </tr>
+        <tr>
+          <td>情感分析</td>
+          <td>本地双引擎（DUTIR + Hownet）</td>
+          <td>项目 <code>基础/emotion_analysis.py</code>，零依赖、结果可解释；词典可扩展 —— <a class="ln" href="https://github.com/hiDaDeng/cnsenti">cnsenti</a> / <a class="ln" href="https://github.com/hiDaDeng/cntext">cntext</a></td>
+        </tr>
+        <tr>
+          <td>LLM 调度</td>
+          <td>OpenAI 兼容 API / 本地模型</td>
+          <td>一套代码切换任意后端 —— <a class="ln" href="https://github.com/openai/openai-python">openai-python</a> · <a class="ln" href="https://ollama.com/">ollama</a> · <a class="ln" href="https://github.com/vllm-project/vllm">vLLM</a></td>
+        </tr>
+        <tr>
+          <td>任务编排</td>
+          <td>内置 TaskQueue（asyncio + aiosqlite）</td>
+          <td>批处理、断点续跑、已生成跳过、失败重试与日志（S4-4 已实现雏形）</td>
+        </tr>
+        <tr>
+          <td>校验门禁</td>
+          <td>移植 verify_v32 / deep_verify / verify_alignment / check_dicts</td>
+          <td>报告生成后自动结构/数据完整性校验（S4-5）</td>
+        </tr>
+        <tr>
+          <td>日志</td>
+          <td>loguru</td>
+          <td>逐章失败定位与重跑依据 —— <a class="ln" href="https://github.com/Delgan/loguru">github.com/Delgan/loguru</a></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ===== 七、实施路线图 ===== -->
+  <h1 class="heading">七、实施路线图（里程碑 + 验收物）</h1>
+
+  <div class="doc-section">
+    <ol class="timeline">
+      <li>
+        <strong>里程碑 1 · 引擎筑基</strong>
+        <p><b>任务：</b>S0 环境与配置外置 → S1 章节拆分 → S2 分词 → S3 情感分析，跑通单章全流程；迁移 38 个脚本为模块；词库资产并入项目。<br>
+        <b>验收物：</b>输入一份 TXT，产出 120 份拆分文件 + 120 份分词 JSON + 120 份情绪 JSON；<code>check_dicts.py</code> 通过。</p>
+      </li>
+      <li>
+        <strong>里程碑 2 · 自动化流水线</strong>
+        <p><b>任务：</b>S4 LLM 深度分析调度（九大模块模板 + 任务队列 + 断点续跑 + 增量跳过）→ S7 结构化提取与索引生成 → S4-5 质量门禁接入。<br>
+        <b>验收物：</b>一条命令跑完 120 章；中断后可续跑且不重复生成；生成后自动校验并列出不合格章节。</p>
+      </li>
+      <li>
+        <strong>里程碑 3 · 可视化与检索</strong>
+        <p><b>任务：</b>S5 事件时间线 → S6 人物关系图谱与人物情感曲线 → S8 情感曲线 / 词云 / 报告阅读器 / Word·PDF·Excel 导出。<br>
+        <b>验收物：</b>6 个工作台可用；图表可交互（点击事件跳原文段落）；导出文件中文无乱码。</p>
+      </li>
+      <li>
+        <strong>里程碑 4 · 通用化与开放</strong>
+        <p><b>任务：</b>章节识别规则配置化（支持任意小说）→ 词库热更新（导入外部 5 库）→ 模板自定义 → LLM 后端可切换（含本地模型，数据不出本机）。<br>
+        <b>验收物：</b>换一本非红楼小说，仅改配置即可跑通 S1–S3；词库可在界面内增删并即时生效。</p>
+      </li>
+    </ol>
+    <aside class="callout" data-variant="quote">
+      <p><b>推进原则：</b>先打通"零依赖的 S1–S3"，再啃"最需要工程化封装的 S4"。S1–S3 全部可直接复用现有脚本，风险极低；S4 是唯一的中改造模块，也是整个软件的价值中枢。</p>
+    </aside>
+  </div>
+
+  <!-- ===== 八、风险与对策 ===== -->
+  <h1 class="heading">八、风险与对策</h1>
+
+  <div class="doc-section">
+    <table class="table" data-caption="风险识别与对策">
+      <colgroup>
+        <col style="width:24%">
+        <col style="width:28%">
+        <col style="width:48%">
+      </colgroup>
+      <thead>
+        <tr><th>风险</th><th>表现</th><th>对策（具体动作）</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>LLM 生成质量波动</td><td>事件/人物提取不全、格式漂移</td><td>九大模块模板约束 + S4-5 质量门禁自动执行四个 verify 脚本；不合格章节自动进入重跑队列；事件数低于"字数÷500"即判失败</td></tr>
+        <tr><td>情感词典覆盖不足</td><td>文言/古语词未被词典命中</td><td>按 S3-4 引入外部 5 库扩词；增加"未登录词巡检"（频次≥5 仍被切为单字的二字串）；新词只并集不覆盖，保持既有口径</td></tr>
+        <tr><td>结构化提取脆弱</td><td>报告格式漂移导致正则失败</td><td>主路径改为 LLM 直接输出 JSON + Pydantic schema 校验；<code>extract_v34_v2.py</code> 仅作历史报告兜底与交叉校验</td></tr>
+        <tr><td>人物别名/异体字</td><td>同一人物分裂为多条</td><td>ALIAS 外置 JSON + 自动建议（包含关系候选）+ 人工确认；<code>analyze_persons_v2.py</code> 别名检测</td></tr>
+        <tr><td>分词口径被破坏</td><td>更换分词器导致 120 份历史产物失效</td><td>锁定 jieba 为唯一生产引擎；pkuseg/HanLP 仅作为补充分析工具，不替换既有产物</td></tr>
+        <tr><td>jieba 性能与缓存</td><td>全量重跑慢；受限文件系统反复建缓存</td><td>进程内只 <code>initialize()</code> 一次；需要提速时切 jieba-fast（接口兼容）；显式设置 <code>jieba.dt.tmp_dir</code></td></tr>
+        <tr><td>中文导出乱码</td><td>词云方框、PDF 缺字</td><td>统一指定中文字体（思源黑体）；导出前做一次字符渲染自检</td></tr>
+        <tr><td>版本迁移</td><td>模板升级后旧报告失效</td><td>沿用归档规范与版本存档习惯；<code>v34_convert.py</code> 已验证可复用</td></tr>
+        <tr><td>数据一致性</td><td>索引与报告不同步</td><td>extract → gen_index 两步串联 + 完整性检测日志；索引生成后抽查 4 个关键章（1/40/80/120）</td></tr>
+        <tr><td>词典版权</td><td>商用风险</td><td>所有外部词典仅供科研教学；软件分发时附来源与许可说明，商用需联系原作者</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="divider"><span class="line"></span><span class="diamond"></span><span class="line"></span></div>
+
+  <!-- ===== 附录 A ===== -->
+  <h1 class="heading">附录 A　外部资源地址总表</h1>
+
+  <h2 class="heading">A.1 中文分词与文本处理</h2>
+  <div class="doc-section">
+    <table class="table" data-caption="分词与文本处理工具">
+      <colgroup><col style="width:24%"><col style="width:76%"></colgroup>
+      <thead><tr><th>名称</th><th>地址</th></tr></thead>
+      <tbody>
+        <tr><td>jieba（首选）</td><td><a class="ln" href="https://github.com/fxsjy/jieba">https://github.com/fxsjy/jieba</a>　PyPI：<a class="ln" href="https://pypi.org/project/jieba/">https://pypi.org/project/jieba/</a></td></tr>
+        <tr><td>jieba 大词典（繁体）</td><td><a class="ln" href="https://github.com/fxsjy/jieba/raw/master/extra_dict/dict.txt.big">https://github.com/fxsjy/jieba/raw/master/extra_dict/dict.txt.big</a></td></tr>
+        <tr><td>jieba 小词典</td><td><a class="ln" href="https://github.com/fxsjy/jieba/raw/master/extra_dict/dict.txt.small">https://github.com/fxsjy/jieba/raw/master/extra_dict/dict.txt.small</a></td></tr>
+        <tr><td>jieba-fast（C 加速）</td><td><a class="ln" href="https://pypi.org/project/jieba-fast/">https://pypi.org/project/jieba-fast/</a>　源码：<a class="ln" href="https://github.com/deepcs233/jieba_fast">https://github.com/deepcs233/jieba_fast</a></td></tr>
+        <tr><td>cppjieba / gojieba / nodejieba</td><td><a class="ln" href="https://github.com/yanyiwu/cppjieba">cppjieba</a>　<a class="ln" href="https://github.com/yanyiwu/gojieba">gojieba</a>　<a class="ln" href="https://github.com/yanyiwu/nodejieba">nodejieba</a></td></tr>
+        <tr><td>结巴分词 Java 版</td><td><a class="ln" href="https://github.com/huaban/jieba-analysis">https://github.com/huaban/jieba-analysis</a></td></tr>
+        <tr><td>pkuseg（领域分词）</td><td><a class="ln" href="https://github.com/lancopku/pkuseg-python">https://github.com/lancopku/pkuseg-python</a></td></tr>
+        <tr><td>HanLP</td><td><a class="ln" href="https://github.com/hankcs/HanLP">https://github.com/hankcs/HanLP</a></td></tr>
+        <tr><td>LTP（哈工大）</td><td><a class="ln" href="https://github.com/HIT-SCIR/ltp">https://github.com/HIT-SCIR/ltp</a></td></tr>
+        <tr><td>THULAC（清华）</td><td><a class="ln" href="https://github.com/thunlp/THULAC-Python">https://github.com/thunlp/THULAC-Python</a></td></tr>
+        <tr><td>SnowNLP</td><td><a class="ln" href="https://github.com/isnowfy/snownlp">https://github.com/isnowfy/snownlp</a></td></tr>
+        <tr><td>百度 LAC</td><td><a class="ln" href="https://github.com/baidu/lac">https://github.com/baidu/lac</a></td></tr>
+        <tr><td>cn2an（中文数字转换）</td><td><a class="ln" href="https://github.com/Ailln/cn2an">https://github.com/Ailln/cn2an</a>　PyPI：<a class="ln" href="https://pypi.org/project/cn2an/">https://pypi.org/project/cn2an/</a></td></tr>
+        <tr><td>chardet（编码探测）</td><td><a class="ln" href="https://github.com/chardet/chardet">https://github.com/chardet/chardet</a></td></tr>
+        <tr><td>ebooklib（EPUB 解析）</td><td><a class="ln" href="https://github.com/aerkalov/ebooklib">https://github.com/aerkalov/ebooklib</a></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 class="heading">A.2 情感词典与情感分析</h2>
+  <div class="doc-section">
+    <table class="table" data-caption="情感词典与分析库">
+      <colgroup><col style="width:24%"><col style="width:76%"></colgroup>
+      <thead><tr><th>名称</th><th>地址</th></tr></thead>
+      <tbody>
+        <tr><td>cnsenti</td><td><a class="ln" href="https://github.com/hiDaDeng/cnsenti">https://github.com/hiDaDeng/cnsenti</a>　PyPI：<a class="ln" href="https://pypi.org/project/cnsenti/">https://pypi.org/project/cnsenti/</a></td></tr>
+        <tr><td>cntext（cnsenti 升级版）</td><td><a class="ln" href="https://github.com/hiDaDeng/cntext">https://github.com/hiDaDeng/cntext</a></td></tr>
+        <tr><td>DUTIR 情感词汇本体</td><td><a class="ln" href="http://ir.dlut.edu.cn/info/1013/1142.htm">http://ir.dlut.edu.cn/info/1013/1142.htm</a>（大连理工，七大类情绪）</td></tr>
+        <tr><td>ppzhenghua（8 类词典汇总）</td><td><a class="ln" href="https://github.com/ppzhenghua/SentimentAnalysisDictionary">https://github.com/ppzhenghua/SentimentAnalysisDictionary</a></td></tr>
+        <tr><td>Shimon-Guo（4 类精简）</td><td><a class="ln" href="https://github.com/Shimon-Guo/chinese_sentiment_dictionary">https://github.com/Shimon-Guo/chinese_sentiment_dictionary</a></td></tr>
+        <tr><td>DavionWu2018（含代码）</td><td><a class="ln" href="https://github.com/DavionWu2018/Sentiment_dictionary">https://github.com/DavionWu2018/Sentiment_dictionary</a></td></tr>
+        <tr><td>知网 Hownet 词语集</td><td><a class="ln" href="http://www.keenage.com/html/c_bulletin_2007.htm">http://www.keenage.com/html/c_bulletin_2007.htm</a>（原站可能失效）</td></tr>
+        <tr><td>台湾大学 NTUSD</td><td><a class="ln" href="http://nlg.csie.ntu.edu.tw/nlpresource/NTUSD-Fin/">http://nlg.csie.ntu.edu.tw/nlpresource/NTUSD-Fin/</a>（原站可能失效）</td></tr>
+        <tr><td>清华大学李军褒贬义词典</td><td><a class="ln" href="http://nlp.csai.tsinghua.edu.cn/site2/index.php/13-sms">http://nlp.csai.tsinghua.edu.cn/site2/index.php/13-sms</a>（原站可能失效）</td></tr>
+        <tr><td>BosonNLP 情感词典</td><td><a class="ln" href="https://bosonnlp.com/dev/resource">https://bosonnlp.com/dev/resource</a>（服务已停）</td></tr>
+        <tr><td>中文停用词表聚合</td><td><a class="ln" href="https://github.com/goto456/stopwords">https://github.com/goto456/stopwords</a></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 class="heading">A.3 后端、前端与可视化</h2>
+  <div class="doc-section">
+    <table class="table" data-caption="架构与可视化组件">
+      <colgroup><col style="width:24%"><col style="width:76%"></colgroup>
+      <thead><tr><th>名称</th><th>地址</th></tr></thead>
+      <tbody>
+        <tr><td>FastAPI</td><td><a class="ln" href="https://fastapi.tiangolo.com/zh/">https://fastapi.tiangolo.com/zh/</a>　源码：<a class="ln" href="https://github.com/fastapi/fastapi">https://github.com/fastapi/fastapi</a></td></tr>
+        <tr><td>Uvicorn</td><td><a class="ln" href="https://www.uvicorn.org/">https://www.uvicorn.org/</a></td></tr>
+        <tr><td>Pydantic</td><td><a class="ln" href="https://docs.pydantic.dev/">https://docs.pydantic.dev/</a></td></tr>
+        <tr><td>SQLModel / SQLAlchemy</td><td><a class="ln" href="https://github.com/fastapi/sqlmodel">https://github.com/fastapi/sqlmodel</a>　<a class="ln" href="https://www.sqlalchemy.org/">https://www.sqlalchemy.org/</a></td></tr>
+        <tr><td>SQLite</td><td><a class="ln" href="https://www.sqlite.org/">https://www.sqlite.org/</a></td></tr>
+        <tr><td>Jinja2（模板引擎）</td><td><a class="ln" href="https://jinja.palletsprojects.com/">https://jinja.palletsprojects.com/</a></td></tr>
+        <tr><td>OpenAI Python SDK</td><td><a class="ln" href="https://github.com/openai/openai-python">https://github.com/openai/openai-python</a></td></tr>
+        <tr><td>Ollama（本地模型）</td><td><a class="ln" href="https://ollama.com/">https://ollama.com/</a></td></tr>
+        <tr><td>vLLM（本地推理服务）</td><td><a class="ln" href="https://github.com/vllm-project/vllm">https://github.com/vllm-project/vllm</a></td></tr>
+        <tr><td>LM Studio</td><td><a class="ln" href="https://lmstudio.ai/">https://lmstudio.ai/</a></td></tr>
+        <tr><td>Vue 3 / Vite</td><td><a class="ln" href="https://cn.vuejs.org/">https://cn.vuejs.org/</a>　<a class="ln" href="https://cn.vitejs.dev/">https://cn.vitejs.dev/</a></td></tr>
+        <tr><td>ECharts</td><td><a class="ln" href="https://echarts.apache.org/zh/index.html">https://echarts.apache.org/zh/index.html</a></td></tr>
+        <tr><td>Element Plus</td><td><a class="ln" href="https://element-plus.org/zh-CN/">https://element-plus.org/zh-CN/</a></td></tr>
+        <tr><td>AntV G6（关系图）</td><td><a class="ln" href="https://github.com/antvis/G6">https://github.com/antvis/G6</a></td></tr>
+        <tr><td>NetworkX / pyvis</td><td><a class="ln" href="https://networkx.org/">https://networkx.org/</a>　<a class="ln" href="https://github.com/WestHealth/pyvis">https://github.com/WestHealth/pyvis</a></td></tr>
+        <tr><td>vis-timeline</td><td><a class="ln" href="https://github.com/visjs/vis-timeline">https://github.com/visjs/vis-timeline</a></td></tr>
+        <tr><td>pyecharts</td><td><a class="ln" href="https://github.com/pyecharts/pyecharts">https://github.com/pyecharts/pyecharts</a></td></tr>
+        <tr><td>Tauri / Electron</td><td><a class="ln" href="https://tauri.app/zh-cn/">https://tauri.app/zh-cn/</a>　<a class="ln" href="https://www.electronjs.org/zh/">https://www.electronjs.org/zh/</a></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 class="heading">A.4 导出与文档生成</h2>
+  <div class="doc-section">
+    <table class="table" data-caption="导出工具">
+      <colgroup><col style="width:24%"><col style="width:76%"></colgroup>
+      <thead><tr><th>名称</th><th>地址</th></tr></thead>
+      <tbody>
+        <tr><td>python-docx（Word）</td><td><a class="ln" href="https://github.com/python-openxml/python-docx">https://github.com/python-openxml/python-docx</a></td></tr>
+        <tr><td>openpyxl（Excel）</td><td><a class="ln" href="https://openpyxl.readthedocs.io/">https://openpyxl.readthedocs.io/</a></td></tr>
+        <tr><td>WeasyPrint（HTML→PDF）</td><td><a class="ln" href="https://weasyprint.org/">https://weasyprint.org/</a></td></tr>
+        <tr><td>Pandoc（万能转换）</td><td><a class="ln" href="https://pandoc.org/">https://pandoc.org/</a></td></tr>
+        <tr><td>wkhtmltopdf</td><td><a class="ln" href="https://wkhtmltopdf.org/">https://wkhtmltopdf.org/</a></td></tr>
+        <tr><td>python-markdown</td><td><a class="ln" href="https://python-markdown.github.io/">https://python-markdown.github.io/</a></td></tr>
+        <tr><td>markdown-it（前端渲染）</td><td><a class="ln" href="https://github.com/markdown-it/markdown-it">https://github.com/markdown-it/markdown-it</a></td></tr>
+        <tr><td>wordcloud（词云）</td><td><a class="ln" href="https://github.com/amueller/word_cloud">https://github.com/amueller/word_cloud</a></td></tr>
+        <tr><td>思源黑体（中文字体）</td><td><a class="ln" href="https://github.com/adobe-fonts/source-han-sans">https://github.com/adobe-fonts/source-han-sans</a></td></tr>
+        <tr><td>loguru（日志）</td><td><a class="ln" href="https://github.com/Delgan/loguru">https://github.com/Delgan/loguru</a></td></tr>
+        <tr><td>APScheduler（定时批量）</td><td><a class="ln" href="https://github.com/agronholm/apscheduler">https://github.com/agronholm/apscheduler</a></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ===== 附录 B ===== -->
+  <h1 class="heading">附录 B　依赖清单与一键安装</h1>
+
+  <div class="doc-section">
+    <h4 class="sub4">B.1 生产依赖（软件运行必需）</h4>
+    <pre class="code"># requirements.txt
+# —— 层 2 预处理（必需，极轻）——
+jieba>=0.42.1
+
+# —— 层 2 辅助 ——
+cn2an>=0.5.22
+chardet>=5.2.0
+
+# —— 层 3 LLM 调度 ——
+openai>=1.30.0
+jinja2>=3.1.4
+pydantic>=2.7.0
+python-dotenv>=1.0.1
+loguru>=0.7.2
+
+# —— 服务层 ——
+fastapi>=0.111.0
+uvicorn[standard]>=0.30.0
+sqlmodel>=0.0.19
+aiosqlite>=0.20.0
+
+# —— 层 4 可视化与导出 ——
+networkx>=3.3
+pyvis>=0.3.2
+wordcloud>=1.9.3
+pyecharts>=2.0.5
+openpyxl>=3.1.2
+python-docx>=1.1.0</pre>
+    <pre class="code"># 一键安装
+pip install -r requirements.txt
+
+# 可选：分词加速（仅在全量重跑耗时明显时启用）
+pip install jieba-fast
+
+# 可选：本地模型（数据不出本机）
+# pip install vllm && vllm serve Qwen/Qwen2.5-14B-Instruct</pre>
+
+    <h4 class="sub4">B.2 项目自带资源（随包分发，无需安装）</h4>
+    <pre class="code">基础/
+├── emotion_analysis.py      # 双引擎：EmotionAnalyzer + SentimentAnalyzer（零依赖）
+├── 情感词典_DUTIR/          # 七类情绪词典（27,414 词标称 / 27,389 词去重）
+├── 情感词典_Hownet/         # 极性词典 + 程度副词 + deny（19,472 词标称 / 17,690 去重）
+├── 停用词.txt + 停用词库/    # 4 表并集（3,884 词）
+├── 否定词.txt               # 1,517 词（奇数次翻转、偶数次还原）
+├── 递进词.txt               # 28 词（默认权重 1.5）
+├── 红楼梦人物名.txt          # 362 行
+├── 红楼梦分词词典.txt        # 663 行（jieba 用户词典）
+├── 红楼梦章节名.txt
+└── 同义词.txt / 反义词.txt   # 词林扩展版 / 反义词对表（非情感词典）</pre>
+
+    <h4 class="sub4">B.3 环境变量模板</h4>
+    <pre class="code"># .env
+LLM_BASE_URL=https://api.openai.com/v1     # 或 http://localhost:11434/v1（Ollama）
+LLM_API_KEY=sk-xxxxxxxx
+LLM_MODEL=gpt-4o-mini                       # 或 qwen2.5:14b（本地）
+PROJECT_ROOT=./红楼梦范例
+LOG_LEVEL=INFO</pre>
+  </div>
+
+  <div class="divider"><span class="line"></span><span class="diamond"></span><span class="line"></span></div>
+
+  <h1 class="heading">主要数据来源</h1>
+  <div class="source-list">
+    <ol class="list">
+      <li id="source-1"><span class="src-id">[1]</span> 红楼梦范例/分析结果/_归档索引_V3.4.md（1207 行，7 大部分全局索引）</li>
+      <li id="source-2"><span class="src-id">[2]</span> 红楼梦范例/基础/emotion_analysis.py（EmotionAnalyzer + SentimentAnalyzer 双引擎）</li>
+      <li id="source-3"><span class="src-id">[3]</span> 红楼梦范例/分析结果/v34_extract_v2.json（17,320 行结构化提取数据）</li>
+      <li id="source-4"><span class="src-id">[4]</span> 红楼梦范例/脚本工具/索引归档类/gen_index.py（ALIAS 别名字典 + TONE_MAP 基调归一）</li>
+      <li><span class="src-id">[5]</span> 红楼梦范例/脚本工具/README.md（38 个脚本的功能与用法说明，V3.4.1）</li>
+      <li><span class="src-id">[6]</span> 红楼梦范例/skill/红楼梦专用版_前置条件与生成规范.md §13.8 完整数据管线一键脚本</li>
+      <li><span class="src-id">[7]</span> 红楼梦范例/情感词库资源统合/ 8 份调研文档（含 5 个公开情感词典资源地址清单）</li>
+      <li><span class="src-id">[8]</span> 红楼梦范例/红楼梦文本分析软件设计方案.html（V1.0 架构版）</li>
+    </ol>
+  </div>
+
+  <!-- ===== 尾页 ===== -->
+  <section class="title end_page">
+    <h1>机制已齐，步骤已明，工程化即软件</h1>
+    <p>V1.0 回答了"能做成什么"；V2.0 回答了"具体怎么做" —— 8 个模块、23 个施工步骤，每一步都有选型理由、安装命令、可运行代码、验收标准与官方地址。<br>从零依赖的 S1–S3 起步，4 个里程碑即可产出可运行的桌面版软件。</p>
+  </section>
+
+</body>
+</html>

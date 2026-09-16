@@ -7,11 +7,17 @@
     "timezone": "China Standard Time",
     "run_if_missed": true
   },
-  "mode": "ai_api",
+  "mode": "oneshot",
   "modes": {
+    "oneshot": {
+      "description": "一键生成模式（推荐）- 单一脚本完成抓取/分类/六要素/渲染/自检，零外部依赖、零人工干预",
+      "enabled": true,
+      "self_check": true,
+      "skip_if_exists_kb": 10
+    },
     "auto_v2": {
-      "description": "全自动模式（v2正则版）- 零人工干预，使用正则提取六要素",
-      "enabled": true
+      "description": "旧版全自动模式（v2正则版）",
+      "enabled": false
     },
     "semi_auto": {
       "description": "半自动模式（分阶段版）- Phase1自动生成，Phase2人工填写后自动合并",
@@ -20,8 +26,8 @@
       "merge_check_max_hours": 24
     },
     "ai_api": {
-      "description": "AI API全自动模式 - 调用外部AI API自动填写六要素，不消耗TeleAgent积分",
-      "enabled": true,
+      "description": "旧版 AI API 模式 - 调用外部AI API填写六要素",
+      "enabled": false,
       "api_provider": "deepseek",
       "api_key": "",
       "api_base_url": "https://api.deepseek.com/v1",
@@ -32,7 +38,13 @@
   },
   "paths": {
     "python_exe": "python",
+    "python_fallbacks": [
+      "C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+      "py"
+    ],
     "script_dir": "../分阶段生成方案",
+    "oneshot_dir": "../一键生成",
+    "oneshot_script": "xwlb_report.py",
     "gen_v2_script": "gen_report_v2.py",
     "gen_final_script": "gen_report_final.py",
     "fill_elements_script": "fill_elements_api.py",
@@ -41,7 +53,7 @@
   },
   "quality": {
     "run_quality_check": true,
-    "quality_check_script": "check_md_quality.py",
+    "quality_check_script": "",
     "min_file_size_kb": 10
   },
   "sync": {
