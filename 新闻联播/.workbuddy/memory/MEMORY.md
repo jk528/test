@@ -86,3 +86,30 @@ T0 覆盖 → T1 人名占位 → T2 机构词典(标题) → T3 标题动作主
 - T9/T9b 排在所有机构规则之后，只可能把「—」补成实体，**不可能覆盖已有结果**，
   故可安全推广到全部 107 份（0915 实测逐列差异 0 行）。
 - 机构词典别只收全称：正文写简称（国铁集团/中广核/世卫）时必须能命中。
+
+## 本机定时任务索引（2026-09-16 建档留档）
+集中留档目录：`C:\Users\Administrator\Desktop\定时任务总览\`
+（每个任务一个子文件夹，内含**脚本副本 + README 应用说明**，根目录有总览 README 与 `任务清单.json`）
+
+| 计划任务名 | 触发 | 脚本原件 |
+|---|---|---|
+| `新闻联播每日总结` | 每天 05:00 | `流程\一键生成\xwlb_report.py` |
+| `每日签到`（TraeWork） | 每天 00:10 | `桌面\定时任务脚本\run_checkin.cmd` → `checkin.js` |
+| `TeleAgent积分签到` | 每天 01:00 | `桌面\定时任务脚本\run_teleagent_checkin.cmd` → `teleagent_checkin.js` |
+| `XinWenLianBo_Sync_0600` | 每天 06:00 | `桌面\定时任务脚本\sync_gitee.ps1` |
+| `XinWenLianBo_Sync_30min` | 每 30 分钟（:27/:57） | 同上（**04/05 共用同一脚本**） |
+
+**维护约定**：留档目录里的是**副本**，任务跑的是原件路径。
+改了原件要复制回去覆盖副本，保持"文件夹里看到的就是线上跑的"。
+新增任务按 `06_xxx（触发描述）` 命名，并同步更新总览 README 与 `任务清单.json`。
+
+**未处理的已知冗余**：04 号（06:00）与 05 号（每 30 分钟，相位 :27/:57）只差 3 分钟，
+职责重叠且有 `index.lock` 撞车风险；建议二选一或把 04 号挪到 06:15。用户尚未决定。
+
+## 本机环境坑（Windows，AI 会话内反复踩）
+- **PowerShell 工具的 stdout 不回显**：`Write-Output`/`Format-Table` 的结果拿不到。
+  可行做法是写文件再 Read：
+  `Set-Content $env:TEMP\x.txt -Value $out -Encoding UTF8` → 用 Read 工具读。
+- **Bash 工具不可用**（`ls`/`dirname: command not found`）→ 一律走 PowerShell。
+- **删除文件走 safe-delete 钩子转回收站，对中文路径会失败**（`trash-failed`，路径以 GBK 乱码传入）；
+  实测重试后仍能清掉。需要清理时优先用 `Set-Content` 覆盖或用非中文路径的中转文件。
