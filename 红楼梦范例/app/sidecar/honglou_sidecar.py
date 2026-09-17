@@ -87,7 +87,10 @@ def _resolve_base_dir():
         return os.path.abspath(env)
     # sidecar.py 位于 app/sidecar/honglou_sidecar.py，基础在 ../../基础/
     here = os.path.dirname(os.path.abspath(__file__))
-    cand = os.path.join(here, "..", "..", "基础")
+    # 兜底：剥离 Rust canonicalize 产生的 \\?\ UNC 前缀（该前缀下 .. 不被 Windows 解析）
+    if here.startswith("\\\\?\\"):
+        here = here[4:]
+    cand = os.path.normpath(os.path.join(here, "..", "..", "基础"))
     if os.path.isdir(cand):
         return os.path.abspath(cand)
     return None

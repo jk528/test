@@ -124,16 +124,16 @@ fn resolve_python() -> String {
 }
 
 /// 定位 sidecar.py：dev 态相对 CARGO_MANIFEST_DIR 上溯到 app/sidecar/。
+/// 注意：不使用 canonicalize —— 它在 Windows 上会产生 \\?\ UNC 前缀，
+/// 该前缀下 Windows 跳过路径解析，导致 Python 里 os.path.join(..., "..", ..) 的 .. 不被解析。
+/// 保留带 .. 的路径交给 Python，Python 的 os.path.abspath/normpath 会正确解析。
 fn resolve_sidecar_path() -> String {
     let cand = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("..")
         .join("sidecar")
         .join("honglou_sidecar.py");
     if cand.is_file() {
-        return cand
-            .canonicalize()
-            .map(|p| p.to_string_lossy().into_owned())
-            .unwrap_or_else(|_| cand.to_string_lossy().into_owned());
+        return cand.to_string_lossy().into_owned();
     }
     "honglou_sidecar.py".to_string()
 }
