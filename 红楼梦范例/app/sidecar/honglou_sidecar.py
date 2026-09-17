@@ -155,11 +155,13 @@ def m_chapter_outline(params: dict) -> dict:
 
 
 def m_analyze_sentiment(params: dict) -> dict:
-    """段落级（物理行级）情感分析。
+    """段落级（物理行级）情感分析 + 字级情感词定位。
 
     params: {text: str}  —— 章内文本（按 \\n 分行；line_offset 为章内 0 基相对行号）
-    返回:   {paragraphs: [{line_offset, dutir_top, polarity, intensity, weights}]}
+    返回:   {paragraphs: [{line_offset, dutir_top, polarity, intensity, weights, word_spans}]}
             dutir_top 为 None 表示该行无情感词（不着色）。
+            word_spans: [{start, end, emotion, word}] —— 字符偏移（已含前导空白），
+                        start/end 可直接映射到 Monaco column（1-based 需 +1）。
     """
     text = params.get("text")
     if not isinstance(text, str):
@@ -167,12 +169,15 @@ def m_analyze_sentiment(params: dict) -> dict:
     eng = _get_engine()
     jieba = eng["jieba"]
     analyzer = eng["analyzer"]
+    emo_dicts = analyzer.emotion_dicts  # {emotion: set of words}
     lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
     paragraphs = []
     for i, line in enumerate(lines):
         stripped = line.strip()
         if not stripped:
             continue
+        # 前导空白字符数（含全角空格 U+3000），用于把 word 位置映射回 Monaco column
+        leading = len(line) - len(line.lstrip())
         words = jieba.lcut(stripped)
         result = analyzer.analyze_words(words)
         counts = result["emotion_counts"]
@@ -184,8 +189,24 @@ def m_analyze_sentiment(params: dict) -> dict:
                 "polarity": 0.0,
                 "intensity": 0.0,
                 "weights": {},
+                "word_spans": [],
             })
             continue
+        # 字级定位：扫描分词结果，记录每个情感词的起止位置 + 情绪类别
+        pos = 0
+        word_spans = []
+        for word in words:
+            if word.strip():
+                for emo in EMOTION_ORDER:
+                    if word in emo_dicts.get(emo, set()):
+                        word_spans.append({
+                            "start": leading + pos,
+                            "end": leading + pos + len(word),
+                            "emotion": emo,
+                            "word": word,
+                        })
+                        break
+            pos += len(word)
         # 主导情绪：七类计数最大者
         top = max(EMOTION_ORDER, key=lambda e: counts.get(e, 0))
         # 极性：(正面 - 负面) / 总情感词数，归一化到 -1~1
@@ -202,6 +223,7 @@ def m_analyze_sentiment(params: dict) -> dict:
             "polarity": polarity,
             "intensity": intensity,
             "weights": weights,
+            "word_spans": word_spans,
         })
     return {"paragraphs": paragraphs}
 

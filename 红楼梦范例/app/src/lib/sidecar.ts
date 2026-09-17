@@ -4,6 +4,16 @@
 
 import { invoke } from "@tauri-apps/api/core";
 
+/** 字级情感词位置：start/end 为行内字符偏移（0-based，含前导空白），Monaco column 需 +1。 */
+export interface WordSpan {
+  start: number;
+  end: number;
+  /** DUTIR 情绪类别：好/乐/哀/怒/惧/恶/惊 */
+  emotion: string;
+  /** 匹配到的具体词 */
+  word: string;
+}
+
 /** 单段（物理行）的情感分析结果。line_offset 为章内 0-based 相对行号。 */
 export interface EmotionSpan {
   line_offset: number;
@@ -15,6 +25,8 @@ export interface EmotionSpan {
   intensity: number;
   /** 七类分量计数 */
   weights: Record<string, number>;
+  /** 字级情感词位置列表（用于 inline decoration 高亮具体字） */
+  word_spans: WordSpan[];
 }
 
 /** 调用 sidecar 的 analyze_sentiment，返回段落级情感区间数组。 */

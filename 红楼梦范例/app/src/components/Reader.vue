@@ -38,6 +38,16 @@ const EMO_CLASS_MAP: Record<string, string> = {
   恶: "hl-emo-e",
   惊: "hl-emo-jing",
 };
+// 字级高亮类名（比整行背景更强：加粗 + 下划线 + 更深底色）
+const EMO_WORD_CLASS_MAP: Record<string, string> = {
+  好: "hl-word-hao",
+  乐: "hl-word-le",
+  哀: "hl-word-ai",
+  怒: "hl-word-nu",
+  惧: "hl-word-ju",
+  恶: "hl-word-e",
+  惊: "hl-word-jing",
+};
 
 const container = ref<HTMLDivElement | null>(null);
 let editor: monaco.editor.IStandaloneCodeEditor | null = null;
@@ -163,17 +173,29 @@ function renderDecorations() {
   // 注意：className 必须用 ASCII —— Monaco decoration 渲染管线会丢失非 ASCII 类名
   if (props.showEmotions) {
     for (const e of props.emotions) {
-      if (!e.dutir_top) continue; // 无情感词不着色
-      const cls = EMO_CLASS_MAP[e.dutir_top];
-      if (!cls) continue;
       const ln = props.emotionBaseLine + e.line_offset + 1; // Monaco 1-based
-      decos.push({
-        range: new monaco.Range(ln, 1, ln, 1),
-        options: {
-          isWholeLine: true,
-          className: cls,
-        },
-      });
+      // 1. 整行浅色背景：段落情绪概览（有 dutir_top 才着色）
+      if (e.dutir_top) {
+        const lineCls = EMO_CLASS_MAP[e.dutir_top];
+        if (lineCls) {
+          decos.push({
+            range: new monaco.Range(ln, 1, ln, 1),
+            options: { isWholeLine: true, className: lineCls },
+          });
+        }
+      }
+      // 2. 字级高亮：具体情感词（更强色 + 加粗 + 下划线，定位到字）
+      if (e.word_spans) {
+        for (const ws of e.word_spans) {
+          const wordCls = EMO_WORD_CLASS_MAP[ws.emotion];
+          if (!wordCls) continue;
+          // start/end 是 0-based 字符偏移，Monaco column 是 1-based
+          decos.push({
+            range: new monaco.Range(ln, ws.start + 1, ln, ws.end + 1),
+            options: { className: wordCls },
+          });
+        }
+      }
     }
   }
 
@@ -260,6 +282,42 @@ onBeforeUnmount(() => {
 }
 .hl-emo-jing {
   background: #ffe0b2 !important; /* 惊 - 浅橙 */
+}
+/* 字级情感词高亮：更深底色 + 加粗 + 下划线（定位到具体字） */
+.hl-word-hao {
+  background: #a5d6a7 !important;
+  font-weight: 700 !important;
+  border-bottom: 2px solid #2e7d32 !important;
+}
+.hl-word-le {
+  background: #ffd54f !important;
+  font-weight: 700 !important;
+  border-bottom: 2px solid #f57f17 !important;
+}
+.hl-word-ai {
+  background: #90caf9 !important;
+  font-weight: 700 !important;
+  border-bottom: 2px solid #1565c0 !important;
+}
+.hl-word-nu {
+  background: #ef9a9a !important;
+  font-weight: 700 !important;
+  border-bottom: 2px solid #c62828 !important;
+}
+.hl-word-ju {
+  background: #ce93d8 !important;
+  font-weight: 700 !important;
+  border-bottom: 2px solid #6a1b9a !important;
+}
+.hl-word-e {
+  background: #b0bec5 !important;
+  font-weight: 700 !important;
+  border-bottom: 2px solid #37474f !important;
+}
+.hl-word-jing {
+  background: #ffcc80 !important;
+  font-weight: 700 !important;
+  border-bottom: 2px solid #e65100 !important;
 }
 /* 图例栏 */
 .reader-wrap {
