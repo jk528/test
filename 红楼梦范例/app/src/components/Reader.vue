@@ -28,6 +28,17 @@ const emit = defineEmits<{
   (e: "toggle-emotions"): void;
 }>();
 
+// 七类情绪中文 → ASCII CSS 类名映射（Monaco decoration 丢非 ASCII 类名）
+const EMO_CLASS_MAP: Record<string, string> = {
+  好: "hl-emo-hao",
+  乐: "hl-emo-le",
+  哀: "hl-emo-ai",
+  怒: "hl-emo-nu",
+  惧: "hl-emo-ju",
+  恶: "hl-emo-e",
+  惊: "hl-emo-jing",
+};
+
 const container = ref<HTMLDivElement | null>(null);
 let editor: monaco.editor.IStandaloneCodeEditor | null = null;
 let decoColl: monaco.editor.IEditorDecorationsCollection | null = null;
@@ -149,15 +160,18 @@ function renderDecorations() {
   }
 
   // M2 情感着色：七类情绪 → 七套低饱和底色（叠加在物理行上）
+  // 注意：className 必须用 ASCII —— Monaco decoration 渲染管线会丢失非 ASCII 类名
   if (props.showEmotions) {
     for (const e of props.emotions) {
       if (!e.dutir_top) continue; // 无情感词不着色
+      const cls = EMO_CLASS_MAP[e.dutir_top];
+      if (!cls) continue;
       const ln = props.emotionBaseLine + e.line_offset + 1; // Monaco 1-based
       decos.push({
         range: new monaco.Range(ln, 1, ln, 1),
         options: {
           isWholeLine: true,
-          className: `hl-emo-${e.dutir_top}`,
+          className: cls,
         },
       });
     }
@@ -191,13 +205,13 @@ onBeforeUnmount(() => {
         {{ showEmotions ? "◉ 情感" : "○ 情感" }}
       </button>
       <template v-if="showEmotions">
-        <span class="legend-item"><i class="emo-swatch emo-好"></i>好</span>
-        <span class="legend-item"><i class="emo-swatch emo-乐"></i>乐</span>
-        <span class="legend-item"><i class="emo-swatch emo-哀"></i>哀</span>
-        <span class="legend-item"><i class="emo-swatch emo-怒"></i>怒</span>
-        <span class="legend-item"><i class="emo-swatch emo-惧"></i>惧</span>
-        <span class="legend-item"><i class="emo-swatch emo-恶"></i>恶</span>
-        <span class="legend-item"><i class="emo-swatch emo-惊"></i>惊</span>
+        <span class="legend-item"><i class="emo-swatch emo-hao"></i>好</span>
+        <span class="legend-item"><i class="emo-swatch emo-le"></i>乐</span>
+        <span class="legend-item"><i class="emo-swatch emo-ai"></i>哀</span>
+        <span class="legend-item"><i class="emo-swatch emo-nu"></i>怒</span>
+        <span class="legend-item"><i class="emo-swatch emo-ju"></i>惧</span>
+        <span class="legend-item"><i class="emo-swatch emo-e"></i>恶</span>
+        <span class="legend-item"><i class="emo-swatch emo-jing"></i>惊</span>
       </template>
     </div>
     <div ref="container" class="reader-container"></div>
@@ -225,27 +239,27 @@ onBeforeUnmount(() => {
   font-size: 14px;
   cursor: pointer;
 }
-/* M2 情感着色：七类情绪 → 七套低饱和底色 */
-.hl-emo-好 {
-  background: #e8f5e9 !important;
+/* M2 情感着色：七类情绪 → 七套低饱和底色（ASCII 类名，Monaco decoration 安全） */
+.hl-emo-hao {
+  background: #c8e6c9 !important; /* 好 - 浅绿 */
 }
-.hl-emo-乐 {
-  background: #fff8e1 !important;
+.hl-emo-le {
+  background: #ffecb3 !important; /* 乐 - 浅黄 */
 }
-.hl-emo-哀 {
-  background: #e3f2fd !important;
+.hl-emo-ai {
+  background: #bbdefb !important; /* 哀 - 浅蓝 */
 }
-.hl-emo-怒 {
-  background: #ffebee !important;
+.hl-emo-nu {
+  background: #ffcdd2 !important; /* 怒 - 浅红 */
 }
-.hl-emo-惧 {
-  background: #f3e5f5 !important;
+.hl-emo-ju {
+  background: #e1bee7 !important; /* 惧 - 浅紫 */
 }
-.hl-emo-恶 {
-  background: #eceff1 !important;
+.hl-emo-e {
+  background: #cfd8dc !important; /* 恶 - 浅灰 */
 }
-.hl-emo-惊 {
-  background: #fff3e0 !important;
+.hl-emo-jing {
+  background: #ffe0b2 !important; /* 惊 - 浅橙 */
 }
 /* 图例栏 */
 .reader-wrap {
@@ -289,26 +303,26 @@ onBeforeUnmount(() => {
   border-radius: 2px;
   border: 1px solid #ddd;
 }
-.emo-好 {
-  background: #e8f5e9;
+.emo-hao {
+  background: #c8e6c9;
 }
-.emo-乐 {
-  background: #fff8e1;
+.emo-le {
+  background: #ffecb3;
 }
-.emo-哀 {
-  background: #e3f2fd;
+.emo-ai {
+  background: #bbdefb;
 }
-.emo-怒 {
-  background: #ffebee;
+.emo-nu {
+  background: #ffcdd2;
 }
-.emo-惧 {
-  background: #f3e5f5;
+.emo-ju {
+  background: #e1bee7;
 }
-.emo-恶 {
-  background: #eceff1;
+.emo-e {
+  background: #cfd8dc;
 }
-.emo-惊 {
-  background: #fff3e0;
+.emo-jing {
+  background: #ffe0b2;
 }
 .reader-container {
   width: 100%;

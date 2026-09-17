@@ -34,6 +34,8 @@ impl SidecarManager {
         let sidecar_path = resolve_sidecar_path();
         let mut child = Command::new(&python_path)
             .arg(&sidecar_path)
+            .env("PYTHONIOENCODING", "utf-8") // 强制 Python stdio 用 UTF-8，避免 Windows GBK
+            .env("PYTHONUTF8", "1") // PEP 540: UTF-8 模式
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit()) // sidecar 日志走 stderr，继承给父进程

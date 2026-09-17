@@ -26,6 +26,15 @@ import re
 import sys
 import traceback
 
+# Windows 下 Python stdout 默认用系统码页（GBK），Rust 按 UTF-8 读会炸。
+# 三层保险：Rust 设 PYTHONIOENCODING=utf-8 + 这里 reconfigure + JSON ensure_ascii=True。
+try:
+    sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)
+    sys.stderr.reconfigure(encoding="utf-8", line_buffering=True)
+except (AttributeError, Exception):
+    # Python < 3.7 没有 reconfigure，回退到 PYTHONIOENCODING（Rust 已设）
+    pass
+
 PROTOCOL = "honglou-sidecar/1"
 SIDE_VERSION = "0.2.0-m2"
 
@@ -229,7 +238,8 @@ def main() -> int:
             resp = {"id": None, "error": {"code": -32700, "message": f"JSON 解析失败: {e}"}}
         else:
             resp = handle(req)
-        sys.stdout.write(json.dumps(resp, ensure_ascii=False) + "\n")
+        # ensure_ascii=True：输出纯 ASCII，规避任何编码问题（Rust 端按 UTF-8 读）
+        sys.stdout.write(json.dumps(resp, ensure_ascii=True) + "\n")
         sys.stdout.flush()
     log("stdin 关闭，sidecar 退出")
     return 0
