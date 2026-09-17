@@ -8,7 +8,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { setupMonaco, monaco } from "../lib/monaco";
 import type { Chapter } from "../lib/chapters";
 import type { Bookmark } from "../lib/annotations";
-import type { EmotionSpan } from "../lib/sidecar";
+import type { EmotionSpan, EntitySpan } from "../lib/sidecar";
 
 const props = defineProps<{
   text: string;
@@ -20,6 +20,12 @@ const props = defineProps<{
   emotionBaseLine: number;
   /** 是否显示情感着色 */
   showEmotions: boolean;
+  /** M4 人物高亮：绝对物理行 + 行内字符偏移（全角字符按 1 个计） */
+  entitySpans: EntitySpan[];
+  /** 是否显示人物高亮 */
+  showEntities: boolean;
+  /** 当前高亮的人物名（空=未选中） */
+  entityName: string;
 }>();
 
 const emit = defineEmits<{
@@ -27,6 +33,10 @@ const emit = defineEmits<{
   (e: "view-range", lineStart: number, lineEnd: number): void;
   (e: "toggle-bookmark", line0: number): void;
   (e: "toggle-emotions"): void;
+  // M3：正文中选中文本 → 外层可填入 AI 提问框
+  (e: "text-selected", text: string): void;
+  // M4：切换人物高亮显隐
+  (e: "toggle-entities"): void;
 }>();
 
 // 七类情绪中文 → ASCII CSS 类名映射（Monaco decoration 丢非 ASCII 类名）
@@ -54,6 +64,7 @@ const container = ref<HTMLDivElement | null>(null);
 let editor: monaco.editor.IStandaloneCodeEditor | null = null;
 let decoColl: monaco.editor.IEditorDecorationsCollection | null = null;
 let scrollRaf = 0;
+let removeResizeListener: (() => void) | null = null;
 
 setupMonaco();
 
@@ -69,6 +80,7 @@ onMounted(() => {
     fontFamily:
       '"Cascadia Code", Consolas, "Microsoft YaHei", "PingFang SC", "Noto Serif SC", SimSun, serif',
     wordWrap: "on",
+    wrappingStrategy: "advanced",
     wrappingIndent: "same",
     lineNumbers: "on",
     lineNumbersMinChars: 3,
@@ -88,6 +100,19 @@ onMounted(() => {
     scrollbar: { vertical: "auto", horizontal: "hidden" },
   });
 
+  // 修复 wordWrap 失效：flex 容器在 onMounted 时可能尚未完成布局，
+  // 导致 Monaco 按错误宽度换行。创建后强制重布局（rAF + 延时双保险）。
+  const fixLayout = () => editor?.layout();
+  requestAnimationFrame(fixLayout);
+  const layoutTimer = window.setTimeout(fixLayout, 500);
+
+  // 修复：Tauri WebView2 下 ResizeObserver 偶发漏触发，补一个窗口 resize 监听
+  window.addEventListener("resize", fixLayout);
+  removeResizeListener = () => {
+    window.removeEventListener("resize", fixLayout);
+    window.clearTimeout(layoutTimer);
+  };
+
   decoColl = editor.createDecorationsCollection();
 
   // 点击 glyph 槽 → 切换该行书签
@@ -97,6 +122,18 @@ onMounted(() => {
       ev.target.position
     ) {
       emit("toggle-bookmark", ev.target.position.lineNumber - 1);
+    }
+  });
+
+  // M3：选区变化 → 外层接收（仅当有非空选区时）
+  editor.onDidChangeCursorSelection((ev) => {
+    const sel = ev.selection;
+    if (!sel || sel.isEmpty()) return;
+    const model = editor?.getModel();
+    if (!model) return;
+    const text = model.getValueInRange(sel);
+    if (text && text.trim().length >= 4) {
+      emit("text-selected", text.trim().slice(0, 300));
     }
   });
 
@@ -140,7 +177,14 @@ watch(
 
 // 章节或书签或情感数据变化 → 重绘装饰
 watch(
-  () => [props.chapters, props.bookmarks, props.emotions, props.showEmotions],
+  () => [
+    props.chapters,
+    props.bookmarks,
+    props.emotions,
+    props.showEmotions,
+    props.entitySpans,
+    props.showEntities,
+  ],
   () => renderDecorations(),
   { deep: true }
 );
@@ -206,6 +250,23 @@ function renderDecorations() {
     }
   }
 
+  // M4 人物高亮：同一人物的所有出场统一配色（className 由外层给，ASCII 安全）
+  if (props.showEntities && props.entitySpans.length > 0) {
+    for (const e of props.entitySpans) {
+      decos.push({
+        range: new monaco.Range(e.line + 1, e.charStart + 1, e.line + 1, e.charEnd + 1),
+        options: {
+          className: e.cls,
+          hoverMessage: { value: `${e.name}（点击人物榜可切换）` },
+          overviewRuler: {
+            color: "#c9a35c",
+            position: monaco.editor.OverviewRulerLane.Right,
+          },
+        },
+      });
+    }
+  }
+
   decoColl.set(decos);
 }
 
@@ -222,6 +283,8 @@ defineExpose({ revealLine });
 
 onBeforeUnmount(() => {
   if (scrollRaf) cancelAnimationFrame(scrollRaf);
+  removeResizeListener?.();
+  removeResizeListener = null;
   editor?.dispose();
   editor = null;
 });
@@ -229,9 +292,16 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="reader-wrap">
-    <div class="emotion-legend" v-if="emotions.length > 0">
+    <div class="emotion-legend" v-if="emotions.length > 0 || entityName">
       <button class="legend-toggle" @click="emit('toggle-emotions')">
         {{ showEmotions ? "◉ 情感" : "○ 情感" }}
+      </button>
+      <button
+        v-if="entityName"
+        class="legend-toggle ent-on"
+        @click="emit('toggle-entities')"
+      >
+        {{ showEntities ? "◉" : "○" }} {{ entityName }}
       </button>
       <template v-if="showEmotions">
         <span class="legend-item"><i class="emo-swatch emo-hao"></i>好</span>
@@ -326,9 +396,40 @@ onBeforeUnmount(() => {
   font-weight: 700 !important;
   border-bottom: 2px solid #e65100 !important;
 }
+/* M4 人物高亮：6 色轮转（与实体 id 取模配对）。下划线 + 半透明底色，
+   不覆盖情感行底色，两者可叠加阅读。 */
+.ent-c0 {
+  background: rgba(198, 40, 40, 0.16) !important;
+  border-bottom: 2px solid #c62828;
+}
+.ent-c1 {
+  background: rgba(21, 101, 192, 0.16) !important;
+  border-bottom: 2px solid #1565c0;
+}
+.ent-c2 {
+  background: rgba(46, 125, 50, 0.16) !important;
+  border-bottom: 2px solid #2e7d32;
+}
+.ent-c3 {
+  background: rgba(106, 27, 154, 0.16) !important;
+  border-bottom: 2px solid #6a1b9a;
+}
+.ent-c4 {
+  background: rgba(230, 81, 0, 0.16) !important;
+  border-bottom: 2px solid #e65100;
+}
+.ent-c5 {
+  background: rgba(0, 121, 107, 0.16) !important;
+  border-bottom: 2px solid #00796b;
+}
+.legend-toggle.ent-on {
+  border-color: #c9a35c;
+  color: #7a5410;
+}
 /* 图例栏 */
 .reader-wrap {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   height: 100%;
   display: flex;
   flex-direction: column;

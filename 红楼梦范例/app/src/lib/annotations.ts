@@ -32,6 +32,14 @@ function persist(bookKey: string, list: Bookmark[]): void {
   localStorage.setItem(storageKey(bookKey), JSON.stringify(list));
 }
 
+/**
+ * 用外部结果（如 SQLite annotations 表）整体覆盖本地书签。
+ * M3 起 SQLite 是书签权威源，localStorage 降级为离线兜底与首屏即时显示。
+ */
+export function persistBookmarks(bookKey: string, list: Bookmark[]): void {
+  persist(bookKey, [...list].sort((a, b) => a.line - b.line));
+}
+
 /** 添加书签（同一行重复添加则更新备注），返回最新列表 */
 export function upsertBookmark(
   bookKey: string,

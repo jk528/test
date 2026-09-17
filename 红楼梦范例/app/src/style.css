@@ -207,6 +207,13 @@ body,
   min-width: 0;
   position: relative;
   background: var(--paper);
+  display: flex;
+}
+/* M3：AI 问答侧栏（与阅读区并排） */
+.ai-side {
+  flex: 0 0 340px;
+  width: 340px;
+  min-width: 0;
 }
 
 .placeholder {

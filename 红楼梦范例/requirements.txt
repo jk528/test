@@ -19,3 +19,9 @@ truststore==0.10.4
 typing-inspection==0.4.4
 typing_extensions==4.16.0
 win32_setctime==1.2.0
+
+# ── M3 新增：向量库 + 嵌入（安装建议：--index-url https://pypi.tuna.tsinghua.edu.cn/simple）
+sqlite-vec==0.1.9
+fastembed==0.8.0
+onnxruntime==1.30.0
+numpy==2.5.3
