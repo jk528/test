@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import type { Chapter } from "../lib/chapters";
+import type { ChapterEmotion } from "../lib/sidecar";
 
 const props = defineProps<{
   chapters: Chapter[];
   activeIndex: number; // 1 基，0=无
+  chapterEmotions: ChapterEmotion[];
+  /** 是否显示情感圆点（与 Reader 的 showEmotions 同步） */
+  showEmotions: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -12,6 +16,28 @@ const emit = defineEmits<{
 }>();
 
 const keyword = ref("");
+
+// 七类情绪 → CSS 类名（与 Reader.vue 一致，ASCII 避免 Monaco 类名问题）
+const EMO_DOT_MAP: Record<string, string> = {
+  好: "dot-hao",
+  乐: "dot-le",
+  哀: "dot-ai",
+  怒: "dot-nu",
+  惧: "dot-ju",
+  恶: "dot-e",
+  惊: "dot-jing",
+};
+
+// 章号 → 主导情绪 CSS 类名 的查找表
+const emoLookup = computed(() => {
+  const m: Record<number, string> = {};
+  for (const ce of props.chapterEmotions) {
+    if (ce.dutir_top && EMO_DOT_MAP[ce.dutir_top]) {
+      m[ce.index] = EMO_DOT_MAP[ce.dutir_top];
+    }
+  }
+  return m;
+});
 
 const filtered = computed(() => {
   const kw = keyword.value.trim();
@@ -45,6 +71,11 @@ function pad(n: number): string {
         @click="emit('select', ch.index)"
       >
         <span class="tree-no">{{ pad(ch.index) }}</span>
+        <i
+          v-if="showEmotions && emoLookup[ch.index]"
+          class="emo-dot"
+          :class="emoLookup[ch.index]"
+        ></i>
         <span class="tree-title">{{ ch.name || ch.title }}</span>
       </button>
       <div v-if="filtered.length === 0" class="tree-empty">无匹配回目</div>
@@ -123,4 +154,21 @@ function pad(n: number): string {
   color: #a08b5e;
   font-size: 13px;
 }
+/* 情绪圆点（与 Reader.vue 七色一致，200-level 更醒目） */
+.emo-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  align-self: center;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+.dot-hao { background: #a5d6a7; }   /* 好 - 绿 */
+.dot-le { background: #ffd54f; }    /* 乐 - 黄 */
+.dot-ai { background: #90caf9; }   /* 哀 - 蓝 */
+.dot-nu { background: #ef9a9a; }   /* 怒 - 红 */
+.dot-ju { background: #ce93d8; }   /* 惧 - 紫 */
+.dot-e { background: #b0bec5; }    /* 恶 - 灰 */
+.dot-jing { background: #ffcc80; } /* 惊 - 橙 */
 </style>

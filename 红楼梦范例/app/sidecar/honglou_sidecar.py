@@ -228,10 +228,64 @@ def m_analyze_sentiment(params: dict) -> dict:
     return {"paragraphs": paragraphs}
 
 
+def m_analyze_chapters(params: dict) -> dict:
+    """批量分析所有章节的主导情绪（用于目录着色）。
+
+    params: {text: str, chapters: [{line: int, ...}]}
+    返回:   {chapter_emotions: [{index, dutir_top, polarity, intensity, weights}]}
+            dutir_top 为 None 表示该章无情感词。
+    """
+    text = params.get("text")
+    chapters = params.get("chapters")
+    if not isinstance(text, str) or not isinstance(chapters, list):
+        raise ValueError("params 需要 text (string) 和 chapters (list)")
+    eng = _get_engine()
+    jieba = eng["jieba"]
+    analyzer = eng["analyzer"]
+    lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    total_lines = len(lines)
+    chapter_emotions = []
+    for idx, ch in enumerate(chapters):
+        start = ch.get("line", 0)
+        end = chapters[idx + 1]["line"] if idx + 1 < len(chapters) else total_lines
+        all_counts = {e: 0 for e in EMOTION_ORDER}
+        total_emotion = 0
+        total_words = 0
+        pos_count = 0
+        neg_count = 0
+        for line_no in range(start, min(end, total_lines)):
+            stripped = lines[line_no].strip()
+            if not stripped:
+                continue
+            words = jieba.lcut(stripped)
+            result = analyzer.analyze_words(words)
+            for e in EMOTION_ORDER:
+                all_counts[e] += result["emotion_counts"].get(e, 0)
+            total_emotion += result["total_emotion_words"]
+            total_words += len(words)
+            pos_count += result["positive_emotion_count"]
+            neg_count += result["negative_emotion_count"]
+        if total_emotion == 0:
+            chapter_emotions.append({
+                "index": idx + 1, "dutir_top": None,
+                "polarity": 0.0, "intensity": 0.0, "weights": all_counts,
+            })
+            continue
+        top = max(EMOTION_ORDER, key=lambda e: all_counts[e])
+        polarity = round((pos_count - neg_count) / total_emotion, 3)
+        intensity = round(total_emotion / max(total_words, 1), 3)
+        chapter_emotions.append({
+            "index": idx + 1, "dutir_top": top,
+            "polarity": polarity, "intensity": intensity, "weights": all_counts,
+        })
+    return {"chapter_emotions": chapter_emotions}
+
+
 METHODS = {
     "ping": m_ping,
     "chapter_outline": m_chapter_outline,
     "analyze_sentiment": m_analyze_sentiment,
+    "analyze_chapters": m_analyze_chapters,
 }
 
 

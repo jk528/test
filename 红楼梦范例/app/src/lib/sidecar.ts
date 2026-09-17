@@ -38,6 +38,27 @@ export async function analyzeSentiment(text: string): Promise<EmotionSpan[]> {
   return resp.paragraphs ?? [];
 }
 
+/** 单章主导情绪（用于目录着色）。 */
+export interface ChapterEmotion {
+  index: number;
+  dutir_top: string | null;
+  polarity: number;
+  intensity: number;
+  weights: Record<string, number>;
+}
+
+/** 批量分析所有章节主导情绪（用于目录着色）。 */
+export async function analyzeChapters(
+  text: string,
+  chapters: { line: number }[]
+): Promise<ChapterEmotion[]> {
+  const resp = await invoke<{ chapter_emotions: ChapterEmotion[] }>(
+    "call_sidecar",
+    { method: "analyze_chapters", params: { text, chapters } }
+  );
+  return resp.chapter_emotions ?? [];
+}
+
 /** 调用 sidecar 的 ping，用于连通性自检。 */
 export async function pingSidecar(): Promise<{
   protocol: string;

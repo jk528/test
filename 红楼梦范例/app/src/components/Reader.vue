@@ -23,7 +23,8 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: "view-line", line0: number): void;
+  // 视口驱动：可见行范围 [lineStart, lineEnd]（0 基物理行，含两端）
+  (e: "view-range", lineStart: number, lineEnd: number): void;
   (e: "toggle-bookmark", line0: number): void;
   (e: "toggle-emotions"): void;
 }>();
@@ -99,26 +100,32 @@ onMounted(() => {
     }
   });
 
-  // 顶部可见行变化 → 通知外层高亮章节树
+  // 可见行范围变化 → 通知外层分析视口（视口驱动 + 缓存）
   editor.onDidScrollChange(() => {
     if (scrollRaf) return;
     scrollRaf = requestAnimationFrame(() => {
       scrollRaf = 0;
       if (!editor) return;
-      const top = editor.getTopForLineNumber(1);
       const visible = editor.getVisibleRanges()[0];
-      void top;
-      if (visible) emit("view-line", visible.startLineNumber - 1);
+      if (visible) {
+        emit("view-range", visible.startLineNumber - 1, visible.endLineNumber - 1);
+      }
     });
   });
 
   renderDecorations();
 
   // 初始定位到第 1 行顶部（规避 dev 预构建 reload / 布局重排导致的中途定位）
+  // 并补发一次视口范围，确保 onMounted 后立即分析可见行（setScrollTop(0) 不触发 onDidScrollChange）
   requestAnimationFrame(() =>
     requestAnimationFrame(() => {
-      editor?.setScrollTop(0);
-      editor?.setPosition({ lineNumber: 1, column: 1 });
+      if (!editor) return;
+      editor.setScrollTop(0);
+      editor.setPosition({ lineNumber: 1, column: 1 });
+      const visible = editor.getVisibleRanges()[0];
+      if (visible) {
+        emit("view-range", visible.startLineNumber - 1, visible.endLineNumber - 1);
+      }
     })
   );
 });
