@@ -1,4 +1,4 @@
-﻿# install_dev_env.ps1
+# install_dev_env.ps1
 # 「红楼读析」开发环境一键安装脚本（Windows / winget）
 # 幂等可重跑：每步先探测、已装则跳过；每步安装后必须拿到版本号证据才算成功
 # 用法（任一）：
@@ -11,7 +11,7 @@ param(
 )
 
 $ErrorActionPreference = 'Continue'
-$ProjectRoot = 'a:\HuaweiMoveData\Users\代\Desktop\gitee\test\红楼梦范例'
+$ProjectRoot = $PSScriptRoot   # 脚本所在目录即项目根（requirements.txt 同目录），勿硬编码本机绝对路径
 $VenvDir     = Join-Path $env:USERPROFILE '.venvs\honglou'   # venv 放在同步文件夹之外
 $LogFile     = Join-Path $PSScriptRoot 'install_dev_env.log'
 $Winget      = "$env:LOCALAPPDATA\Microsoft\WindowsApps\winget.exe"
