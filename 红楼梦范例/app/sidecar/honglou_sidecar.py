@@ -26,8 +26,8 @@ PROTOCOL = "honglou-sidecar/1"
 SIDE_VERSION = "0.1.0-m1"
 
 # 与 split_txt.bas 默认正则 #1、前端 src/lib/chapters.ts 一致
-# 标准中文：第 + 数字(阿拉伯/中文,含〇两) + 章/回/节/卷 + 可选空白 + 标题
-CHAPTER_RE = re.compile(r"^第([0-9一二三四五六七八九十百千万零〇两]+)(章|回|节|卷)\s*(.*)$")
+# 标准中文：第 + 数字(阿拉伯/中文,含〇两,含大写中文数字壹贰叁…) + 章/回/节/卷 + 可选空白 + 标题
+CHAPTER_RE = re.compile(r"^第([0-9一二三四五六七八九十百千万零〇两壹贰叁肆伍陆柒捌玖拾佰仟]+)(章|回|节|卷)\s*(.*)$")
 
 
 def log(msg: str) -> None:

@@ -73,10 +73,10 @@ Private g_selCount As Long            ' 选中正则个数
 Private Sub InitRegexPatterns()
     g_regexCount = 0
 
-    ' 1. 标准中文（第N章/回/节/卷，含中文数字，含〇）
+    ' 1. 标准中文（第N章/回/节/卷，含中文数字，含〇，含大写中文数字壹贰叁…）
     g_regexCount = g_regexCount + 1
-    g_regexNames(g_regexCount) = "标准中文（第N章/回/节/卷，含中文数字含〇）"
-    g_regexPatterns(g_regexCount) = "^第([0-9一二三四五六七八九十百千万零〇两]+)(章|回|节|卷)(\s*)(.*)$"
+    g_regexNames(g_regexCount) = "标准中文（第N章/回/节/卷，含中文数字含〇含大写）"
+    g_regexPatterns(g_regexCount) = "^第([0-9一二三四五六七八九十百千万零〇两壹贰叁肆伍陆柒捌玖拾佰仟]+)(章|回|节|卷)(\s*)(.*)$"
     g_regexUnitGroups(g_regexCount) = 1    ' SubMatches(1) = 单位词
     g_regexDefaultUnits(g_regexCount) = "章"
 
@@ -1155,7 +1155,7 @@ Private Sub ScanChapters(lines() As String, ByVal lineCount As Long, _
         ReDim g_selPatterns(0 To 0)
         ReDim g_selUnitGroups(0 To 0)
         ReDim g_selDefaultUnits(0 To 0)
-        g_selPatterns(0) = "^第([0-9一二三四五六七八九十百千万零〇两]+)(章|回|节|卷)(\s*)(.*)$"
+        g_selPatterns(0) = "^第([0-9一二三四五六七八九十百千万零〇两壹贰叁肆伍陆柒捌玖拾佰仟]+)(章|回|节|卷)(\s*)(.*)$"
         g_selUnitGroups(0) = 1
         g_selDefaultUnits(0) = "章"
         g_selCount = 1
