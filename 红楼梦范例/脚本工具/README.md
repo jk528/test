@@ -13,7 +13,7 @@
 
 ## 目录结构
 
-脚本按功能分类到 6 个子文件夹：
+脚本按功能分类到 7 个子文件夹：
 
 ```
 脚本工具/
@@ -66,6 +66,12 @@
 │   ├── extract_v34.py             # 从 V3.4 报告提取数据 v1（已废弃，仅供参考）
 │   ├── extract_v34_v2.py          # 从 V3.4 报告提取数据 v2（当前使用，容错增强）
 │   └── gen_index.py               # 生成 V3.4 归档索引（7大部分完整索引）
+│
+├── 应用开发类/              # app 侧工程开发工具（回归测试/GUI 点验/数据修复/数据迁移）
+│   ├── e2e_sidecar.py             # sidecar 全协议回归测试（29 方法契约 + stdout 纯净性）
+│   ├── gui_once.py                # GUI 原子点验范式（起栈→交互→退栈一次调用）
+│   ├── repair_m3.py               # M3 数据修复（去重+清孤儿向量，历史工具）
+│   └── migrate_runtime_data.py    # 运行时数据迁出同步目录（一次性迁移，历史工具）
 │
 └── README.md                # 本文件
 ```
@@ -279,6 +285,35 @@
 
 ---
 
+## 七、应用开发类
+
+> 说明：本类目归集「红楼梦阅读分析一体化」桌面应用（app/）开发过程中沉淀的可复用脚本。运行版本分别位于 `app/tools/`（e2e_sidecar.py / gui_once.py）与历史 `app/.temp/`（repair_m3.py / migrate_runtime_data.py），本处为归集归档副本，与运行版字节一致（MD5 可校验）。**改动本类目脚本后须同步运行版，反之亦然**。
+
+### 1. e2e_sidecar.py
+**功能**：通过真实 stdio NDJSON 协议端到端验证 Python sidecar 的全部方法契约（截至 M4.5 共 29 个方法），含 stdout 纯净性断言（日志不得混入 NDJSON 通道）。
+- 重点覆盖：协议握手 / 情感分析 / 主库书目 / 情感持久化往返 / 标注 CRUD / 向量索引幂等 / RAG 检索 / 全景回灌（M4）/ 全书预处理（M4.5）
+- 运行位置：**固定在 `app/tools/`**（内部以 `dirname(__file__)/..` 解析 app 根目录），依赖项目 venv（`%USERPROFILE%\.venvs\honglou`）
+- 报告：`app/.temp/e2e_sidecar_report.txt`
+- 用法：`python app/tools/e2e_sidecar.py`
+
+### 2. gui_once.py
+**功能**：GUI 原子点验范式——在**一次工具调用内**完成「起 vite dev server + app.exe → 等待窗口 → 按步骤截图/点击 → 退栈」，规避进程树在调用结束后被回收的问题。
+- 步骤语法：`wait:N` / `shot:NAME` / `click:X,Y`（物理坐标）/ `cssclick:X,Y`（CSS 像素，自动 DPI 换算）
+- 运行位置：**固定在 `app/tools/`**（内部解析 app 根目录 + node + vite + app.exe 路径）
+- 报告：`app/.temp/gui_once_report.txt`
+- 用法：`python app/tools/gui_once.py`
+
+### 3. repair_m3.py
+**功能**：M3 数据修复——去重 books/chapters/chunks + 清孤儿向量，然后端到端验证（历史工具）。
+- 注意：修复针对的是 M3 阶段的派生缓存表；主库已于 M3 缺陷 7 迁移到同步目录外 `%USERPROFILE%\.honglou\data\honglou.sqlite`，本脚本中的旧库路径仅供参考与追溯，再跑前需先核对当前库位置。
+
+### 4. migrate_runtime_data.py
+**功能**：把运行时数据（SQLite 主库 + 模型缓存）从同步目录内迁到同步目录外（一次性迁移，历史工具）。
+- 使命已完成：现主库 `%USERPROFILE%\.honglou\data`、模型 `%USERPROFILE%\.honglou\models`，由 `config.DATA_DIR` 解析。
+- 保留价值：作为「运行时数据必须脱离同步目录」这一决策的依据与参考实现。
+
+---
+
 ## 使用流程
 
 ### 新增一章分析的标准流程
@@ -377,6 +412,7 @@
 | V3.2 | 2026-08-26 | 加回冲突动机分析、叙事手法、情感趋势分析 |
 | V3.3 | 2026-08-26 | 归档索引细化（逐章统计、人物档案、伏笔线索） |
 | V3.4 | 2026-08-26 | 事件颗粒度细化、字段格式统一、词典规模口径说明；新增 v34_convert.py / extract_v34_v2.py / gen_index.py 等 V3.4 专项脚本 |
+| V3.4.2 | 2026-09-18 | 新增「应用开发类」子目录：归集 app 侧可复用脚本（e2e_sidecar.py / gui_once.py / repair_m3.py / migrate_runtime_data.py），运行版分别在 app/tools/ 与历史 app/.temp/ |
 
 ---
 
@@ -389,6 +425,7 @@
 5. **存档习惯**：每次大版本升级前先备份，确认无误后再覆盖
 6. **验证优先**：任何修改后务必运行验证脚本确保结构完整
 7. **V3.4 索引生成推荐流程**：`extract_v34_v2.py` → `gen_index.py`（两步完成，无需其他脚本）
+8. **应用开发类双底本同步**：「应用开发类/」内的 e2e_sidecar.py 与 gui_once.py 为**归集归档副本**，其路径解析依赖 `app/tools/` 运行位置，改动脚本时必须**同步两处**（本目录 + app/tools/），否则回归测试会因路径解析失效而失败
 
 ---
 
