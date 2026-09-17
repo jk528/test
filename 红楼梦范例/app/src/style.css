@@ -11,6 +11,11 @@
   --ruler-line: #c9a35c;
   --progress-bar: #c9a35c;
   --progress-track: rgba(201, 163, 92, 0.15);
+  /* 彩读美学：纸纹纹理（SVG 噪点，亮色版）——叠加在阅读区底色之上
+     baseFrequency 越低纹理越粗，opacity 控制纹理浓度（0.55 更明显但不刺眼） */
+  --reader-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+  /* 彩读美学：阅读列最大宽度（行长控制，居中留白） */
+  --reader-max-w: 880px;
   font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
 }
 
@@ -26,6 +31,8 @@
   --ruler-bg: #38332b;
   --ruler-line: #c9a35c;
   --progress-track: rgba(201, 163, 92, 0.2);
+  /* 暗色版纹理：透明度适中，噪点柔和不刺眼 */
+  --reader-texture: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.28'/%3E%3C/svg%3E");
 }
 
 /* 彩读风格：亮色命名配色方案（7 种，仿彩读 v3.8） */

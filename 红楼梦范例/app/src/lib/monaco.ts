@@ -21,14 +21,15 @@ export function setupMonaco(): typeof monaco {
     inherit: true,
     rules: [],
     colors: {
-      "editor.background": "#fbf8f1",
+      // 阅读器背景交给最外层 CSS 纹理层，Monaco 自身透明
+      "editor.background": "#00000000",
       "editor.foreground": "#2b2620",
       "editorLineNumber.foreground": "#c9bfa8",
       "editorLineNumber.activeForeground": "#8a6d3b",
       "editorGutter.background": "#f4eee0",
-      "editor.lineHighlightBackground": "#f3ead3",
       "editorCursor.foreground": "#8a6d3b",
       "editorIndentGuide.background1": "#ece3cf",
+      "editor.lineHighlightBackground": "#00000000",
     },
   });
 
@@ -38,14 +39,15 @@ export function setupMonaco(): typeof monaco {
     inherit: true,
     rules: [],
     colors: {
-      "editor.background": "#1e1c19",
+      // 阅读器背景交给最外层 CSS 纹理层，Monaco 自身透明
+      "editor.background": "#00000000",
       "editor.foreground": "#cfc6b8",
       "editorLineNumber.foreground": "#5f5749",
       "editorLineNumber.activeForeground": "#c9a35c",
       "editorGutter.background": "#262320",
-      "editor.lineHighlightBackground": "#2e2a24",
       "editorCursor.foreground": "#c9a35c",
       "editorIndentGuide.background1": "#33302a",
+      "editor.lineHighlightBackground": "#00000000",
     },
   });
 

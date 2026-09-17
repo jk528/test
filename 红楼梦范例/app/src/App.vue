@@ -103,9 +103,9 @@ type LightSchemeKey = typeof LIGHT_SCHEMES[number]["key"];
 type DarkSchemeKey = typeof DARK_SCHEMES[number]["key"];
 
 const readSettings = ref({
-  fontSize: 17,
-  lineHeight: 30,
-  lineHeightRatio: 1.76,
+  fontSize: 24,
+  lineHeight: 36,
+  lineHeightRatio: 1.5,
   fontFamily: FONT_PRESETS[0].value,
   theme: "light" as "light" | "dark",
   lightScheme: "default" as LightSchemeKey,
@@ -125,7 +125,7 @@ const showSettingsPanel = ref(false);
 const sidebarHover = ref(false);
 
 function bumpFont(d: number) {
-  const n = Math.min(26, Math.max(13, readSettings.value.fontSize + d));
+  const n = Math.min(30, Math.max(13, readSettings.value.fontSize + d));
   readSettings.value.fontSize = n;
   readSettings.value.lineHeight = Math.round(n * readSettings.value.lineHeightRatio);
 }

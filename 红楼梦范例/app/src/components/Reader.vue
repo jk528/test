@@ -368,6 +368,8 @@ function applySettings() {
   if (el) {
     el.style.setProperty("--indent-w", `${indentPx.value}px`);
     el.style.setProperty("--para-gap", `${paraGapPx.value}px`);
+    // 彩读美学：阅读尺改为「淡化非聚焦行」——容器加 class，CSS 用 opacity 淡化其余行
+    el.classList.toggle("reader-ruler-on", s.readingRuler);
   }
   applyTheme(s.theme);
   renderDecorations();
@@ -398,12 +400,15 @@ onMounted(() => {
     scrollBeyondLastLine: true,
     smoothScrolling: true,
     renderWhitespace: "none",
+    // 彩读美学：关闭当前行高亮，去掉"IDE 感"；阅读模式隐藏光标（宽度 0，不闪烁）
+    renderLineHighlight: "none",
+    cursorWidth: 0,
+    cursorBlinking: "solid",
     // 正文以全角空格（U+3000）缩进，中文小说常见，关闭不可见字符高亮与横幅
     unicodeHighlight: {
       ambiguousCharacters: false,
       invisibleCharacters: false,
     },
-    cursorBlinking: "smooth",
     padding: {
       top: 16,
       bottom: 120,
@@ -645,8 +650,8 @@ onMounted(() => {
   });
 
   renderDecorations();
-
-  // 初始定位到第 1 行顶部（规避 dev 预构建 reload / 布局重排导致的中途定位）
+  // 初始应用一次设置：确保阅读尺「淡化模式」class、缩进/段距 CSS 变量等首帧即生效
+  applySettings();
   // 并补发一次视口范围，确保 onMounted 后立即分析可见行（setScrollTop(0) 不触发 onDidScrollChange）
   requestAnimationFrame(() =>
     requestAnimationFrame(() => {
@@ -1187,11 +1192,12 @@ onBeforeUnmount(() => {
 </template>
 
 <style>
-/* OPT-6: Monaco 粘性章节条样式 —— 与阅读主题统一 */
+/* OPT-6 + 彩读美学：粘性章节条与阅读区完全融合 —— 同底色、无阴影、无分隔线、禁误触 */
 .reader-container .monaco-editor .sticky-widget {
-  background-color: var(--paper-2) !important;
-  border-bottom: 1px solid var(--line);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  background-color: var(--paper) !important;
+  border-bottom: none !important;
+  box-shadow: none !important;
+  pointer-events: none !important;
   z-index: 10;
 }
 .reader-container .monaco-editor .sticky-widget .sticky-line-content {
@@ -1199,15 +1205,15 @@ onBeforeUnmount(() => {
   font-weight: 700 !important;
   font-size: 13px;
   letter-spacing: 0.5px;
-  background-color: var(--paper-2) !important;
+  background-color: var(--paper) !important;
   padding: 2px 0;
 }
 .reader-container .monaco-editor .sticky-widget .sticky-widget-line-numbers,
 .reader-container .monaco-editor .sticky-widget .sticky-widget-lines-scrollable {
-  background-color: var(--paper-2) !important;
+  background-color: var(--paper) !important;
 }
 .reader-container .monaco-editor .sticky-widget .sticky-line-number {
-  background-color: var(--paper-2) !important;
+  background-color: var(--paper) !important;
   color: var(--accent-ink, #8a6d3b) !important;
 }
 /* OPT-3: 阅读尺聚焦带 —— 视觉行级精度，inline 方式高亮整行文字 */
@@ -1217,6 +1223,27 @@ onBeforeUnmount(() => {
   display: inline-block;
   width: 100%;
   box-shadow: inset 0 1px 0 var(--ruler-line), inset 0 -1px 0 var(--ruler-line);
+}
+/* 彩读美学：阅读尺「淡化非聚焦行」—— 开启时其余行 opacity 降低，聚焦行保持清晰
+   聚焦行判定：.view-line 内包含 .hl-ruler-focus 装饰 span（:has 现代 Chromium 支持） */
+.reader-container.reader-ruler-on .view-line {
+  opacity: 0.25;
+  transition: opacity 0.2s ease;
+}
+.reader-container.reader-ruler-on .view-line:has(.hl-ruler-focus) {
+  opacity: 1;
+}
+/* 彩读风格：阅读尺开启时粘性章节条同步淡化（避免抢视觉焦点） */
+.reader-container.reader-ruler-on .sticky-widget {
+  opacity: 0.4;
+  transition: opacity 0.2s ease;
+}
+/* 无障碍：用户偏好减少动效时关闭淡化过渡 */
+@media (prefers-reduced-motion: reduce) {
+  .reader-container.reader-ruler-on .view-line,
+  .reader-container.reader-ruler-on .sticky-widget {
+    transition: none;
+  }
 }
 /* 章节标题行 */
 .hl-chapter-title {
@@ -1394,9 +1421,105 @@ onBeforeUnmount(() => {
   width: 100%;
   flex: 1;
   overflow: hidden;
+  /* 彩读美学：底色 + 纸纹纹理叠加（Monaco 层透明后透出） */
+  background-color: var(--paper);
+  background-image: var(--reader-texture);
+  background-repeat: repeat;
+  /* 彩读美学：行长控制 —— 阅读列居中，两侧留白（透出外层底色） */
+  max-width: var(--reader-max-w, 880px);
+  margin: 0 auto;
 }
+/* 彩读美学：Monaco 所有层透明，底色/纹理只画在最外层（同彩读 .readerSurfaceBg 做法）
+   逐层穿透：editor → overflow-guard → scrollable → editor-scrollable → background → lines-content → view-lines */
 .reader-container .monaco-editor,
+.reader-container .monaco-editor .overflow-guard,
+.reader-container .monaco-editor .monaco-scrollable-element,
+.reader-container .monaco-editor .editor-scrollable,
+.reader-container .monaco-editor .margin,
+.reader-container .monaco-editor .monaco-editor-background,
+.reader-container .monaco-editor .lines-content,
+.reader-container .monaco-editor .view-lines,
+.reader-container .monaco-editor .glyph-margin,
+.reader-container .monaco-editor .view-zones,
+.reader-container .monaco-editor .contentWidgets,
+.reader-container .monaco-editor .margin-view-overlays,
+.reader-container .monaco-editor .lines-content .monaco-editor-background {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+/* 彩读美学：滚动条美化 —— 细窄、半透明、hover 时加深，与纸感背景协调 */
+.reader-container .monaco-editor .scrollbar {
+  background: transparent !important;
+}
+.reader-container .monaco-editor .scrollbar .slider {
+  background: var(--line) !important;
+  border-radius: 4px;
+  opacity: 0.5;
+  transition: opacity 0.2s ease, background 0.2s ease;
+}
+.reader-container .monaco-editor .scrollbar .slider:hover {
+  opacity: 1;
+  background: var(--accent) !important;
+}
+.reader-container .monaco-editor .scrollbar .slider.active {
+  opacity: 1;
+  background: var(--accent) !important;
+}
+/* 隐藏滚动条箭头按钮 */
+.reader-container .monaco-editor .scrollbar .arrow {
+  display: none !important;
+}
+
+/* 彩读美学：行号区与正文的柔和过渡 —— 右侧渐变淡出，替代生硬的竖线分隔 */
 .reader-container .monaco-editor .margin {
-  border-radius: 0;
+  border-right: none !important;
+  position: relative;
+}
+.reader-container .monaco-editor .margin::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 20px;
+  background: linear-gradient(90deg, transparent, var(--paper));
+  pointer-events: none;
+  z-index: 1;
+}
+/* 行号文字更精致：更轻的字重 + 更小字号 */
+.reader-container .monaco-editor .line-numbers {
+  font-weight: 300 !important;
+  font-size: 12px !important;
+  letter-spacing: 0.3px;
+}
+
+/* 彩读美学：文字渲染优化 —— 更清晰的中文字体渲染 + 微抗锯齿 */
+.reader-container .monaco-editor .view-lines {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+.reader-container .monaco-editor .view-line {
+  font-feature-settings: "kern" 1;
+  letter-spacing: 0.02em;
+}
+
+/* 彩读美学：选中文本样式 —— 柔和的金色半透明底色，不刺眼 */
+.reader-container .monaco-editor .view-line span::selection {
+  background: rgba(201, 163, 92, 0.35);
+}
+.reader-container .monaco-editor .selected-text {
+  background: rgba(201, 163, 92, 0.35) !important;
+}
+
+/* 彩读美学：概览标尺（右侧缩略条）美化 —— 更细、更柔和 */
+.reader-container .monaco-editor .decorationsOverviewRuler {
+  width: 6px !important;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+.reader-container .monaco-editor .decorationsOverviewRuler:hover {
+  opacity: 1;
 }
 </style>
