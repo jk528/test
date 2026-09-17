@@ -56,7 +56,7 @@ from retrieval import (  # noqa: E402
 )
 
 PROTOCOL = "honglou-sidecar/1"
-SIDE_VERSION = "0.5.0-m4.5"
+SIDE_VERSION = "0.6.0-m4.6"
 
 # 与 split_txt.bas 默认正则 #1、前端 src/lib/chapters.ts 一致
 CHAPTER_RE = re.compile(r"^第([0-9一二三四五六七八九十百千万零〇两壹贰叁肆伍陆柒捌玖拾佰仟]+)(章|回|节|卷)\s*(.*)$")

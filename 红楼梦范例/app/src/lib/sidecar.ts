@@ -273,6 +273,19 @@ export interface BookEvent {
   para_raw: string | null;
   char_start: number | null;
   char_end: number | null;
+  /** M4.6：报告 §三 新闻六要素表回填（子集覆盖，可为 null） */
+  w5h1: EventW5H1 | null;
+}
+
+export interface EventW5H1 {
+  title: string;
+  when: string;
+  where: string;
+  who: string;
+  what: string;
+  why: string;
+  how: string;
+  source: string;
 }
 
 export interface EntityRow {

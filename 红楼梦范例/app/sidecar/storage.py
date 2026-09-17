@@ -545,7 +545,7 @@ class BookStore:
         """按章区间/级别/人物筛事件。entity 为规范名（参与人物里包含即命中）。"""
         sql = ("SELECT id, event_uid, level, chapter_idx, line_start, line_end, "
                "summary, tone, anchor_precision, participants_json, para_raw, "
-               "char_start, char_end FROM events WHERE book_id=?")
+               "char_start, char_end, w5h1_json FROM events WHERE book_id=?")
         args: List[Any] = [book_id]
         if chapter_from is not None:
             sql += " AND chapter_idx >= ?"
@@ -568,6 +568,11 @@ class BookStore:
                 d["participants"] = json.loads(d.pop("participants_json") or "[]")
             except (TypeError, ValueError):
                 d["participants"] = []
+            try:
+                w5raw = d.pop("w5h1_json", None)
+                d["w5h1"] = json.loads(w5raw) if w5raw else None
+            except (TypeError, ValueError):
+                d["w5h1"] = None
             out.append(d)
         return out
 

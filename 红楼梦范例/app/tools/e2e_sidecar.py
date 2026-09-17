@@ -81,7 +81,7 @@ print("=" * 70)
 print("一、基础与协议")
 print("=" * 70)
 r = call("ping")
-check("ping", r["version"] == "0.5.0-m4.5", f"version={r['version']} python={r['python']}")
+check("ping", r["version"] == "0.6.0-m4.6", f"version={r['version']} python={r['python']}")
 
 r = call("chapter_outline", {"path": BOOK})
 check("chapter_outline", r["chapter_count"] == 120 and r["total_lines"] == 3367,
@@ -357,6 +357,28 @@ for _row in _db:
         _diff += 1
 check("预处理结果 == 实时计算（第 1 章逐行）", _diff == 0 and _same > 0,
       f"一致 {_same} 行 / 差异 {_diff} 行")
+
+print()
+print("=" * 70)
+print("十二、M4.6 事件 5W1H 回填（报告 §三 新闻六要素表）")
+print("=" * 70)
+_r = call("import_analysis", {"book_id": bid, "text": text})
+check("import_analysis 返回 5W1H 覆盖",
+      "w5h1" in _r and _r["w5h1"] > 0,
+      f"events={_r['events']} w5h1={_r.get('w5h1')}")
+_ev1 = call("list_events", {"book_id": bid, "chapter_from": 0, "chapter_to": 0})["events"]
+_with = [e for e in _ev1 if e.get("w5h1")]
+check("第 1 章事件带 5W1H 明细", len(_with) > 0,
+      f"{len(_ev1)} 条事件中 {len(_with)} 条带 5W1H")
+_w = next((e["w5h1"] for e in _ev1 if e["event_uid"] == "E01-19"), None)
+check("E01-19 赠银助考 六要素内容正确",
+      bool(_w) and _w["when"] == "中秋夜" and _w["where"] == "甄士隐书房"
+      and "赠" in _w["what"] and _w["why"] == "识雨村才学",
+      f"w5h1={_w}")
+_keys = {"title", "when", "where", "who", "what", "why", "how", "source"}
+check("5W1H 字段结构统一（8 键）",
+      bool(_with) and all(set(e["w5h1"]) == _keys for e in _with),
+      f"样本键集={sorted(_with[0]['w5h1']) if _with else '无样本'}")
 
 proc.stdin.close()
 proc.wait(timeout=10)

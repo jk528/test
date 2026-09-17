@@ -130,6 +130,21 @@ function precBadge(p: string): string {
   return p === "quote" ? "精确" : p === "cooccur" ? "近似" : "粗定位";
 }
 
+/** M4.6：事件悬停显示 5W1H 六要素（来自报告 §三 新闻六要素表） */
+function w5h1Tip(e: BookEvent): string {
+  const w = e.w5h1;
+  if (!w) return "";
+  const parts: string[] = [];
+  if (w.when) parts.push("时间：" + w.when);
+  if (w.where) parts.push("地点：" + w.where);
+  if (w.who) parts.push("主体：" + w.who);
+  if (w.what) parts.push("事件：" + w.what);
+  if (w.why) parts.push("原因：" + w.why);
+  if (w.how) parts.push("方式：" + w.how);
+  if (w.source) parts.push("出处：" + w.source);
+  return parts.join("\n");
+}
+
 onMounted(loadAll);
 watch(() => props.bookId, loadAll);
 watch(
@@ -195,7 +210,7 @@ watch(
           >
             <span class="ev-uid">{{ e.event_uid }}</span>
             <span class="ev-lv">{{ e.level }}</span>
-            <span class="ev-sum">{{ e.summary }}</span>
+            <span class="ev-sum" :title="w5h1Tip(e)">{{ e.summary }}</span>
             <span class="ev-prec" :title="'锚点精度：' + e.anchor_precision">
               {{ precBadge(e.anchor_precision) }}
             </span>

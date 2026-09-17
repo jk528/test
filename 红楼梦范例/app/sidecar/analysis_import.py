@@ -34,10 +34,12 @@ from typing import Any, Dict, List, Optional, Tuple
 HDR_EVENT = "事件ID | 段落索引 | 事件摘要 | 涉及人物 | 情感倾向 | 事件级别 | 溯源状态"
 HDR_RELATION = "角色A | 关系 | 角色B | 本章互动"
 HDR_FORESHADOW = "章回 | 线索内容 | 类型 | 状态"
+HDR_W5H1 = "事件ID | 事件标题 | 时间 | 地点 | 新闻主体 | 事件 | 原因 | 方式 | 详细信息源"
 
 SECTION_EVENT = "二、事件接入清单"
 SECTION_RELATION = "六、人物关系梳理"
 SECTION_FORESHADOW = "伏笔与线索追踪"
+SECTION_W5H1 = "三、新闻六要素表"
 
 # 事件级别：★核心（推动主线）｜◆关键（人物出场/关系建立）｜◇背景（环境/次要情节）
 LEVEL_MAP = {"★": "主线", "◆": "支线", "◇": "细节"}
@@ -142,6 +144,18 @@ def parse_report(path: str) -> Dict[str, Any]:
     """解析单章报告：事件 / 人物关系 / 伏笔。"""
     text = open(path, encoding="utf-8", errors="replace").read()
 
+    # §三 新闻六要素表（A轨）：按事件ID 挂载 5W1H（★核心+判词组子集）
+    w5h1_map: Dict[str, Dict[str, str]] = {}
+    for cells in _table_rows(_section(text, SECTION_W5H1, "## 四、"),
+                             HDR_W5H1):
+        if len(cells) < 9 or not re.match(r"^E\d{2,3}-\d{2}$", cells[0]):
+            continue
+        w5h1_map[cells[0]] = {
+            "title": cells[1], "when": cells[2], "where": cells[3],
+            "who": cells[4], "what": cells[5], "why": cells[6],
+            "how": cells[7], "source": cells[8],
+        }
+
     events = []
     for cells in _table_rows(_section(text, SECTION_EVENT, "## 三、"), HDR_EVENT):
         if len(cells) < 6:
@@ -154,6 +168,7 @@ def parse_report(path: str) -> Dict[str, Any]:
             "participants": [p for p in re.split(r"[/、,，]", cells[3]) if p.strip()],
             "tone": normalize_tone(cells[4]),
             "level": LEVEL_MAP.get(cells[5].strip()[:1], "细节"),
+            "w5h1": w5h1_map.get(cells[0]),
         })
 
     relations = []
@@ -408,7 +423,7 @@ def import_analysis(store, book_id: str, text: str, chapters: List[Dict[str, Any
                 "line_end": line, "summary": ev["summary"], "tone": ev["tone"],
                 "level": ev["level"], "participants": ev["participants"],
                 "char_start": cs, "char_end": ce, "precision": prec,
-                "para_raw": ev["para_raw"],
+                "para_raw": ev["para_raw"], "w5h1": ev.get("w5h1"),
             })
         for rel in rep["relations"]:
             relations.append({"chapter_idx": ci, **rel})
@@ -527,7 +542,9 @@ def _write_all(store, book_id: str, events, entity_rows, mention_rows,
             "anchor_precision, char_start, char_end, para_raw) "
             "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (book_id, ev["level"], ev["chapter_idx"], ev["line_start"],
-             ev["line_end"], ev["summary"], None,
+             ev["line_end"], ev["summary"],
+             (json.dumps(ev["w5h1"], ensure_ascii=False)
+              if ev.get("w5h1") else None),
              json.dumps(ev["participants"], ensure_ascii=False), ev["uid"],
              ev["tone"], ev["precision"], ev["char_start"], ev["char_end"],
              ev["para_raw"]))
@@ -568,4 +585,5 @@ def _write_all(store, book_id: str, events, entity_rows, mention_rows,
         "events": len(events), "entities": len(entity_rows),
         "mentions": len(mention_rows), "foreshadows": len(foreshadows),
         "relations": len(relations),
+        "w5h1": sum(1 for ev in events if ev.get("w5h1")),
     }
