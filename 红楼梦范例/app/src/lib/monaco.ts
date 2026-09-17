@@ -15,7 +15,7 @@ export function setupMonaco(): typeof monaco {
     },
   };
 
-  // 中文阅读主题：深色批注感，正文行高宽松
+  // 中文阅读主题（明亮）：纸感米黄，正文行高宽松
   monaco.editor.defineTheme("honglou-read", {
     base: "vs",
     inherit: true,
@@ -28,6 +28,24 @@ export function setupMonaco(): typeof monaco {
       "editorGutter.background": "#f4eee0",
       "editor.lineHighlightBackground": "#f3ead3",
       "editorCursor.foreground": "#8a6d3b",
+      "editorIndentGuide.background1": "#ece3cf",
+    },
+  });
+
+  // 中文阅读主题（暗黑）：仿彩读暗黑配色，暖调纸黑
+  monaco.editor.defineTheme("honglou-read-dark", {
+    base: "vs-dark",
+    inherit: true,
+    rules: [],
+    colors: {
+      "editor.background": "#1e1c19",
+      "editor.foreground": "#cfc6b8",
+      "editorLineNumber.foreground": "#5f5749",
+      "editorLineNumber.activeForeground": "#c9a35c",
+      "editorGutter.background": "#262320",
+      "editor.lineHighlightBackground": "#2e2a24",
+      "editorCursor.foreground": "#c9a35c",
+      "editorIndentGuide.background1": "#33302a",
     },
   });
 

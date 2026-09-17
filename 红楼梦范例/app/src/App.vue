@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 红楼梦阅读分析一体化 — M1 主界面
 // 布局：顶部工具栏 | 左栏（回目树 + 书签） | 阅读区
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import Reader from "./components/Reader.vue";
 import ChapterTree from "./components/ChapterTree.vue";
 import AiPanel from "./components/AiPanel.vue";
@@ -75,6 +75,43 @@ const prepareProgress = ref("");
 const lastView = ref<[number, number]>([0, 0]);
 const showEmotions = ref(true);
 const chapterEmotions = ref<ChapterEmotion[]>([]);
+// 彩读风格：阅读设置（localStorage 持久化）+ 极简视图
+const READ_LS = "honglou.read.settings";
+const readSettings = ref({
+  fontSize: 17,
+  lineHeight: 30,
+  fontFamily:
+    '"Noto Serif SC","Source Han Serif SC","SimSun","Songti SC","Microsoft YaHei",serif',
+  theme: "light" as "light" | "dark",
+  paddingX: 48,
+  readingRuler: false,
+});
+const minimalView = ref(false);
+
+function bumpFont(d: number) {
+  const n = Math.min(26, Math.max(13, readSettings.value.fontSize + d));
+  readSettings.value.fontSize = n;
+  readSettings.value.lineHeight = Math.round(n * 1.76);
+}
+
+function loadReadSettings() {
+  try {
+    const raw = localStorage.getItem(READ_LS);
+    if (raw) Object.assign(readSettings.value, JSON.parse(raw));
+  } catch {
+    /* 忽略损坏的本地设置 */
+  }
+  document.body.classList.toggle("theme-dark", readSettings.value.theme === "dark");
+}
+
+watch(
+  readSettings,
+  (s) => {
+    localStorage.setItem(READ_LS, JSON.stringify(s));
+    document.body.classList.toggle("theme-dark", s.theme === "dark");
+  },
+  { deep: true }
+);
 // 视口缓存：key = 绝对物理行号，value = EmotionSpan（line_offset 存绝对行号）
 const emotionCache = new Map<number, EmotionSpan>();
 // 已分析行集合（含无情感词的行，避免重复请求 sidecar）
@@ -575,6 +612,7 @@ function onAiJump(line0: number) {
 }
 
 onMounted(async () => {
+  loadReadSettings();
   if (!isTauri) {
     errorMsg.value =
       "当前为普通浏览器预览，无法读取本地文件。请运行 pnpm tauri dev 在桌面窗口中使用。";
@@ -608,12 +646,59 @@ onMounted(async () => {
       >
         AI
       </button>
+      <div class="read-tools">
+        <button
+          class="btn"
+          title="缩小字号"
+          :disabled="!rawText"
+          @click="bumpFont(-1)"
+        >
+          A-
+        </button>
+        <button
+          class="btn"
+          title="放大字号"
+          :disabled="!rawText"
+          @click="bumpFont(1)"
+        >
+          A+
+        </button>
+        <button
+          class="btn"
+          :class="{ active: readSettings.theme === 'dark' }"
+          title="明亮 / 暗黑主题"
+          :disabled="!rawText"
+          @click="
+            readSettings.theme = readSettings.theme === 'dark' ? 'light' : 'dark'
+          "
+        >
+          主题
+        </button>
+        <button
+          class="btn"
+          :class="{ active: readSettings.readingRuler }"
+          title="阅读尺（聚焦当前行）"
+          :disabled="!rawText"
+          @click="readSettings.readingRuler = !readSettings.readingRuler"
+        >
+          阅读尺
+        </button>
+        <button
+          class="btn"
+          :class="{ active: minimalView }"
+          title="极简视图（隐藏侧栏，鼠标移右缘可切回）"
+          :disabled="!rawText"
+          @click="minimalView = !minimalView"
+        >
+          极简
+        </button>
+      </div>
     </header>
 
     <div v-if="errorMsg" class="error-banner">{{ errorMsg }}</div>
 
     <main class="main">
-      <aside class="sidebar">
+      <aside class="sidebar" :class="{ hidden: minimalView }">
         <div class="tabs">
           <button
             :class="{ on: sidebarTab === 'toc' }"
@@ -699,6 +784,7 @@ onMounted(async () => {
           :entity-spans="entitySpans"
           :show-entities="showEntities"
           :entity-name="activeEntity ?? ''"
+          :settings="readSettings"
           @toggle-entities="showEntities = !showEntities"
           @view-range="onViewRange"
           @toggle-bookmark="onToggleBookmark"

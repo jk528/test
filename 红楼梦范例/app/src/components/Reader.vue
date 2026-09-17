@@ -6,7 +6,7 @@
 // - 滚动/定位均基于 0 基物理行（Monaco 内部为 1 基）
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { setupMonaco, monaco } from "../lib/monaco";
-import type { Chapter } from "../lib/chapters";
+import { chapterAtLine, type Chapter } from "../lib/chapters";
 import type { Bookmark } from "../lib/annotations";
 import type { EmotionSpan, EntitySpan } from "../lib/sidecar";
 
@@ -26,6 +26,15 @@ const props = defineProps<{
   showEntities: boolean;
   /** 当前高亮的人物名（空=未选中） */
   entityName: string;
+  /** 阅读设置（彩读风格：字号/行高/字体/主题/左右留白/阅读尺） */
+  settings: {
+    fontSize: number;
+    lineHeight: number;
+    fontFamily: string;
+    theme: "light" | "dark";
+    paddingX: number;
+    readingRuler: boolean;
+  };
 }>();
 
 const emit = defineEmits<{
@@ -65,20 +74,52 @@ let editor: monaco.editor.IStandaloneCodeEditor | null = null;
 let decoColl: monaco.editor.IEditorDecorationsCollection | null = null;
 let scrollRaf = 0;
 let removeResizeListener: (() => void) | null = null;
+// 彩读风格：阅读区顶部常驻当前章节标题
+const stickyLabel = ref("");
+// 阅读尺：当前光标行（Monaco 1-based），开启时高亮该行
+let rulerLine = 1;
 
 setupMonaco();
+
+function applyTheme(t: "light" | "dark") {
+  monaco.editor.setTheme(t === "dark" ? "honglou-read-dark" : "honglou-read");
+}
+
+/** 滚动/跳转后更新顶部粘性章节标题。line1 为 Monaco 1-based 可见行。 */
+function updateSticky(line1: number) {
+  const idx = chapterAtLine(props.chapters, line1 - 1);
+  if (idx > 0) {
+    const ch = props.chapters[idx - 1];
+    const label = ch.title.trim().replace(/\s+/g, " ");
+    stickyLabel.value = label || `第${ch.numberText}${ch.unit}`;
+  } else {
+    stickyLabel.value = "";
+  }
+}
+
+function applySettings() {
+  if (!editor) return;
+  const s = props.settings;
+  editor.updateOptions({
+    fontSize: s.fontSize,
+    lineHeight: s.lineHeight,
+    fontFamily: s.fontFamily,
+    padding: { top: 16, bottom: 120, left: s.paddingX, right: s.paddingX },
+  });
+  applyTheme(s.theme);
+  renderDecorations();
+}
 
 onMounted(() => {
   if (!container.value) return;
   editor = monaco.editor.create(container.value, {
     value: props.text,
     readOnly: true,
-    theme: "honglou-read",
+    theme: props.settings.theme === "dark" ? "honglou-read-dark" : "honglou-read",
     automaticLayout: true,
-    fontSize: 17,
-    lineHeight: 30,
-    fontFamily:
-      '"Cascadia Code", Consolas, "Microsoft YaHei", "PingFang SC", "Noto Serif SC", SimSun, serif',
+    fontSize: props.settings.fontSize,
+    lineHeight: props.settings.lineHeight,
+    fontFamily: props.settings.fontFamily,
     wordWrap: "on",
     wrappingStrategy: "advanced",
     wrappingIndent: "same",
@@ -96,7 +137,12 @@ onMounted(() => {
       invisibleCharacters: false,
     },
     cursorBlinking: "smooth",
-    padding: { top: 16, bottom: 120 },
+    padding: {
+      top: 16,
+      bottom: 120,
+      left: props.settings.paddingX,
+      right: props.settings.paddingX,
+    },
     scrollbar: { vertical: "auto", horizontal: "hidden" },
   });
 
@@ -137,7 +183,7 @@ onMounted(() => {
     }
   });
 
-  // 可见行范围变化 → 通知外层分析视口（视口驱动 + 缓存）
+  // 可见行范围变化 → 通知外层分析视口（视口驱动 + 缓存）+ 刷新粘性章节标题
   editor.onDidScrollChange(() => {
     if (scrollRaf) return;
     scrollRaf = requestAnimationFrame(() => {
@@ -146,8 +192,16 @@ onMounted(() => {
       const visible = editor.getVisibleRanges()[0];
       if (visible) {
         emit("view-range", visible.startLineNumber - 1, visible.endLineNumber - 1);
+        updateSticky(visible.startLineNumber);
       }
     });
+  });
+
+  // 阅读尺：光标行变化 → 更新当前行高亮（开启状态下生效）
+  editor.onDidChangeCursorPosition((e) => {
+    if (rulerLine === e.position.lineNumber) return;
+    rulerLine = e.position.lineNumber;
+    if (props.settings.readingRuler) renderDecorations();
   });
 
   renderDecorations();
@@ -162,6 +216,7 @@ onMounted(() => {
       const visible = editor.getVisibleRanges()[0];
       if (visible) {
         emit("view-range", visible.startLineNumber - 1, visible.endLineNumber - 1);
+        updateSticky(visible.startLineNumber);
       }
     })
   );
@@ -186,6 +241,13 @@ watch(
     props.showEntities,
   ],
   () => renderDecorations(),
+  { deep: true }
+);
+
+// 阅读设置变化 → 应用（字号/行高/字体/留白/主题/阅读尺）
+watch(
+  () => props.settings,
+  () => applySettings(),
   { deep: true }
 );
 
@@ -267,6 +329,18 @@ function renderDecorations() {
     }
   }
 
+  // 彩读风格：阅读尺 —— 高亮当前光标行（聚焦阅读行，淡化由背景对比实现）
+  if (props.settings.readingRuler && rulerLine > 0) {
+    decos.push({
+      range: new monaco.Range(rulerLine, 1, rulerLine, 1),
+      options: {
+        isWholeLine: true,
+        className: "hl-ruler-line",
+        marginClassName: "hl-ruler-margin",
+      },
+    });
+  }
+
   decoColl.set(decos);
 }
 
@@ -292,6 +366,8 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="reader-wrap">
+    <!-- 彩读风格：阅读区顶部常驻当前章节标题 -->
+    <div class="sticky-title" v-if="stickyLabel">{{ stickyLabel }}</div>
     <div class="emotion-legend" v-if="emotions.length > 0 || entityName">
       <button class="legend-toggle" @click="emit('toggle-emotions')">
         {{ showEmotions ? "◉ 情感" : "○ 情感" }}
@@ -318,6 +394,31 @@ onBeforeUnmount(() => {
 </template>
 
 <style>
+/* 彩读风格：粘性章节标题条（阅读区顶部常驻） */
+.sticky-title {
+  flex-shrink: 0;
+  padding: 6px 16px;
+  background: var(--paper-2);
+  border-bottom: 1px solid var(--line);
+  color: var(--accent-ink);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+/* 彩读风格：阅读尺 —— 当前光标行高亮 */
+.hl-ruler-line {
+  background: var(--ruler-bg) !important;
+  border-top: 1px solid var(--ruler-line);
+  border-bottom: 1px solid var(--ruler-line);
+}
+.hl-ruler-margin {
+  background: var(--ruler-bg) !important;
+}
 /* 章节标题行 */
 .hl-chapter-title {
   background: #f6ead0 !important;
@@ -440,34 +541,34 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 10px;
   padding: 4px 12px;
-  background: #fafafa;
-  border-bottom: 1px solid #e0e0e0;
+  background: var(--paper-2);
+  border-bottom: 1px solid var(--line);
   font-size: 12px;
   flex-shrink: 0;
 }
 .legend-toggle {
-  border: 1px solid #ccc;
-  background: #fff;
+  border: 1px solid var(--line);
+  background: var(--paper);
   border-radius: 3px;
   padding: 2px 8px;
   cursor: pointer;
   font-size: 12px;
 }
 .legend-toggle:hover {
-  background: #f0f0f0;
+  background: var(--paper-2);
 }
 .legend-item {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: #555;
+  color: var(--ink-soft);
 }
 .emo-swatch {
   display: inline-block;
   width: 14px;
   height: 14px;
   border-radius: 2px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--line);
 }
 .emo-hao {
   background: #c8e6c9;
