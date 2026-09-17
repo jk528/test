@@ -2,21 +2,30 @@
 // 只读阅读器：Monaco 承载整篇文本，物理行作为唯一锚点。
 // - 章节标题行高亮（与解析结果联动）
 // - 书签行：glyph 角标 + 行底色，点击左侧 glyph 槽切换书签
+// - M2：情感着色（七类情绪 → 七套低饱和底色，叠加在物理行上）
 // - 滚动/定位均基于 0 基物理行（Monaco 内部为 1 基）
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { setupMonaco, monaco } from "../lib/monaco";
 import type { Chapter } from "../lib/chapters";
 import type { Bookmark } from "../lib/annotations";
+import type { EmotionSpan } from "../lib/sidecar";
 
 const props = defineProps<{
   text: string;
   chapters: Chapter[];
   bookmarks: Bookmark[];
+  /** 当前章段落级情感数据（line_offset 为章内 0-based 相对行） */
+  emotions: EmotionSpan[];
+  /** 当前章起始物理行（0-based），用于把 line_offset 映射到全局物理行 */
+  emotionBaseLine: number;
+  /** 是否显示情感着色 */
+  showEmotions: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: "view-line", line0: number): void;
   (e: "toggle-bookmark", line0: number): void;
+  (e: "toggle-emotions"): void;
 }>();
 
 const container = ref<HTMLDivElement | null>(null);
@@ -101,9 +110,9 @@ watch(
   }
 );
 
-// 章节或书签变化 → 重绘装饰
+// 章节或书签或情感数据变化 → 重绘装饰
 watch(
-  () => [props.chapters, props.bookmarks],
+  () => [props.chapters, props.bookmarks, props.emotions, props.showEmotions],
   () => renderDecorations(),
   { deep: true }
 );
@@ -139,6 +148,21 @@ function renderDecorations() {
     });
   }
 
+  // M2 情感着色：七类情绪 → 七套低饱和底色（叠加在物理行上）
+  if (props.showEmotions) {
+    for (const e of props.emotions) {
+      if (!e.dutir_top) continue; // 无情感词不着色
+      const ln = props.emotionBaseLine + e.line_offset + 1; // Monaco 1-based
+      decos.push({
+        range: new monaco.Range(ln, 1, ln, 1),
+        options: {
+          isWholeLine: true,
+          className: `hl-emo-${e.dutir_top}`,
+        },
+      });
+    }
+  }
+
   decoColl.set(decos);
 }
 
@@ -161,7 +185,23 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="container" class="reader-container"></div>
+  <div class="reader-wrap">
+    <div class="emotion-legend" v-if="emotions.length > 0">
+      <button class="legend-toggle" @click="emit('toggle-emotions')">
+        {{ showEmotions ? "◉ 情感" : "○ 情感" }}
+      </button>
+      <template v-if="showEmotions">
+        <span class="legend-item"><i class="emo-swatch emo-好"></i>好</span>
+        <span class="legend-item"><i class="emo-swatch emo-乐"></i>乐</span>
+        <span class="legend-item"><i class="emo-swatch emo-哀"></i>哀</span>
+        <span class="legend-item"><i class="emo-swatch emo-怒"></i>怒</span>
+        <span class="legend-item"><i class="emo-swatch emo-惧"></i>惧</span>
+        <span class="legend-item"><i class="emo-swatch emo-恶"></i>恶</span>
+        <span class="legend-item"><i class="emo-swatch emo-惊"></i>惊</span>
+      </template>
+    </div>
+    <div ref="container" class="reader-container"></div>
+  </div>
 </template>
 
 <style>
@@ -185,9 +225,94 @@ onBeforeUnmount(() => {
   font-size: 14px;
   cursor: pointer;
 }
-.reader-container {
+/* M2 情感着色：七类情绪 → 七套低饱和底色 */
+.hl-emo-好 {
+  background: #e8f5e9 !important;
+}
+.hl-emo-乐 {
+  background: #fff8e1 !important;
+}
+.hl-emo-哀 {
+  background: #e3f2fd !important;
+}
+.hl-emo-怒 {
+  background: #ffebee !important;
+}
+.hl-emo-惧 {
+  background: #f3e5f5 !important;
+}
+.hl-emo-恶 {
+  background: #eceff1 !important;
+}
+.hl-emo-惊 {
+  background: #fff3e0 !important;
+}
+/* 图例栏 */
+.reader-wrap {
   width: 100%;
   height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.emotion-legend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 12px;
+  background: #fafafa;
+  border-bottom: 1px solid #e0e0e0;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.legend-toggle {
+  border: 1px solid #ccc;
+  background: #fff;
+  border-radius: 3px;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.legend-toggle:hover {
+  background: #f0f0f0;
+}
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #555;
+}
+.emo-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  border: 1px solid #ddd;
+}
+.emo-好 {
+  background: #e8f5e9;
+}
+.emo-乐 {
+  background: #fff8e1;
+}
+.emo-哀 {
+  background: #e3f2fd;
+}
+.emo-怒 {
+  background: #ffebee;
+}
+.emo-惧 {
+  background: #f3e5f5;
+}
+.emo-恶 {
+  background: #eceff1;
+}
+.emo-惊 {
+  background: #fff3e0;
+}
+.reader-container {
+  width: 100%;
+  flex: 1;
   overflow: hidden;
 }
 .reader-container .monaco-editor,

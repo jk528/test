@@ -9,21 +9,25 @@
   失败：{"id": <同请求>, "error": {"code": <int>, "message": "<说明>"}}
   约定：stdout 只输出响应（保证 NDJSON 干净）；所有日志走 stderr。
 
-M1 仅提供：
+M1 提供：
   ping             —— 连通性 / 版本自检
   chapter_outline  —— 解析章节目录（规则与前端 TS、splittxt2 VBA 完全一致）
 
-M2 起在此协议上扩展 sentiment / highlight 等方法，不改变传输方式。
-仅使用标准库，便于 PyInstaller 打包为单可执行 sidecar。
+M2 新增：
+  analyze_sentiment —— 段落级（物理行级）情感分析，复用 基础/emotion_analysis.py 的
+                        EmotionAnalyzer（DUTIR 七类）+ jieba 分词（红楼梦分词词典）。
+
+仅使用标准库 + jieba（venv 内），便于后续 PyInstaller 打包为单可执行 sidecar。
 """
 
 import json
+import os
 import re
 import sys
 import traceback
 
 PROTOCOL = "honglou-sidecar/1"
-SIDE_VERSION = "0.1.0-m1"
+SIDE_VERSION = "0.2.0-m2"
 
 # 与 split_txt.bas 默认正则 #1、前端 src/lib/chapters.ts 一致
 # 标准中文：第 + 数字(阿拉伯/中文,含〇两,含大写中文数字壹贰叁…) + 章/回/节/卷 + 可选空白 + 标题
@@ -70,6 +74,49 @@ def parse_chapters(text: str) -> list:
     return chapters, len(lines)
 
 
+# ---------------- 基础目录与引擎懒加载 ----------------
+
+# DUTIR 七类情绪顺序（与 emotion_analysis.py EmotionAnalyzer 一致）
+EMOTION_ORDER = ["好", "乐", "哀", "怒", "惧", "恶", "惊"]
+
+
+def _resolve_base_dir():
+    """定位 基础/ 目录：环境变量优先，否则相对 sidecar.py 上溯两级。"""
+    env = os.environ.get("HONGLOU_BASE_DIR")
+    if env and os.path.isdir(env):
+        return os.path.abspath(env)
+    # sidecar.py 位于 app/sidecar/honglou_sidecar.py，基础在 ../../基础/
+    here = os.path.dirname(os.path.abspath(__file__))
+    cand = os.path.join(here, "..", "..", "基础")
+    if os.path.isdir(cand):
+        return os.path.abspath(cand)
+    return None
+
+
+BASE_DIR = _resolve_base_dir()
+_engine = None  # 懒加载：首次调 analyze_sentiment 时初始化
+
+
+def _get_engine():
+    """加载 jieba（红楼梦分词词典）+ EmotionAnalyzer（DUTIR 七类）。"""
+    global _engine
+    if _engine is not None:
+        return _engine
+    if not BASE_DIR:
+        raise RuntimeError("基础目录未找到（HONGLOU_BASE_DIR 未设且相对路径无效）")
+    if BASE_DIR not in sys.path:
+        sys.path.insert(0, BASE_DIR)
+    from emotion_analysis import EmotionAnalyzer  # noqa: E402
+    import jieba  # noqa: E402
+    seg_dict = os.path.join(BASE_DIR, "红楼梦分词词典.txt")
+    if os.path.isfile(seg_dict):
+        jieba.load_userdict(seg_dict)
+    analyzer = EmotionAnalyzer()
+    _engine = {"jieba": jieba, "analyzer": analyzer}
+    log(f"分析引擎已加载 BASE_DIR={BASE_DIR}")
+    return _engine
+
+
 # ---------------- JSON-RPC 方法表 ----------------
 
 def m_ping(_params: dict) -> dict:
@@ -95,9 +142,62 @@ def m_chapter_outline(params: dict) -> dict:
     }
 
 
+def m_analyze_sentiment(params: dict) -> dict:
+    """段落级（物理行级）情感分析。
+
+    params: {text: str}  —— 章内文本（按 \\n 分行；line_offset 为章内 0 基相对行号）
+    返回:   {paragraphs: [{line_offset, dutir_top, polarity, intensity, weights}]}
+            dutir_top 为 None 表示该行无情感词（不着色）。
+    """
+    text = params.get("text")
+    if not isinstance(text, str):
+        raise ValueError("params 需要 text (string)")
+    eng = _get_engine()
+    jieba = eng["jieba"]
+    analyzer = eng["analyzer"]
+    lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    paragraphs = []
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        words = jieba.lcut(stripped)
+        result = analyzer.analyze_words(words)
+        counts = result["emotion_counts"]
+        total = result["total_emotion_words"]
+        if total == 0:
+            paragraphs.append({
+                "line_offset": i,
+                "dutir_top": None,
+                "polarity": 0.0,
+                "intensity": 0.0,
+                "weights": {},
+            })
+            continue
+        # 主导情绪：七类计数最大者
+        top = max(EMOTION_ORDER, key=lambda e: counts.get(e, 0))
+        # 极性：(正面 - 负面) / 总情感词数，归一化到 -1~1
+        polarity = round(
+            (result["positive_emotion_count"] - result["negative_emotion_count"])
+            / total, 3
+        )
+        # 强度：情感词密度 = 总情感词数 / 分词数
+        intensity = round(total / max(len(words), 1), 3)
+        weights = {e: counts.get(e, 0) for e in EMOTION_ORDER}
+        paragraphs.append({
+            "line_offset": i,
+            "dutir_top": top,
+            "polarity": polarity,
+            "intensity": intensity,
+            "weights": weights,
+        })
+    return {"paragraphs": paragraphs}
+
+
 METHODS = {
     "ping": m_ping,
     "chapter_outline": m_chapter_outline,
+    "analyze_sentiment": m_analyze_sentiment,
 }
 
 

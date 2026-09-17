@@ -1,8 +1,13 @@
 // 红楼梦阅读分析一体化 — Rust 壳命令
 // M1「读起来」：纯读域。提供文本读取（多编码）与默认书目探测。
 // 章节识别在前端/sidecar 完成（规则移植自 splittxt2/split_txt.bas）。
+// M2「接上析」：新增 sidecar 进程管理 + call_sidecar invoke 命令。
+
+mod sidecar;
 
 use encoding_rs::GBK;
+use std::sync::Arc;
+use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 
 /// 读取文本文件并解码为字符串。
@@ -78,16 +83,42 @@ async fn pick_text_file(app: tauri::AppHandle) -> Result<Option<String>, String>
     Ok(file_path.map(|p| p.to_string()))
 }
 
+/// 调用 Python sidecar 方法（通用入口）。同步 IO 放 spawn_blocking，不阻塞 UI 线程。
+#[tauri::command]
+async fn call_sidecar(
+    state: tauri::State<'_, Arc<sidecar::SidecarManager>>,
+    method: String,
+    params: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let mgr = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || mgr.call(&method, params))
+        .await
+        .map_err(|e| format!("sidecar 任务失败: {e}"))?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .setup(|app| {
+            app.manage(Arc::new(sidecar::SidecarManager::new()));
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             read_text_file,
             probe_default_book,
-            pick_text_file
+            pick_text_file,
+            call_sidecar
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+    app.run(|app, event| {
+        // 应用退出时清理 sidecar 子进程
+        if let tauri::RunEvent::Exit = event {
+            if let Some(mgr) = app.try_state::<Arc<sidecar::SidecarManager>>() {
+                mgr.shutdown();
+            }
+        }
+    });
 }

@@ -21,6 +21,7 @@ import {
   removeBookmarkAt,
   type Bookmark,
 } from "./lib/annotations";
+import { analyzeSentiment, type EmotionSpan } from "./lib/sidecar";
 
 const reader = ref<InstanceType<typeof Reader> | null>(null);
 
@@ -32,6 +33,11 @@ const activeChapter = ref(0);
 const loading = ref(false);
 const errorMsg = ref("");
 const sidebarTab = ref<"toc" | "marks">("toc");
+// M2 情感分析
+const currentEmotions = ref<EmotionSpan[]>([]);
+const emotionBaseLine = ref(0);
+const analyzing = ref(false);
+const showEmotions = ref(true);
 
 const physicalLines = computed(() => rawText.value.split("\n"));
 const fileName = computed(() => {
@@ -61,6 +67,10 @@ async function loadBook(path: string) {
     chapters.value = parseChapters(text);
     bookmarks.value = loadBookmarks(path);
     activeChapter.value = chapters.value.length ? 1 : 0;
+    // M2：加载后分析第 1 章
+    if (chapters.value.length > 0) {
+      void analyzeCurrentChapter(1);
+    }
   } catch (e) {
     errorMsg.value = String(e);
   } finally {
@@ -78,6 +88,29 @@ function selectChapter(index1: number) {
   if (!ch) return;
   activeChapter.value = index1;
   reader.value?.revealLine(ch.line);
+  // M2：翻章触发情感分析
+  void analyzeCurrentChapter(index1);
+}
+
+/** M2：分析当前章情感（sidecar 调用，结果锚定物理行）。 */
+async function analyzeCurrentChapter(idx1: number) {
+  const ch = chapters.value[idx1 - 1];
+  if (!ch) return;
+  const next = chapters.value[idx1];
+  const end = next ? next.line : physicalLines.value.length;
+  const chapterText = physicalLines.value.slice(ch.line, end).join("\n");
+  analyzing.value = true;
+  errorMsg.value = "";
+  try {
+    const spans = await analyzeSentiment(chapterText);
+    currentEmotions.value = spans;
+    emotionBaseLine.value = ch.line;
+  } catch (e) {
+    errorMsg.value = `情感分析失败: ${e}`;
+    currentEmotions.value = [];
+  } finally {
+    analyzing.value = false;
+  }
 }
 
 function onViewLine(line0: number) {
@@ -118,6 +151,7 @@ onMounted(async () => {
         <span v-if="chapters.length" class="stat"
           >共 {{ chapters.length }} 回 · {{ physicalLines.length }} 行</span
         >
+        <span v-if="analyzing" class="stat">情感分析中…</span>
       </div>
       <button class="btn primary" :disabled="loading" @click="openFile">
         {{ loading ? "加载中…" : "打开 TXT" }}
@@ -186,8 +220,12 @@ onMounted(async () => {
           :text="rawText"
           :chapters="chapters"
           :bookmarks="bookmarks"
+          :emotions="currentEmotions"
+          :emotion-base-line="emotionBaseLine"
+          :show-emotions="showEmotions"
           @view-line="onViewLine"
           @toggle-bookmark="onToggleBookmark"
+          @toggle-emotions="showEmotions = !showEmotions"
         />
         <div v-else class="placeholder">
           <div class="ph-card">
