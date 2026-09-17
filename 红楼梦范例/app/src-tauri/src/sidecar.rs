@@ -109,33 +109,135 @@ impl SidecarManager {
     }
 }
 
-/// 定位 Python 解释器：环境变量 HONGLOU_PYTHON 优先，否则用项目 venv。
+/// 定位 Python 解释器（优先级从高到低）：
+///   1. 环境变量 HONGLOU_PYTHON
+///   2. 可执行文件同级 .venv\Scripts\python.exe（release 打包场景）
+///   3. 可执行文件同级 sidecar\python\python.exe（嵌入式 Python 场景）
+///   4. %USERPROFILE%\.venvs\honglou\Scripts\python.exe（开发场景）
+///   5. 当前工作目录下 .venv\Scripts\python.exe
+///   6. 系统 PATH 中的 python / python3
 fn resolve_python() -> String {
+    // 1) 环境变量优先
     if let Ok(p) = std::env::var("HONGLOU_PYTHON") {
         if !p.is_empty() && std::path::Path::new(&p).is_file() {
             return p;
         }
     }
+
+    // 获取当前可执行文件所在目录（运行时，不依赖编译时路径）
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(exe_dir) = exe.parent() {
+            // 2) exe 同级 .venv
+            let venv_exe = exe_dir.join(".venv").join("Scripts").join("python.exe");
+            if venv_exe.is_file() {
+                return venv_exe.to_string_lossy().into_owned();
+            }
+            // 3) exe 同级 sidecar/python（嵌入式 Python）
+            let embed_exe = exe_dir.join("sidecar").join("python").join("python.exe");
+            if embed_exe.is_file() {
+                return embed_exe.to_string_lossy().into_owned();
+            }
+        }
+    }
+
+    // 4) 用户目录下的项目 venv（开发场景）
     if let Ok(home) = std::env::var("USERPROFILE") {
         let venv = format!("{}\\.venvs\\honglou\\Scripts\\python.exe", home);
         if std::path::Path::new(&venv).is_file() {
             return venv;
         }
     }
+
+    // 5) 当前工作目录 .venv
+    if let Ok(cwd) = std::env::current_dir() {
+        let local_venv = cwd.join(".venv").join("Scripts").join("python.exe");
+        if local_venv.is_file() {
+            return local_venv.to_string_lossy().into_owned();
+        }
+    }
+
+    // 6) 系统 PATH 兜底（python -> python3 -> py -3）
+    for candidate in &["python", "python3"] {
+        if which_cmd(candidate).is_some() {
+            return candidate.to_string();
+        }
+    }
+    // Windows 上 py launcher
+    if which_cmd("py").is_some() {
+        return "python".to_string(); // 最后兜底，让 Command::new("python") 去尝试
+    }
+
     "python".to_string()
 }
 
-/// 定位 sidecar.py：dev 态相对 CARGO_MANIFEST_DIR 上溯到 app/sidecar/。
+/// 简易 which：通过 cmd /c where 探测可执行文件是否在 PATH 中
+fn which_cmd(name: &str) -> Option<String> {
+    let output = std::process::Command::new("cmd")
+        .args(["/C", "where", name])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    stdout.lines().next().map(|s| s.trim().to_string())
+}
+
+/// 定位 sidecar.py（优先级从高到低）：
+///   1. 环境变量 HONGLOU_SIDECAR
+///   2. 可执行文件同级 sidecar/honglou_sidecar.py（release 打包场景）
+///   3. 可执行文件同级 resources/sidecar/（macOS .app bundle 场景）
+///   4. CARGO_MANIFEST_DIR 上溯（dev 开发场景，编译时常量）
+///   5. 当前工作目录下 sidecar/
+///   6. 兜底：honglou_sidecar.py（让 Python 在 sys.path 里找）
+///
 /// 注意：不使用 canonicalize —— 它在 Windows 上会产生 \\?\ UNC 前缀，
 /// 该前缀下 Windows 跳过路径解析，导致 Python 里 os.path.join(..., "..", ..) 的 .. 不被解析。
 /// 保留带 .. 的路径交给 Python，Python 的 os.path.abspath/normpath 会正确解析。
 fn resolve_sidecar_path() -> String {
-    let cand = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+    // 1) 环境变量优先
+    if let Ok(p) = std::env::var("HONGLOU_SIDECAR") {
+        if !p.is_empty() && std::path::Path::new(&p).is_file() {
+            return p;
+        }
+    }
+
+    // 2) 运行时：可执行文件同级 sidecar/ 目录（release 打包）
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(exe_dir) = exe.parent() {
+            let cand = exe_dir.join("sidecar").join("honglou_sidecar.py");
+            if cand.is_file() {
+                return cand.to_string_lossy().into_owned();
+            }
+            // 3) macOS .app bundle: Contents/Resources/sidecar/
+            let cand_res = exe_dir
+                .join("..")
+                .join("Resources")
+                .join("sidecar")
+                .join("honglou_sidecar.py");
+            if cand_res.is_file() {
+                return cand_res.to_string_lossy().into_owned();
+            }
+        }
+    }
+
+    // 4) 编译时：CARGO_MANIFEST_DIR 上溯（dev 模式）
+    let dev_cand = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("..")
         .join("sidecar")
         .join("honglou_sidecar.py");
-    if cand.is_file() {
-        return cand.to_string_lossy().into_owned();
+    if dev_cand.is_file() {
+        return dev_cand.to_string_lossy().into_owned();
     }
+
+    // 5) 当前工作目录 sidecar/
+    if let Ok(cwd) = std::env::current_dir() {
+        let cand = cwd.join("sidecar").join("honglou_sidecar.py");
+        if cand.is_file() {
+            return cand.to_string_lossy().into_owned();
+        }
+    }
+
+    // 6) 兜底
     "honglou_sidecar.py".to_string()
 }
