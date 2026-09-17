@@ -9,6 +9,14 @@ import { setupMonaco, monaco } from "../lib/monaco";
 import { chapterEndLine, type Chapter } from "../lib/chapters";
 import type { Bookmark } from "../lib/annotations";
 import type { EmotionSpan, EntitySpan } from "../lib/sidecar";
+import {
+  buildNormalizedIndentPipeline,
+  physLineToDisplay,
+  physPosToDisplay,
+  physRangeToDisplay,
+  displayLineToPhys,
+  type DisplayPipeline,
+} from "../lib/displayPipeline";
 
 const props = defineProps<{
   text: string;
@@ -103,6 +111,23 @@ let forcedVpLine: number | null = null;
 // 性能优化：缓存文本行数组，避免 renderDecorations 每次全量 split
 let cachedLines: string[] | null = null;
 let cachedTextKey = "";
+// ===== 双坐标系：物理行 ↔ 展示行 =====
+// pipeline 为 null 时退化到单坐标系（兼容旧行为）
+let pipeline: DisplayPipeline | null = null;
+
+/**
+ * （重新）构建展示行管线。
+ * 当前 Step 3：段首空格规范化——去掉行首全角/半角空格，用 CSS 缩进替代。
+ * 行映射 1:1，字符偏移 = 物理偏移 - 被移除的前导空格数。
+ * 后续加入简繁/替换/硬换行重排等转换时，只改这个函数，上层调用方不变。
+ */
+function rebuildPipeline() {
+  const physLines = props.text.replace(/\r\n?/g, "\n").split("\n");
+  pipeline = buildNormalizedIndentPipeline(physLines);
+  // 失效行缓存
+  cachedLines = null;
+  cachedTextKey = "";
+}
 
 // ===== OPT-1: 视口装饰渲染 =====
 // 视口缓冲行数：上下各多渲染 N 行，避免快速滚动时出现短暂空白
@@ -350,8 +375,11 @@ function applySettings() {
 
 onMounted(() => {
   if (!container.value) return;
+  // 先构建展示行管线（恒等变换，1:1 映射）
+  rebuildPipeline();
+  if (!pipeline) return;
   editor = monaco.editor.create(container.value, {
-    value: props.text,
+    value: pipeline.displayText,
     language: "plaintext",
     readOnly: true,
     theme: props.settings.theme === "dark" ? "honglou-read-dark" : "honglou-read",
@@ -408,11 +436,12 @@ onMounted(() => {
 
   // OPT-6: 注册章节文档符号提供者，供 Monaco StickyScroll 使用
   // 把章节列表转为 DocumentSymbol 树，Monaco 自动管理粘性条渲染与滚动同步
+  // 物理行 → 展示行转换：章节锚定物理行，StickyScroll 用展示行
   const registerStickyProvider = () => {
     if (!editor) return;
     const model = editor.getModel();
     if (!model) return;
-    const totalLines = model.getLineCount();
+    const totalDispLines = model.getLineCount();
     stickyProviderDisposable?.dispose();
     stickyProviderDisposable = monaco.languages.registerDocumentSymbolProvider(
       "plaintext",
@@ -420,10 +449,17 @@ onMounted(() => {
         provideDocumentSymbols() {
           const symbols: monaco.languages.DocumentSymbol[] = [];
           for (const ch of props.chapters) {
-            const startLine = ch.line + 1; // Monaco 1-based
-            const endLine = chapterEndLine(props.chapters, ch.index - 1, totalLines) + 1;
+            const physLine = ch.line;
+            const dispLine = pipeline ? physLineToDisplay(pipeline, physLine) : physLine;
+            if (dispLine < 0) continue;
+            const startLine = dispLine + 1; // Monaco 1-based 展示行
+            // 章节结束物理行 → 展示行
+            const totalPhysLines = pipeline ? pipeline.physicalLines.length : totalDispLines;
+            const endPhysLine = chapterEndLine(props.chapters, ch.index - 1, totalPhysLines);
+            const endDispLine = pipeline ? physLineToDisplay(pipeline, endPhysLine) : endPhysLine;
+            const endLine = Math.max(0, endDispLine) + 1;
             // Monaco 只为至少跨 3 行的符号创建 sticky 候选
-            const realEnd = Math.max(startLine + 2, endLine);
+            const realEnd = Math.max(startLine + 2, Math.min(endLine, totalDispLines));
             symbols.push({
               name: ch.title.trim().replace(/\s+/g, " ") || `第${ch.numberText}${ch.unit}`,
               detail: "",
@@ -453,7 +489,11 @@ onMounted(() => {
       ev.target.type === monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN &&
       ev.target.position
     ) {
-      emit("toggle-bookmark", ev.target.position.lineNumber - 1);
+      const dispLine0 = ev.target.position.lineNumber - 1; // 0 基展示行
+      // 展示行 → 物理行（书签锚定物理行，持久化不错位）
+      const physLine0 = pipeline ? displayLineToPhys(pipeline, dispLine0) : dispLine0;
+      if (physLine0 < 0) return;
+      emit("toggle-bookmark", physLine0);
     }
   });
 
@@ -477,9 +517,14 @@ onMounted(() => {
       if (!editor) return;
       const visible = editor.getVisibleRanges()[0];
       if (visible) {
-        const vs = visible.startLineNumber - 1;
-        const ve = visible.endLineNumber - 1;
-        emit("view-range", vs, ve);
+        const dispVs = visible.startLineNumber - 1; // 0 基展示行
+        const dispVe = visible.endLineNumber - 1;
+        // 展示行 → 物理行，供外层分析使用
+        const physVs = pipeline ? displayLineToPhys(pipeline, dispVs) : dispVs;
+        const physVe = pipeline ? displayLineToPhys(pipeline, dispVe) : dispVe;
+        if (physVs >= 0 && physVe >= 0) {
+          emit("view-range", physVs, physVe);
+        }
         // 彩读风格：计算阅读进度
         const model = editor.getModel();
         if (model) {
@@ -490,13 +535,14 @@ onMounted(() => {
           progressText.value = `${pct}%`;
         }
         // P1 修复：如果强制视口行已进入可见范围，则清除强制状态
-        if (forcedVpLine !== null && forcedVpLine >= vs && forcedVpLine <= ve) {
+        if (forcedVpLine !== null && forcedVpLine >= dispVs && forcedVpLine <= dispVe) {
           forcedVpLine = null;
         }
         // OPT-1: 视口变化 → 更新视口范围并重绘装饰
         // 若存在 forcedVpLine，则确保视口范围包含该行
-        let newStart = Math.max(0, vs - VIEWPORT_BUFFER);
-        let newEnd = ve + VIEWPORT_BUFFER;
+        // 视口范围使用展示行坐标系（Monaco 坐标系）
+        let newStart = Math.max(0, dispVs - VIEWPORT_BUFFER);
+        let newEnd = dispVe + VIEWPORT_BUFFER;
         if (forcedVpLine !== null) {
           newStart = Math.min(newStart, Math.max(0, forcedVpLine - VIEWPORT_BUFFER));
           newEnd = Math.max(newEnd, forcedVpLine + VIEWPORT_BUFFER);
@@ -609,25 +655,31 @@ onMounted(() => {
       editor.setPosition({ lineNumber: 1, column: 1 });
       const visible = editor.getVisibleRanges()[0];
       if (visible) {
-        const vs = visible.startLineNumber - 1;
-        const ve = visible.endLineNumber - 1;
-        emit("view-range", vs, ve);
-        // OPT-1: 初始化视口范围，立即启用视口装饰优化
-        viewportStart = Math.max(0, vs - VIEWPORT_BUFFER);
-        viewportEnd = ve + VIEWPORT_BUFFER;
+        const dispVs = visible.startLineNumber - 1;
+        const dispVe = visible.endLineNumber - 1;
+        // 展示行 → 物理行
+        const physVs = pipeline ? displayLineToPhys(pipeline, dispVs) : dispVs;
+        const physVe = pipeline ? displayLineToPhys(pipeline, dispVe) : dispVe;
+        if (physVs >= 0 && physVe >= 0) {
+          emit("view-range", physVs, physVe);
+        }
+        // OPT-1: 初始化视口范围（展示行坐标系），立即启用视口装饰优化
+        viewportStart = Math.max(0, dispVs - VIEWPORT_BUFFER);
+        viewportEnd = dispVe + VIEWPORT_BUFFER;
         renderDecorations();
       }
     })
   );
 });
 
-// 文本变化 → 重建 model 内容 + 失效行缓存
+// 文本变化 → 重建管线 + 更新 model 内容
 watch(
   () => props.text,
-  (t) => {
-    if (editor && editor.getValue() !== t) editor.setValue(t);
-    cachedLines = null;
-    cachedTextKey = "";
+  () => {
+    rebuildPipeline();
+    if (editor && pipeline && editor.getValue() !== pipeline.displayText) {
+      editor.setValue(pipeline.displayText);
+    }
   }
 );
 
@@ -652,7 +704,7 @@ watch(
     if (!editor) return;
     const model = editor.getModel();
     if (!model) return;
-    const totalLines = model.getLineCount();
+    const totalDispLines = model.getLineCount();
     stickyProviderDisposable?.dispose();
     stickyProviderDisposable = monaco.languages.registerDocumentSymbolProvider(
       "plaintext",
@@ -660,9 +712,15 @@ watch(
         provideDocumentSymbols() {
           const symbols: monaco.languages.DocumentSymbol[] = [];
           for (const ch of props.chapters) {
-            const startLine = ch.line + 1;
-            const endLine = chapterEndLine(props.chapters, ch.index - 1, totalLines) + 1;
-            const realEnd = Math.max(startLine + 2, endLine);
+            const physLine = ch.line;
+            const dispLine = pipeline ? physLineToDisplay(pipeline, physLine) : physLine;
+            if (dispLine < 0) continue;
+            const startLine = dispLine + 1;
+            const totalPhysLines = pipeline ? pipeline.physicalLines.length : totalDispLines;
+            const endPhysLine = chapterEndLine(props.chapters, ch.index - 1, totalPhysLines);
+            const endDispLine = pipeline ? physLineToDisplay(pipeline, endPhysLine) : endPhysLine;
+            const endLine = Math.max(0, endDispLine) + 1;
+            const realEnd = Math.max(startLine + 2, Math.min(endLine, totalDispLines));
             symbols.push({
               name: ch.title.trim().replace(/\s+/g, " ") || `第${ch.numberText}${ch.unit}`,
               detail: "",
@@ -723,7 +781,7 @@ function doFind(query: string, matchCase: boolean) {
     false        // captureMatches
   );
   const results = matches.map((m) => ({
-    line: m.range.startLineNumber - 1,  // 转为 0 基物理行
+    line: m.range.startLineNumber - 1,  // 转为 0 基展示行（model 中文本 = 展示文本）
     start: m.range.startColumn - 1,     // 转为 0 基列
     end: m.range.endColumn - 1,
   }));
@@ -804,13 +862,17 @@ function renderDecorations() {
   if (!editor || !decoColl || !overviewColl) return;
   const decos: monaco.editor.IModelDeltaDecoration[] = [];
   const overviewDecos: monaco.editor.IModelDeltaDecoration[] = [];
-  // OPT-1: 视口范围（Monaco 1-based）。大体量装饰仅在视口 ± 缓冲内渲染。
+  // OPT-1: 视口范围（Monaco 1-based，展示行坐标系）。大体量装饰仅在视口 ± 缓冲内渲染。
   const vpStart1 = viewportStart + 1;
   const vpEnd1 = viewportEnd + 1;
 
   // 章节标题行（小体量，全量渲染）
+  // 物理行 → 展示行转换（恒等变换下 1:1，不影响结果）
   for (const ch of props.chapters) {
-    const ln = ch.line + 1;
+    const physLine = ch.line;
+    const dispLine = pipeline ? physLineToDisplay(pipeline, physLine) : physLine;
+    if (dispLine < 0) continue;
+    const ln = dispLine + 1; // Monaco 1-based
     decos.push({
       range: new monaco.Range(ln, 1, ln, 1),
       options: {
@@ -823,7 +885,10 @@ function renderDecorations() {
 
   // 书签行（小体量，全量渲染）
   for (const b of props.bookmarks) {
-    const ln = b.line + 1;
+    const physLine = b.line;
+    const dispLine = pipeline ? physLineToDisplay(pipeline, physLine) : physLine;
+    if (dispLine < 0) continue;
+    const ln = dispLine + 1;
     decos.push({
       range: new monaco.Range(ln, 1, ln, 1),
       options: {
@@ -839,10 +904,13 @@ function renderDecorations() {
   // OPT-1: 大体量，仅渲染视口范围内
   // 注意：className 必须用 ASCII —— Monaco decoration 渲染管线会丢失非 ASCII 类名
   if (props.showEmotions) {
-    const baseL = props.emotionBaseLine + 1;
+    const basePhysL = props.emotionBaseLine;
     for (const e of props.emotions) {
-      const ln = baseL + e.line_offset; // Monaco 1-based
-      // OPT-1: 视口过滤
+      const physLine = basePhysL + e.line_offset; // 全局物理行（0 基）
+      const dispLine = pipeline ? physLineToDisplay(pipeline, physLine) : physLine;
+      if (dispLine < 0) continue;
+      const ln = dispLine + 1; // Monaco 1-based
+      // OPT-1: 视口过滤（展示行坐标系）
       if (ln < vpStart1 || ln > vpEnd1) continue;
       // 1. 整行浅色背景：段落情绪概览（有 dutir_top 才着色）
       if (e.dutir_top) {
@@ -859,11 +927,33 @@ function renderDecorations() {
         for (const ws of e.word_spans) {
           const wordCls = EMO_WORD_CLASS_MAP[ws.emotion];
           if (!wordCls) continue;
-          // start/end 是 0-based 字符偏移，Monaco column 是 1-based
-          decos.push({
-            range: new monaco.Range(ln, ws.start + 1, ln, ws.end + 1),
-            options: { className: wordCls },
-          });
+          // start/end 是物理行内 0-based 字符偏移 → 转展示行列
+          const dispStart = pipeline
+            ? physPosToDisplay(pipeline, physLine, ws.start)
+            : { line: physLine, col: ws.start };
+          const dispEnd = pipeline
+            ? physPosToDisplay(pipeline, physLine, ws.end)
+            : { line: physLine, col: ws.end };
+          if (dispStart.line < 0 || dispEnd.line < 0) continue;
+          // 恒等变换下同行，直接用单条装饰
+          if (dispStart.line === dispEnd.line) {
+            decos.push({
+              range: new monaco.Range(
+                dispStart.line + 1, dispStart.col + 1,
+                dispEnd.line + 1, dispEnd.col + 1,
+              ),
+              options: { className: wordCls },
+            });
+          } else {
+            // 跨展示行（恒等变换下不会发生，防御性处理）
+            const ranges = physRangeToDisplay(pipeline!, physLine, ws.start, ws.end);
+            for (const r of ranges) {
+              decos.push({
+                range: new monaco.Range(r.line + 1, r.startCol + 1, r.line + 1, r.endCol + 1),
+                options: { className: wordCls },
+              });
+            }
+          }
         }
       }
     }
@@ -874,20 +964,36 @@ function renderDecorations() {
   // P0-1 修复：overviewRuler 标记全量渲染（右侧概览栏必须显示全书标记）
   if (props.showEntities && props.entitySpans.length > 0) {
     for (const e of props.entitySpans) {
-      const ln = e.line + 1;
+      const physLine = e.line;
+      const dispLine = pipeline ? physLineToDisplay(pipeline, physLine) : physLine;
+      if (dispLine < 0) continue;
+      const ln = dispLine + 1;
       // 行内装饰：仅视口内（减少 DOM）
       if (ln >= vpStart1 && ln <= vpEnd1) {
-        decos.push({
-          range: new monaco.Range(ln, e.charStart + 1, ln, e.charEnd + 1),
-          options: {
-            className: e.cls,
-            hoverMessage: { value: `${e.name}（点击人物榜可切换）` },
-          },
-        });
+        // 字符偏移：物理 → 展示
+        const dispStart = pipeline
+          ? physPosToDisplay(pipeline, physLine, e.charStart)
+          : { line: physLine, col: e.charStart };
+        const dispEnd = pipeline
+          ? physPosToDisplay(pipeline, physLine, e.charEnd)
+          : { line: physLine, col: e.charEnd };
+        if (dispStart.line >= 0 && dispEnd.line >= 0 && dispStart.line === dispEnd.line) {
+          decos.push({
+            range: new monaco.Range(
+              dispStart.line + 1, dispStart.col + 1,
+              dispEnd.line + 1, dispEnd.col + 1,
+            ),
+            options: {
+              className: e.cls,
+              hoverMessage: { value: `${e.name}（点击人物榜可切换）` },
+            },
+          });
+        }
       }
       // 右侧概览栏：全量（用户需要看到全书分布）
+      // overviewRuler 只需要行号，列号不影响显示位置
       overviewDecos.push({
-        range: new monaco.Range(ln, e.charStart + 1, ln, e.charEnd + 1),
+        range: new monaco.Range(ln, 1, ln, 2),
         options: {
           overviewRuler: {
             color: "#c9a35c",
@@ -937,23 +1043,31 @@ function renderDecorations() {
   // 彩读风格：段间距 + 行首缩进（作用于全部段落首行）
   // OPT-1: 大体量（3000+ 段落 × 1~2 个装饰），仅渲染视口范围内
   // 性能优化：使用缓存行数组，避免每次全量 split
+  // 注意：段落结构检测基于物理行（原文逻辑结构），装饰落到展示行
   if (props.settings.paragraphSpacing > 0 || props.settings.firstLineIndent > 0) {
     // 惰性缓存：基于长度 + 首尾字符粗略判断文本是否变化（比完整 split 快得多）
     const text = props.text;
     const key = text.length + ":" + text.slice(0, 20) + ":" + text.slice(-20);
     if (!cachedLines || cachedTextKey !== key) {
-      cachedLines = text.split("\n");
+      cachedLines = text.replace(/\r\n?/g, "\n").split("\n");
       cachedTextKey = key;
     }
     const lines = cachedLines;
     const chapterLinesSet = new Set(props.chapters.map((ch) => ch.line));
-    // OPT-1: 只遍历视口范围内的行
+    // OPT-1: 只遍历视口范围内的行（展示行坐标系 → 转回物理行扫描）
+    // 恒等变换下展示行 = 物理行，scanStart/scanEnd 直接用视口范围
     const scanStart = Math.max(0, viewportStart);
     const scanEnd = Math.min(lines.length - 1, viewportEnd);
     for (let l = scanStart; l <= scanEnd; l++) {
-      if (!lines[l]?.trim()) continue;
-      if (!isParagraphStart(lines, l, chapterLinesSet)) continue;
-      const ln = l + 1;
+      // l 是 0 基展示行号 → 转回物理行做段落检测
+      const physL = pipeline ? displayLineToPhys(pipeline, l) : l;
+      if (physL < 0) continue;
+      if (!lines[physL]?.trim()) continue;
+      if (!isParagraphStart(lines, physL, chapterLinesSet)) continue;
+      // 物理段落首行 → 展示行号（恒等变换下相同）
+      const dispL = pipeline ? physLineToDisplay(pipeline, physL) : physL;
+      if (dispL < 0) continue;
+      const ln = dispL + 1;
       // 段间距：段落首行上方加空白
       if (props.settings.paragraphSpacing > 0) {
         decos.push({
@@ -983,16 +1097,19 @@ function renderDecorations() {
 /** 外部调用：滚动到指定 0 基物理行并居中靠上 */
 function revealLine(line0: number) {
   if (!editor) return;
-  const ln = line0 + 1;
-  // OPT-3: 同步更新阅读尺锚点到该行开头
+  // 物理行 → 展示行（Monaco 用展示行坐标）
+  const dispLine0 = pipeline ? physLineToDisplay(pipeline, line0) : line0;
+  if (dispLine0 < 0) return;
+  const ln = dispLine0 + 1;
+  // OPT-3: 同步更新阅读尺锚点到该行开头（展示行坐标系）
   rulerAnchor = visualRowStart(ln, 1);
   editor.revealLineNearTop(ln, monaco.editor.ScrollType.Smooth);
   editor.setPosition({ lineNumber: ln, column: 1 });
   editor.focus();
-  // P1 修复：设置强制视口行，确保平滑滚动过程中段间距等装饰始终可见
-  forcedVpLine = line0;
-  viewportStart = Math.max(0, line0 - VIEWPORT_BUFFER);
-  viewportEnd = line0 + VIEWPORT_BUFFER;
+  // P1 修复：设置强制视口行（展示行坐标系），确保平滑滚动过程中装饰始终可见
+  forcedVpLine = dispLine0;
+  viewportStart = Math.max(0, dispLine0 - VIEWPORT_BUFFER);
+  viewportEnd = dispLine0 + VIEWPORT_BUFFER;
   renderDecorations();
 }
 
