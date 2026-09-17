@@ -62,11 +62,20 @@ export function chapterEndLine(chapters: Chapter[], index: number, totalLines: n
 }
 
 /** 根据 0 基物理行号反查所属章序号（1 基），未落在任何章返回 0 */
+// OPT-4: 二分查找 O(log n)，替代原先的线性扫描 O(n)
+// chapters 按 line 升序排列（行扫描得到），可直接二分
 export function chapterAtLine(chapters: Chapter[], line: number): number {
-  let result = 0;
-  for (const ch of chapters) {
-    if (ch.line <= line) result = ch.index;
-    else break;
+  let lo = 0;
+  let hi = chapters.length - 1;
+  let ans = 0;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (chapters[mid]!.line <= line) {
+      ans = chapters[mid]!.index;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
   }
-  return result;
+  return ans;
 }
