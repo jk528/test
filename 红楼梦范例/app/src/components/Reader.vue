@@ -26,7 +26,7 @@ const props = defineProps<{
   showEntities: boolean;
   /** 当前高亮的人物名（空=未选中） */
   entityName: string;
-  /** 阅读设置（彩读风格：字号/行高/字体/主题/左右留白/阅读尺） */
+  /** 阅读设置（彩读风格全量） */
   settings: {
     fontSize: number;
     lineHeight: number;
@@ -34,6 +34,11 @@ const props = defineProps<{
     theme: "light" | "dark";
     paddingX: number;
     readingRuler: boolean;
+    showLineNumbers: boolean;
+    letterSpacing: number;
+    paragraphSpacing: number;
+    firstLineIndent: number;
+    clickToPage: boolean;
   };
 }>();
 
@@ -78,6 +83,18 @@ let removeResizeListener: (() => void) | null = null;
 const stickyLabel = ref("");
 // 阅读尺：当前光标行（Monaco 1-based），开启时高亮该行
 let rulerLine = 1;
+// 彩读风格：阅读进度（0~1）
+const readProgress = ref(0);
+const progressText = ref("0%");
+// 彩读风格：查找栏
+const showFindBar = ref(false);
+const findQuery = ref("");
+const findMatchCase = ref(false);
+const findMatches = ref<{ line: number; start: number; end: number }[]>([]);
+const findCurrentIndex = ref(0);
+// 行首缩进的 CSS 变量（px）
+const indentPx = ref(0);
+const paraGapPx = ref(0);
 
 setupMonaco();
 
@@ -104,8 +121,21 @@ function applySettings() {
     fontSize: s.fontSize,
     lineHeight: s.lineHeight,
     fontFamily: s.fontFamily,
+    letterSpacing: s.letterSpacing,
+    lineNumbers: s.showLineNumbers ? "on" : "off",
+    glyphMargin: s.showLineNumbers,
     padding: { top: 16, bottom: 120, left: s.paddingX, right: s.paddingX },
   });
+  // 行首缩进：按字号 * 缩进字符数（2 字符 = 标准中文缩进）
+  indentPx.value = Math.round(s.fontSize * s.firstLineIndent);
+  // 段间距：按行距比例
+  paraGapPx.value = Math.round(s.lineHeight * 0.4 * s.paragraphSpacing);
+  // 设置 CSS 变量供装饰类使用
+  const el = container.value;
+  if (el) {
+    el.style.setProperty("--indent-w", `${indentPx.value}px`);
+    el.style.setProperty("--para-gap", `${paraGapPx.value}px`);
+  }
   applyTheme(s.theme);
   renderDecorations();
 }
@@ -123,9 +153,9 @@ onMounted(() => {
     wordWrap: "on",
     wrappingStrategy: "advanced",
     wrappingIndent: "same",
-    lineNumbers: "on",
+    lineNumbers: props.settings.showLineNumbers ? "on" : "off",
     lineNumbersMinChars: 3,
-    glyphMargin: true,
+    glyphMargin: props.settings.showLineNumbers,
     folding: false,
     minimap: { enabled: false },
     scrollBeyondLastLine: true,
@@ -183,7 +213,7 @@ onMounted(() => {
     }
   });
 
-  // 可见行范围变化 → 通知外层分析视口（视口驱动 + 缓存）+ 刷新粘性章节标题
+  // 可见行范围变化 → 通知外层分析视口（视口驱动 + 缓存）+ 刷新粘性章节标题 + 进度
   editor.onDidScrollChange(() => {
     if (scrollRaf) return;
     scrollRaf = requestAnimationFrame(() => {
@@ -193,6 +223,15 @@ onMounted(() => {
       if (visible) {
         emit("view-range", visible.startLineNumber - 1, visible.endLineNumber - 1);
         updateSticky(visible.startLineNumber);
+        // 彩读风格：计算阅读进度
+        const model = editor.getModel();
+        if (model) {
+          const total = model.getLineCount();
+          const current = visible.endLineNumber;
+          const pct = Math.min(100, Math.round((current / total) * 100));
+          readProgress.value = pct / 100;
+          progressText.value = `${pct}%`;
+        }
       }
     });
   });
@@ -250,6 +289,98 @@ watch(
   () => applySettings(),
   { deep: true }
 );
+
+// ===== 彩读风格：查找功能 =====
+function doFind(query: string, matchCase: boolean) {
+  findQuery.value = query;
+  findMatchCase.value = matchCase;
+  findMatches.value = [];
+  findCurrentIndex.value = 0;
+  if (!editor || !query) {
+    renderDecorations();
+    return;
+  }
+  const model = editor.getModel();
+  if (!model) return;
+  const lines = model.getLinesContent();
+  const q = matchCase ? query : query.toLowerCase();
+  const results: { line: number; start: number; end: number }[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = matchCase ? lines[i] : lines[i].toLowerCase();
+    let idx = 0;
+    while ((idx = line.indexOf(q, idx)) >= 0) {
+      results.push({ line: i, start: idx, end: idx + q.length });
+      idx += q.length || 1;
+    }
+  }
+  findMatches.value = results;
+  // 跳到第一个当前视口附近的匹配
+  if (results.length > 0) {
+    const visible = editor.getVisibleRanges()[0];
+    const visStart = visible ? visible.startLineNumber - 1 : 0;
+    let nearIdx = results.findIndex((r) => r.line >= visStart);
+    if (nearIdx < 0) nearIdx = 0;
+    findCurrentIndex.value = nearIdx;
+    revealMatch(nearIdx);
+  }
+  renderDecorations();
+}
+
+function revealMatch(idx: number) {
+  if (!editor || findMatches.value.length === 0) return;
+  const m = findMatches.value[idx];
+  if (!m) return;
+  findCurrentIndex.value = idx;
+  editor.revealLineNearTop(m.line + 1, monaco.editor.ScrollType.Smooth);
+  editor.setPosition({ lineNumber: m.line + 1, column: m.start + 1 });
+  renderDecorations();
+}
+
+function findNext() {
+  if (findMatches.value.length === 0) return;
+  const next = (findCurrentIndex.value + 1) % findMatches.value.length;
+  revealMatch(next);
+}
+
+function findPrev() {
+  if (findMatches.value.length === 0) return;
+  const prev =
+    (findCurrentIndex.value - 1 + findMatches.value.length) % findMatches.value.length;
+  revealMatch(prev);
+}
+
+function toggleFindBar() {
+  showFindBar.value = !showFindBar.value;
+  if (!showFindBar.value) {
+    findMatches.value = [];
+    findQuery.value = "";
+    renderDecorations();
+  }
+}
+
+// ===== 彩读风格：点击翻页 =====
+function pageUp() {
+  if (!editor) return;
+  editor.trigger("page-zone", "pageUp", null);
+}
+function pageDown() {
+  if (!editor) return;
+  editor.trigger("page-zone", "pageDown", null);
+}
+
+// ===== 彩读风格：判断段落首行（空行之后 / 章节标题之后 / 正文第一行） =====
+// 注意：章节标题行本身不算段落开始
+function isParagraphStart(lines: string[], line0: number, chapterLinesSet: Set<number>): boolean {
+  if (line0 >= lines.length) return false;
+  if (!lines[line0].trim()) return false;
+  // 章节标题行本身不是段落开始
+  if (chapterLinesSet.has(line0)) return false;
+  if (line0 === 0) return true;
+  const prev = lines[line0 - 1];
+  if (!prev || !prev.trim()) return true;
+  if (chapterLinesSet.has(line0 - 1)) return true;
+  return false;
+}
 
 function renderDecorations() {
   if (!editor || !decoColl) return;
@@ -341,6 +472,55 @@ function renderDecorations() {
     });
   }
 
+  // 彩读风格：查找结果高亮
+  if (findMatches.value.length > 0) {
+    for (let i = 0; i < findMatches.value.length; i++) {
+      const m = findMatches.value[i];
+      const isCurrent = i === findCurrentIndex.value;
+      decos.push({
+        range: new monaco.Range(m.line + 1, m.start + 1, m.line + 1, m.end + 1),
+        options: {
+          className: isCurrent ? "hl-find-current" : "hl-find-match",
+          overviewRuler: {
+            color: isCurrent ? "#ff9800" : "#ffd54f",
+            position: monaco.editor.OverviewRulerLane.Right,
+          },
+        },
+      });
+    }
+  }
+
+  // 彩读风格：段间距 + 行首缩进（作用于全部段落首行）
+  // 大文件下段落数通常几千级，Monaco decoration 可承受
+  if (props.settings.paragraphSpacing > 0 || props.settings.firstLineIndent > 0) {
+    const lines = props.text.split("\n");
+    const chapterLinesSet = new Set(props.chapters.map((ch) => ch.line));
+    for (let l = 0; l < lines.length; l++) {
+      if (!lines[l]?.trim()) continue;
+      if (!isParagraphStart(lines, l, chapterLinesSet)) continue;
+      const ln = l + 1;
+      // 段间距：段落首行上方加空白
+      if (props.settings.paragraphSpacing > 0) {
+        decos.push({
+          range: new monaco.Range(ln, 1, ln, 1),
+          options: {
+            isWholeLine: true,
+            className: "hl-para-spacing",
+          },
+        });
+      }
+      // 行首缩进：给段落首行第一个字符加左侧内边距
+      if (props.settings.firstLineIndent > 0) {
+        decos.push({
+          range: new monaco.Range(ln, 1, ln, 2),
+          options: {
+            className: "indent-first-char",
+          },
+        });
+      }
+    }
+  }
+
   decoColl.set(decos);
 }
 
@@ -353,7 +533,7 @@ function revealLine(line0: number) {
   editor.focus();
 }
 
-defineExpose({ revealLine });
+defineExpose({ revealLine, toggleFindBar, doFind, findNext, findPrev, pageUp, pageDown });
 
 onBeforeUnmount(() => {
   if (scrollRaf) cancelAnimationFrame(scrollRaf);
@@ -389,7 +569,39 @@ onBeforeUnmount(() => {
         <span class="legend-item"><i class="emo-swatch emo-jing"></i>惊</span>
       </template>
     </div>
+    <!-- 彩读风格：查找栏 -->
+    <div v-if="showFindBar" class="find-bar">
+      <input
+        type="text"
+        :value="findQuery"
+        placeholder="查找关键词…"
+        @input="doFind(($event.target as HTMLInputElement).value, findMatchCase)"
+        @keydown.enter="findNext"
+        @keydown.esc="toggleFindBar"
+        ref="findInput"
+      />
+      <span class="find-count">
+        {{ findMatches.length ? `${findCurrentIndex + 1}/${findMatches.length}` : "0/0" }}
+      </span>
+      <button @click="findPrev" :disabled="!findMatches.length">▲</button>
+      <button @click="findNext" :disabled="!findMatches.length">▼</button>
+      <label>
+        <input type="checkbox" :checked="findMatchCase" @change="doFind(findQuery, !findMatchCase)" />
+        区分大小写
+      </label>
+      <button @click="toggleFindBar">✕</button>
+    </div>
     <div ref="container" class="reader-container"></div>
+    <!-- 彩读风格：底部阅读进度条 -->
+    <div class="read-progress">
+      <div class="read-progress-bar" :style="{ width: progressText }"></div>
+      <span class="read-progress-tip">{{ progressText }}</span>
+    </div>
+    <!-- 彩读风格：点击翻页热区（左右各 25%） -->
+    <div v-if="settings.clickToPage" class="page-zones active">
+      <div class="page-zone prev" @click="pageUp" title="上一页 (PageUp)"></div>
+      <div class="page-zone next" @click="pageDown" title="下一页 (PageDown / Space)"></div>
+    </div>
   </div>
 </template>
 

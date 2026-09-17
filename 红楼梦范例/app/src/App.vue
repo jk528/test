@@ -77,21 +77,62 @@ const showEmotions = ref(true);
 const chapterEmotions = ref<ChapterEmotion[]>([]);
 // 彩读风格：阅读设置（localStorage 持久化）+ 极简视图
 const READ_LS = "honglou.read.settings";
+const FONT_PRESETS: { label: string; value: string }[] = [
+  { label: "宋体（衬线）", value: '"Noto Serif SC","Source Han Serif SC","SimSun","Songti SC","Microsoft YaHei",serif' },
+  { label: "黑体（无衬线）", value: '"Microsoft YaHei","PingFang SC","Noto Sans SC","SimHei",sans-serif' },
+  { label: "楷体", value: '"KaiTi","STKaiti","Noto Serif SC",serif' },
+  { label: "仿宋", value: '"FangSong","STFangsong","SimSun",serif' },
+];
+// 彩读 v3.8 风格：亮色配色方案 7 种
+const LIGHT_SCHEMES = [
+  { key: "default", label: "默认", cls: "bg-paper" },
+  { key: "suzhi", label: "素纸", cls: "bg-suzhi" },
+  { key: "yangpi", label: "羊皮纸", cls: "bg-yangpi" },
+  { key: "huyan", label: "护眼", cls: "bg-huyan" },
+  { key: "maorong", label: "毛绒地毯", cls: "bg-maorong" },
+  { key: "mozhu", label: "墨竹", cls: "bg-mozhu" },
+  { key: "xuemei", label: "雪梅", cls: "bg-xuemei" },
+] as const;
+// 彩读 v3.8 风格：暗色配色方案 2 种
+const DARK_SCHEMES = [
+  { key: "dark-default", label: "默认", cls: "bg-dark-default" },
+  { key: "xingkong", label: "星空", cls: "bg-xingkong" },
+] as const;
+
+type LightSchemeKey = typeof LIGHT_SCHEMES[number]["key"];
+type DarkSchemeKey = typeof DARK_SCHEMES[number]["key"];
+
 const readSettings = ref({
   fontSize: 17,
   lineHeight: 30,
-  fontFamily:
-    '"Noto Serif SC","Source Han Serif SC","SimSun","Songti SC","Microsoft YaHei",serif',
+  lineHeightRatio: 1.76,
+  fontFamily: FONT_PRESETS[0].value,
   theme: "light" as "light" | "dark",
+  lightScheme: "default" as LightSchemeKey,
+  darkScheme: "dark-default" as DarkSchemeKey,
   paddingX: 48,
   readingRuler: false,
+  showLineNumbers: true,
+  letterSpacing: 0,
+  paragraphSpacing: 0,
+  firstLineIndent: 0,
+  clickToPage: false,
+  immersive: false,
 });
 const minimalView = ref(false);
+const showSettingsPanel = ref(false);
+// 极简视图下：鼠标移入左缘 → 临时显示侧栏
+const sidebarHover = ref(false);
 
 function bumpFont(d: number) {
   const n = Math.min(26, Math.max(13, readSettings.value.fontSize + d));
   readSettings.value.fontSize = n;
-  readSettings.value.lineHeight = Math.round(n * 1.76);
+  readSettings.value.lineHeight = Math.round(n * readSettings.value.lineHeightRatio);
+}
+
+function setLineHeightRatio(r: number) {
+  readSettings.value.lineHeightRatio = r;
+  readSettings.value.lineHeight = Math.round(readSettings.value.fontSize * r);
 }
 
 function loadReadSettings() {
@@ -102,6 +143,14 @@ function loadReadSettings() {
     /* 忽略损坏的本地设置 */
   }
   document.body.classList.toggle("theme-dark", readSettings.value.theme === "dark");
+  document.body.classList.toggle("theme-light", readSettings.value.theme === "light");
+  document.body.classList.toggle("immersive", readSettings.value.immersive);
+  // 应用配色方案
+  const scheme =
+    readSettings.value.theme === "light"
+      ? readSettings.value.lightScheme
+      : readSettings.value.darkScheme;
+  document.body.classList.add(`theme-scheme-${scheme}`);
 }
 
 watch(
@@ -109,9 +158,64 @@ watch(
   (s) => {
     localStorage.setItem(READ_LS, JSON.stringify(s));
     document.body.classList.toggle("theme-dark", s.theme === "dark");
+    document.body.classList.toggle("theme-light", s.theme === "light");
+    document.body.classList.toggle("immersive", s.immersive);
+    // 切换配色方案：先清全部 scheme 类，再加当前的
+    for (const sc of LIGHT_SCHEMES) {
+      document.body.classList.remove(`theme-scheme-${sc.key}`);
+    }
+    for (const sc of DARK_SCHEMES) {
+      document.body.classList.remove(`theme-scheme-${sc.key}`);
+    }
+    const scheme = s.theme === "light" ? s.lightScheme : s.darkScheme;
+    document.body.classList.add(`theme-scheme-${scheme}`);
   },
   { deep: true }
 );
+
+// ===== 彩读风格：键盘快捷键 =====
+function onKeyDown(e: KeyboardEvent) {
+  if (!rawText.value) return;
+  // Ctrl/Cmd + 加号/等号 → 放大；减号 → 缩小
+  if (e.ctrlKey || e.metaKey) {
+    if (e.key === "=" || e.key === "+") {
+      e.preventDefault();
+      bumpFont(1);
+    } else if (e.key === "-" || e.key === "_") {
+      e.preventDefault();
+      bumpFont(-1);
+    }
+  }
+  // F7 → 阅读尺
+  if (e.key === "F7") {
+    e.preventDefault();
+    readSettings.value.readingRuler = !readSettings.value.readingRuler;
+  }
+  // F8 → 主题切换
+  if (e.key === "F8") {
+    e.preventDefault();
+    readSettings.value.theme = readSettings.value.theme === "dark" ? "light" : "dark";
+  }
+  // F9 → 极简视图
+  if (e.key === "F9") {
+    e.preventDefault();
+    minimalView.value = !minimalView.value;
+  }
+  // F11 → 沉浸模式
+  if (e.key === "F11") {
+    e.preventDefault();
+    readSettings.value.immersive = !readSettings.value.immersive;
+  }
+  // Ctrl+F → 查找
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") {
+    e.preventDefault();
+    reader.value?.toggleFindBar();
+  }
+  // Esc → 关闭设置面板
+  if (e.key === "Escape") {
+    showSettingsPanel.value = false;
+  }
+}
 // 视口缓存：key = 绝对物理行号，value = EmotionSpan（line_offset 存绝对行号）
 const emotionCache = new Map<number, EmotionSpan>();
 // 已分析行集合（含无情感词的行，避免重复请求 sidecar）
@@ -613,6 +717,7 @@ function onAiJump(line0: number) {
 
 onMounted(async () => {
   loadReadSettings();
+  window.addEventListener("keydown", onKeyDown);
   if (!isTauri) {
     errorMsg.value =
       "当前为普通浏览器预览，无法读取本地文件。请运行 pnpm tauri dev 在桌面窗口中使用。";
@@ -649,7 +754,7 @@ onMounted(async () => {
       <div class="read-tools">
         <button
           class="btn"
-          title="缩小字号"
+          title="缩小字号 (Ctrl+-)"
           :disabled="!rawText"
           @click="bumpFont(-1)"
         >
@@ -657,7 +762,7 @@ onMounted(async () => {
         </button>
         <button
           class="btn"
-          title="放大字号"
+          title="放大字号 (Ctrl++)"
           :disabled="!rawText"
           @click="bumpFont(1)"
         >
@@ -666,7 +771,7 @@ onMounted(async () => {
         <button
           class="btn"
           :class="{ active: readSettings.theme === 'dark' }"
-          title="明亮 / 暗黑主题"
+          title="明亮 / 暗黑主题 (F8)"
           :disabled="!rawText"
           @click="
             readSettings.theme = readSettings.theme === 'dark' ? 'light' : 'dark'
@@ -677,7 +782,7 @@ onMounted(async () => {
         <button
           class="btn"
           :class="{ active: readSettings.readingRuler }"
-          title="阅读尺（聚焦当前行）"
+          title="阅读尺（聚焦当前行）(F7)"
           :disabled="!rawText"
           @click="readSettings.readingRuler = !readSettings.readingRuler"
         >
@@ -685,20 +790,191 @@ onMounted(async () => {
         </button>
         <button
           class="btn"
+          :class="{ active: readSettings.immersive }"
+          title="沉浸阅读 (F11)"
+          :disabled="!rawText"
+          @click="readSettings.immersive = !readSettings.immersive"
+        >
+          沉浸
+        </button>
+        <button
+          class="btn"
           :class="{ active: minimalView }"
-          title="极简视图（隐藏侧栏，鼠标移右缘可切回）"
+          title="极简视图（隐藏侧栏，鼠标移左缘可唤出）(F9)"
           :disabled="!rawText"
           @click="minimalView = !minimalView"
         >
           极简
         </button>
+        <button
+          class="btn"
+          :class="{ active: showSettingsPanel }"
+          title="阅读设置（字体 / 排版 / 配色 / 翻页）"
+          :disabled="!rawText"
+          @click.stop="showSettingsPanel = !showSettingsPanel"
+        >
+          ⚙ 设置
+        </button>
+        <button
+          class="btn"
+          title="查找 (Ctrl+F)"
+          :disabled="!rawText"
+          @click="reader?.toggleFindBar()"
+        >
+          🔍 查找
+        </button>
+        <!-- 设置下拉面板 -->
+        <div v-if="showSettingsPanel" class="read-dropdown" @click.stop>
+          <h4>文字排版</h4>
+          <div class="row">
+            <label>字体</label>
+            <select
+              :value="readSettings.fontFamily"
+              @change="(e) => (readSettings.fontFamily = (e.target as HTMLSelectElement).value)"
+            >
+              <option v-for="f in FONT_PRESETS" :key="f.value" :value="f.value">
+                {{ f.label }}
+              </option>
+            </select>
+          </div>
+          <div class="row">
+            <label>字号</label>
+            <input
+              type="range"
+              min="13"
+              max="26"
+              :value="readSettings.fontSize"
+              @input="(e) => bumpFont(Number((e.target as HTMLInputElement).value) - readSettings.fontSize)"
+            />
+            <span class="val-tag">{{ readSettings.fontSize }}px</span>
+          </div>
+          <div class="row">
+            <label>行距</label>
+            <input
+              type="range"
+              min="1.4"
+              max="2.4"
+              step="0.05"
+              :value="readSettings.lineHeightRatio"
+              @input="(e) => setLineHeightRatio(Number((e.target as HTMLInputElement).value))"
+            />
+            <span class="val-tag">{{ readSettings.lineHeightRatio.toFixed(2) }}</span>
+          </div>
+          <div class="row">
+            <label>字间距</label>
+            <input
+              type="range"
+              min="0"
+              max="4"
+              step="0.5"
+              :value="readSettings.letterSpacing"
+              @input="(e) => (readSettings.letterSpacing = Number((e.target as HTMLInputElement).value))"
+            />
+            <span class="val-tag">{{ readSettings.letterSpacing }}px</span>
+          </div>
+          <div class="row">
+            <label>段间距</label>
+            <input
+              type="range"
+              min="0"
+              max="2"
+              step="0.25"
+              :value="readSettings.paragraphSpacing"
+              @input="(e) => (readSettings.paragraphSpacing = Number((e.target as HTMLInputElement).value))"
+            />
+            <span class="val-tag">{{ readSettings.paragraphSpacing.toFixed(2) }}</span>
+          </div>
+          <div class="row">
+            <label>行首缩进</label>
+            <input
+              type="range"
+              min="0"
+              max="3"
+              step="0.5"
+              :value="readSettings.firstLineIndent"
+              @input="(e) => (readSettings.firstLineIndent = Number((e.target as HTMLInputElement).value))"
+            />
+            <span class="val-tag">{{ readSettings.firstLineIndent }}字</span>
+          </div>
+
+          <h4 style="margin-top: 12px">显示选项</h4>
+          <div class="row">
+            <label>行号</label>
+            <button
+              class="btn"
+              :class="{ active: readSettings.showLineNumbers }"
+              @click="readSettings.showLineNumbers = !readSettings.showLineNumbers"
+              style="flex: 0 0 auto"
+            >
+              {{ readSettings.showLineNumbers ? "显示" : "隐藏" }}
+            </button>
+            <label style="margin-left: auto">左右留白</label>
+            <input
+              type="range"
+              min="16"
+              max="120"
+              step="4"
+              :value="readSettings.paddingX"
+              @input="(e) => (readSettings.paddingX = Number((e.target as HTMLInputElement).value))"
+            />
+            <span class="val-tag">{{ readSettings.paddingX }}</span>
+          </div>
+          <div class="row">
+            <label>点击翻页</label>
+            <button
+              class="btn"
+              :class="{ active: readSettings.clickToPage }"
+              @click="readSettings.clickToPage = !readSettings.clickToPage"
+              style="flex: 0 0 auto"
+            >
+              {{ readSettings.clickToPage ? "开启" : "关闭" }}
+            </button>
+          </div>
+
+          <h4 style="margin-top: 12px">配色方案</h4>
+          <div v-if="readSettings.theme === 'light'" style="margin-bottom: 6px">
+            <div style="font-size:11px;color:var(--ink-soft);margin-bottom:4px">明亮模式</div>
+            <div class="bg-preset">
+              <button
+                v-for="s in LIGHT_SCHEMES"
+                :key="s.key"
+                :class="[s.cls, { on: readSettings.lightScheme === s.key }]"
+                :title="s.label"
+                @click="readSettings.lightScheme = s.key"
+              ></button>
+            </div>
+          </div>
+          <div v-else style="margin-bottom: 6px">
+            <div style="font-size:11px;color:var(--ink-soft);margin-bottom:4px">暗黑模式</div>
+            <div class="bg-preset">
+              <button
+                v-for="s in DARK_SCHEMES"
+                :key="s.key"
+                :class="[s.cls, { on: readSettings.darkScheme === s.key }]"
+                :title="s.label"
+                @click="readSettings.darkScheme = s.key"
+              ></button>
+            </div>
+          </div>
+          <div style="font-size:11px;color:var(--ink-soft);margin-top:6px">
+            按 F8 切换明/暗主题
+          </div>
+        </div>
       </div>
     </header>
 
     <div v-if="errorMsg" class="error-banner">{{ errorMsg }}</div>
 
     <main class="main">
-      <aside class="sidebar" :class="{ hidden: minimalView }">
+      <!-- 彩读风格：极简视图下的左缘触发条（鼠标移入临时显示侧栏） -->
+      <div
+        v-if="minimalView"
+        class="sidebar-edge"
+        title="鼠标移入显示侧栏 (F9 退出极简)"
+        @mouseenter="sidebarHover = true"
+        @mouseleave="sidebarHover = false"
+      ></div>
+      <aside class="sidebar" :class="{ hidden: minimalView && !sidebarHover }">
         <div class="tabs">
           <button
             :class="{ on: sidebarTab === 'toc' }"
