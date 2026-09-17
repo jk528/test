@@ -2,3 +2,40 @@
 __pycache__/
 *.pyc
 *.pyo
+
+# Python 虚拟环境（本机相关、不可跨机同步，统一放同步/仓库目录外）
+.venv/
+venv/
+env/
+
+# Node / 前端依赖与构建产物
+node_modules/
+dist/
+*.local
+
+# Rust / Tauri 构建产物
+**/src-tauri/target/
+target/
+
+# 本机环境安装脚本产物（红楼梦范例）
+/红楼梦范例/install_dev_env.log
+/红楼梦范例/install_fix.log
+
+# 密钥与本地配置（严禁提交）
+.env
+.env.*
+!.env.example
+secrets.vault
+*.key
+
+# 系统 / 编辑器
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*~
