@@ -76,7 +76,10 @@ const EMO_WORD_CLASS_MAP: Record<string, string> = {
 
 const container = ref<HTMLDivElement | null>(null);
 let editor: monaco.editor.IStandaloneCodeEditor | null = null;
+// 行内装饰（视口化渲染，减少 DOM 节点）
 let decoColl: monaco.editor.IEditorDecorationsCollection | null = null;
+// 右侧概览栏装饰（全量渲染，overviewRuler 必须显示全书标记）
+let overviewColl: monaco.editor.IEditorDecorationsCollection | null = null;
 let scrollRaf = 0;
 let removeResizeListener: (() => void) | null = null;
 // OPT-6: StickyScroll 章节粘性条 provider 的销毁句柄
@@ -93,6 +96,13 @@ const findCurrentIndex = ref(0);
 // 行首缩进的 CSS 变量（px）
 const indentPx = ref(0);
 const paraGapPx = ref(0);
+// P1 修复：强制视口包含的目标行（0 基物理行）。
+// 跳转查找结果/章节时设置，滚动到位后清除。
+// 用于保证平滑滚动过程中，目标匹配项的行内装饰始终可见。
+let forcedVpLine: number | null = null;
+// 性能优化：缓存文本行数组，避免 renderDecorations 每次全量 split
+let cachedLines: string[] | null = null;
+let cachedTextKey = "";
 
 // ===== OPT-1: 视口装饰渲染 =====
 // 视口缓冲行数：上下各多渲染 N 行，避免快速滚动时出现短暂空白
@@ -101,7 +111,6 @@ const VIEWPORT_BUFFER = 80;
 // 首次滚动后会被更新为真实视口范围，此后仅渲染视口 ± 缓冲内的装饰。
 let viewportStart = 0;
 let viewportEnd = Infinity;
-let viewportRaf = 0;
 
 // ===== OPT-3: 视觉行级阅读尺 =====
 // 阅读尺锚点（视觉行精度，Monaco 1-based）
@@ -323,7 +332,7 @@ function applySettings() {
     letterSpacing: s.letterSpacing,
     lineNumbers: s.showLineNumbers ? "on" : "off",
     glyphMargin: s.showLineNumbers,
-    padding: { top: 16, bottom: 120, left: s.paddingX, right: s.paddingX },
+    padding: { top: 16, bottom: 120 },
   });
   // 行首缩进：按字号 * 缩进字符数（2 字符 = 标准中文缩进）
   indentPx.value = Math.round(s.fontSize * s.firstLineIndent);
@@ -370,8 +379,6 @@ onMounted(() => {
     padding: {
       top: 16,
       bottom: 120,
-      left: props.settings.paddingX,
-      right: props.settings.paddingX,
     },
     scrollbar: { vertical: "auto", horizontal: "hidden" },
     // OPT-6: 启用粘性滚动章节条（由 DocumentSymbolProvider 提供章节树）
@@ -396,6 +403,8 @@ onMounted(() => {
   };
 
   decoColl = editor.createDecorationsCollection();
+  // P0-1 修复：右侧概览栏独立装饰集合（全量，不随视口变化）
+  overviewColl = editor.createDecorationsCollection();
 
   // OPT-6: 注册章节文档符号提供者，供 Monaco StickyScroll 使用
   // 把章节列表转为 DocumentSymbol 树，Monaco 自动管理粘性条渲染与滚动同步
@@ -480,9 +489,18 @@ onMounted(() => {
           readProgress.value = pct / 100;
           progressText.value = `${pct}%`;
         }
-        // OPT-1: 视口变化 → 更新视口范围并重绘装饰（仅大体量装饰受视口限制）
-        const newStart = Math.max(0, vs - VIEWPORT_BUFFER);
-        const newEnd = ve + VIEWPORT_BUFFER;
+        // P1 修复：如果强制视口行已进入可见范围，则清除强制状态
+        if (forcedVpLine !== null && forcedVpLine >= vs && forcedVpLine <= ve) {
+          forcedVpLine = null;
+        }
+        // OPT-1: 视口变化 → 更新视口范围并重绘装饰
+        // 若存在 forcedVpLine，则确保视口范围包含该行
+        let newStart = Math.max(0, vs - VIEWPORT_BUFFER);
+        let newEnd = ve + VIEWPORT_BUFFER;
+        if (forcedVpLine !== null) {
+          newStart = Math.min(newStart, Math.max(0, forcedVpLine - VIEWPORT_BUFFER));
+          newEnd = Math.max(newEnd, forcedVpLine + VIEWPORT_BUFFER);
+        }
         if (newStart !== viewportStart || newEnd !== viewportEnd) {
           viewportStart = newStart;
           viewportEnd = newEnd;
@@ -504,7 +522,9 @@ onMounted(() => {
   // OPT-3: 阅读尺键盘导航：开启时上下箭头按「有内容的视觉行」移动
   editor.onKeyDown((e) => {
     if (!props.settings.readingRuler) return;
-    const model = editor?.getModel();
+    const ed = editor;
+    if (!ed) return;
+    const model = ed.getModel();
     if (!model) return;
     let handled = false;
     if (e.keyCode === monaco.KeyCode.UpArrow) {
@@ -513,8 +533,8 @@ onMounted(() => {
       );
       if (next.lineNumber !== rulerAnchor.lineNumber || next.column !== rulerAnchor.column) {
         rulerAnchor = next;
-        editor.setPosition({ lineNumber: rulerAnchor.lineNumber, column: rulerAnchor.column });
-        editor.revealPositionInCenterIfOutsideViewport(
+        ed.setPosition({ lineNumber: rulerAnchor.lineNumber, column: rulerAnchor.column });
+        ed.revealPositionInCenterIfOutsideViewport(
           { lineNumber: rulerAnchor.lineNumber, column: rulerAnchor.column },
           monaco.editor.ScrollType.Smooth
         );
@@ -527,8 +547,8 @@ onMounted(() => {
       );
       if (next.lineNumber !== rulerAnchor.lineNumber || next.column !== rulerAnchor.column) {
         rulerAnchor = next;
-        editor.setPosition({ lineNumber: rulerAnchor.lineNumber, column: rulerAnchor.column });
-        editor.revealPositionInCenterIfOutsideViewport(
+        ed.setPosition({ lineNumber: rulerAnchor.lineNumber, column: rulerAnchor.column });
+        ed.revealPositionInCenterIfOutsideViewport(
           { lineNumber: rulerAnchor.lineNumber, column: rulerAnchor.column },
           monaco.editor.ScrollType.Smooth
         );
@@ -545,8 +565,8 @@ onMounted(() => {
       }
       if (p.lineNumber !== rulerAnchor.lineNumber || p.column !== rulerAnchor.column) {
         rulerAnchor = p;
-        editor.setPosition({ lineNumber: rulerAnchor.lineNumber, column: rulerAnchor.column });
-        editor.revealPositionNearTop(
+        ed.setPosition({ lineNumber: rulerAnchor.lineNumber, column: rulerAnchor.column });
+        ed.revealPositionNearTop(
           { lineNumber: rulerAnchor.lineNumber, column: rulerAnchor.column },
           monaco.editor.ScrollType.Smooth
         );
@@ -563,8 +583,8 @@ onMounted(() => {
       }
       if (p.lineNumber !== rulerAnchor.lineNumber || p.column !== rulerAnchor.column) {
         rulerAnchor = p;
-        editor.setPosition({ lineNumber: rulerAnchor.lineNumber, column: rulerAnchor.column });
-        editor.revealPositionNearTop(
+        ed.setPosition({ lineNumber: rulerAnchor.lineNumber, column: rulerAnchor.column });
+        ed.revealPositionNearTop(
           { lineNumber: rulerAnchor.lineNumber, column: rulerAnchor.column },
           monaco.editor.ScrollType.Smooth
         );
@@ -601,11 +621,13 @@ onMounted(() => {
   );
 });
 
-// 文本变化 → 重建 model 内容
+// 文本变化 → 重建 model 内容 + 失效行缓存
 watch(
   () => props.text,
   (t) => {
     if (editor && editor.getValue() !== t) editor.setValue(t);
+    cachedLines = null;
+    cachedTextKey = "";
   }
 );
 
@@ -725,6 +747,10 @@ function revealMatch(idx: number) {
   findCurrentIndex.value = idx;
   editor.revealLineNearTop(m.line + 1, monaco.editor.ScrollType.Smooth);
   editor.setPosition({ lineNumber: m.line + 1, column: m.start + 1 });
+  // P1 修复：设置强制视口行，确保平滑滚动过程中匹配项装饰始终可见
+  forcedVpLine = m.line;
+  viewportStart = Math.max(0, m.line - VIEWPORT_BUFFER);
+  viewportEnd = m.line + VIEWPORT_BUFFER;
   renderDecorations();
 }
 
@@ -775,8 +801,9 @@ function isParagraphStart(lines: string[], line0: number, chapterLinesSet: Set<n
 }
 
 function renderDecorations() {
-  if (!editor || !decoColl) return;
+  if (!editor || !decoColl || !overviewColl) return;
   const decos: monaco.editor.IModelDeltaDecoration[] = [];
+  const overviewDecos: monaco.editor.IModelDeltaDecoration[] = [];
   // OPT-1: 视口范围（Monaco 1-based）。大体量装饰仅在视口 ± 缓冲内渲染。
   const vpStart1 = viewportStart + 1;
   const vpEnd1 = viewportEnd + 1;
@@ -843,16 +870,25 @@ function renderDecorations() {
   }
 
   // M4 人物高亮：同一人物的所有出场统一配色（className 由外层给，ASCII 安全）
-  // OPT-1: 大体量（30000+），仅渲染视口范围内
+  // OPT-1: 行内装饰视口化（30000+ → ~200）
+  // P0-1 修复：overviewRuler 标记全量渲染（右侧概览栏必须显示全书标记）
   if (props.showEntities && props.entitySpans.length > 0) {
     for (const e of props.entitySpans) {
       const ln = e.line + 1;
-      if (ln < vpStart1 || ln > vpEnd1) continue;
-      decos.push({
+      // 行内装饰：仅视口内（减少 DOM）
+      if (ln >= vpStart1 && ln <= vpEnd1) {
+        decos.push({
+          range: new monaco.Range(ln, e.charStart + 1, ln, e.charEnd + 1),
+          options: {
+            className: e.cls,
+            hoverMessage: { value: `${e.name}（点击人物榜可切换）` },
+          },
+        });
+      }
+      // 右侧概览栏：全量（用户需要看到全书分布）
+      overviewDecos.push({
         range: new monaco.Range(ln, e.charStart + 1, ln, e.charEnd + 1),
         options: {
-          className: e.cls,
-          hoverMessage: { value: `${e.name}（点击人物榜可切换）` },
           overviewRuler: {
             color: "#c9a35c",
             position: monaco.editor.OverviewRulerLane.Right,
@@ -870,17 +906,25 @@ function renderDecorations() {
   }
 
   // 彩读风格：查找结果高亮
-  // OPT-1: 匹配数多时大体量，仅渲染视口范围内
+  // OPT-1: 行内装饰视口化；P0-1 修复：overviewRuler 全量
   if (findMatches.value.length > 0) {
     for (let i = 0; i < findMatches.value.length; i++) {
       const m = findMatches.value[i];
       const ln = m.line + 1;
-      if (ln < vpStart1 || ln > vpEnd1) continue;
       const isCurrent = i === findCurrentIndex.value;
-      decos.push({
+      // 行内装饰：仅视口内
+      if (ln >= vpStart1 && ln <= vpEnd1) {
+        decos.push({
+          range: new monaco.Range(ln, m.start + 1, ln, m.end + 1),
+          options: {
+            className: isCurrent ? "hl-find-current" : "hl-find-match",
+          },
+        });
+      }
+      // 右侧概览栏：全量
+      overviewDecos.push({
         range: new monaco.Range(ln, m.start + 1, ln, m.end + 1),
         options: {
-          className: isCurrent ? "hl-find-current" : "hl-find-match",
           overviewRuler: {
             color: isCurrent ? "#ff9800" : "#ffd54f",
             position: monaco.editor.OverviewRulerLane.Right,
@@ -892,8 +936,16 @@ function renderDecorations() {
 
   // 彩读风格：段间距 + 行首缩进（作用于全部段落首行）
   // OPT-1: 大体量（3000+ 段落 × 1~2 个装饰），仅渲染视口范围内
+  // 性能优化：使用缓存行数组，避免每次全量 split
   if (props.settings.paragraphSpacing > 0 || props.settings.firstLineIndent > 0) {
-    const lines = props.text.split("\n");
+    // 惰性缓存：基于长度 + 首尾字符粗略判断文本是否变化（比完整 split 快得多）
+    const text = props.text;
+    const key = text.length + ":" + text.slice(0, 20) + ":" + text.slice(-20);
+    if (!cachedLines || cachedTextKey !== key) {
+      cachedLines = text.split("\n");
+      cachedTextKey = key;
+    }
+    const lines = cachedLines;
     const chapterLinesSet = new Set(props.chapters.map((ch) => ch.line));
     // OPT-1: 只遍历视口范围内的行
     const scanStart = Math.max(0, viewportStart);
@@ -925,6 +977,7 @@ function renderDecorations() {
   }
 
   decoColl.set(decos);
+  overviewColl.set(overviewDecos);
 }
 
 /** 外部调用：滚动到指定 0 基物理行并居中靠上 */
@@ -936,6 +989,11 @@ function revealLine(line0: number) {
   editor.revealLineNearTop(ln, monaco.editor.ScrollType.Smooth);
   editor.setPosition({ lineNumber: ln, column: 1 });
   editor.focus();
+  // P1 修复：设置强制视口行，确保平滑滚动过程中段间距等装饰始终可见
+  forcedVpLine = line0;
+  viewportStart = Math.max(0, line0 - VIEWPORT_BUFFER);
+  viewportEnd = line0 + VIEWPORT_BUFFER;
+  renderDecorations();
 }
 
 defineExpose({ revealLine, toggleFindBar, doFind, findNext, findPrev, pageUp, pageDown });
