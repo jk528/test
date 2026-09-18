@@ -414,9 +414,10 @@ onMounted(() => {
       bottom: 120,
     },
     scrollbar: { vertical: "auto", horizontal: "hidden" },
-    // OPT-6: 启用粘性滚动章节条（由 DocumentSymbolProvider 提供章节树）
+    // OPT-6 章节粘性条：临时禁用（怀疑其 DocumentSymbolProvider 破坏滚动计算，
+    // 且用户反馈其"弹出窗体遮挡"），待验证后决定移除或修复
     stickyScroll: {
-      enabled: true,
+      enabled: false,
       maxLineCount: 2,
       scrollWithEditor: false,
     },
@@ -746,13 +747,8 @@ watch(
         },
       }
     );
-    // 触发 Monaco 重新计算粘性条
+    // 触发 Monaco 重新计算粘性条（已禁用 stickyScroll，仅保留 provider 注册无害）
     editor.updateOptions({ stickyScroll: { enabled: false } });
-    requestAnimationFrame(() => {
-      editor?.updateOptions({
-        stickyScroll: { enabled: true, maxLineCount: 2, scrollWithEditor: false },
-      });
-    });
   },
   { deep: true }
 );
@@ -840,13 +836,17 @@ function toggleFindBar() {
 }
 
 // ===== 彩读风格：点击翻页 =====
+// 直接操作滚动位置（trigger 的 'pageUp'/'pageDown' 命令在 Monaco 中不存在，
+// 会抛 "command not found" 且不生效）
 function pageUp() {
   if (!editor) return;
-  editor.trigger("page-zone", "pageUp", null);
+  const vh = editor.getLayoutInfo().height;
+  editor.setScrollTop(Math.max(0, editor.getScrollTop() - vh * 0.9));
 }
 function pageDown() {
   if (!editor) return;
-  editor.trigger("page-zone", "pageDown", null);
+  const vh = editor.getLayoutInfo().height;
+  editor.setScrollTop(editor.getScrollTop() + vh * 0.9);
 }
 
 // ===== 彩读风格：判断段落首行（空行之后 / 章节标题之后 / 正文第一行） =====
@@ -1177,16 +1177,17 @@ onBeforeUnmount(() => {
       </label>
       <button @click="toggleFindBar">✕</button>
     </div>
-    <div ref="container" class="reader-container"></div>
+    <div ref="container" class="reader-container">
+      <!-- 彩读风格：点击翻页热区（左右各 25%，仅覆盖阅读区，不遮挡图例栏/查找栏） -->
+      <div v-if="settings.clickToPage" class="page-zones active">
+        <div class="page-zone prev" @click="pageUp" title="上一页 (PageUp)"></div>
+        <div class="page-zone next" @click="pageDown" title="下一页 (PageDown / Space)"></div>
+      </div>
+    </div>
     <!-- 彩读风格：底部阅读进度条 -->
     <div class="read-progress">
       <div class="read-progress-bar" :style="{ width: progressText }"></div>
       <span class="read-progress-tip">{{ progressText }}</span>
-    </div>
-    <!-- 彩读风格：点击翻页热区（左右各 25%） -->
-    <div v-if="settings.clickToPage" class="page-zones active">
-      <div class="page-zone prev" @click="pageUp" title="上一页 (PageUp)"></div>
-      <div class="page-zone next" @click="pageDown" title="下一页 (PageDown / Space)"></div>
     </div>
   </div>
 </template>
@@ -1421,6 +1422,7 @@ onBeforeUnmount(() => {
   width: 100%;
   flex: 1;
   overflow: hidden;
+  position: relative;
   /* 彩读美学：底色 + 纸纹纹理叠加（Monaco 层透明后透出） */
   background-color: var(--paper);
   background-image: var(--reader-texture);

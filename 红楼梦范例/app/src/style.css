@@ -594,7 +594,9 @@ body,
   pointer-events: none;
   z-index: 5;
 }
-.page-zones.active {
+/* 修复：父容器不得全屏拦截（会把正文/查找栏/图例全部挡住），
+   只允许左右两个翻页热区接收点击，中间区域保持穿透给 Monaco */
+.page-zones.active .page-zone {
   pointer-events: auto;
 }
 .page-zone {
