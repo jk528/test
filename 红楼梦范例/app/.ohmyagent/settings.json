@@ -1,0 +1,12 @@
+{
+  "permission_rules": [
+    {
+      "tool": "Glob",
+      "decision": "allow"
+    },
+    {
+      "tool": "Read",
+      "decision": "allow"
+    }
+  ]
+}
