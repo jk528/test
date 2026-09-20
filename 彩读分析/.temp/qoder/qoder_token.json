@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "token": "dt-NiqqPlxzN6dIdkSFF7QC3JXc",
+  "refreshToken": "drt-klzrqjwtb8pU3YngVAfTRLVL",
+  "expiresAt": "2026-10-20T14:18:56Z",
+  "refreshTokenExpiresAt": "2027-09-15T14:18:56Z",
+  "user": {
+    "id": "01a0b9ed-5ba8-73c5-afae-bcbb9535bf50",
+    "name": "nick0639407703",
+    "email": "",
+    "phone": "19180697336",
+    "avatarUrl": "https://qoder.com.cn/users/01a0b9ed-5ba8-73c5-afae-bcbb9535bf50/default/avatars"
+  }
+}
