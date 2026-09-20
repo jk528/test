@@ -13,6 +13,9 @@ node_modules/
 dist/
 *.local
 
+# ColorTxt 源码：内嵌的独立 Git 仓库（远程 GitHub），不作为 gitlink 纳入本仓库
+彩读分析/.temp/ColorTxt/
+
 # Rust / Tauri 构建产物
 **/src-tauri/target/
 target/
