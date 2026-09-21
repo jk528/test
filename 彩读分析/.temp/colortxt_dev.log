@@ -11,7 +11,7 @@ rendering chunks...
 [2mdist/main/[22m[36mai/rag/embedding/worker.js                 [39m[1m[2m    3.72 kB[22m[1m[22m
 [2mdist/main/[22m[36mchunks/index-BbfI3uLC.js                   [39m[1m[33m1,649.25 kB[39m[22m
 [2mdist/main/[22m[36mindex.js                                   [39m[1m[33m5,410.08 kB[39m[22m
-[32m✓ built in 15.02s[39m
+[32m✓ built in 23.19s[39m
 [32m
 build the electron main process successfully[39m
 [90m
@@ -22,7 +22,7 @@ transforming...
 [32m✓[39m 14 modules transformed.
 rendering chunks...
 [2mdist/preload/[22m[36mindex.js  [39m[1m[2m44.06 kB[22m[1m[22m
-[32m✓ built in 229ms[39m
+[32m✓ built in 285ms[39m
 [32m
 build the electron preload files successfully[39m
 [90m
@@ -36,5 +36,5 @@ build the electron preload files successfully[39m
 start electron app...
 [39m
 
-(node:25004) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:7824) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `electron --trace-warnings ...` to show where the warning was created)

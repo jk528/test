@@ -10,3 +10,20 @@
 2026/9/21 22:46:10  vite listening after 10s
 2026/9/21 22:46:15  electron process detected after 0s
 2026/9/21 22:46:15  === launcher finished ===
+2026/9/21 22:53:33  === ColorTxt Analysis launcher ===
+2026/9/21 22:53:33  Project: C:\Users\Administrator\Documents\这是什么\JK-temp\彩读分析\.temp\ColorTxt
+2026/9/21 22:53:35  vite not running - starting dev server...
+2026/9/21 22:53:54  vite listening after 9s
+2026/9/21 22:53:55  electron process detected after 0s
+2026/9/21 22:53:55  === launcher finished ===
+2026/9/22 5:34:01  === ColorTxt Analysis launcher ===
+2026/9/22 5:34:01  Project: C:\Users\Administrator\Documents\这是什么\JK-temp\彩读分析\.temp\ColorTxt
+2026/9/22 5:34:03  vite not running - starting dev server...
+2026/9/22 5:34:47  vite listening after 17s
+2026/9/22 5:34:50  electron process detected after 0s
+2026/9/22 5:34:50  === launcher finished ===
+2026/9/22 5:35:52  === ColorTxt Analysis launcher ===
+2026/9/22 5:35:52  Project: C:\Users\Administrator\Documents\这是什么\JK-temp\彩读分析\.temp\ColorTxt
+2026/9/22 5:35:54  vite already listening on port 5173 - reuse it
+2026/9/22 5:37:02  WARNING: no electron process detected within 30s
+2026/9/22 5:37:06  === launcher finished ===
