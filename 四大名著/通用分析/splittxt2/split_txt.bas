@@ -73,59 +73,59 @@ Private g_selCount As Long            ' 选中正则个数
 Private Sub InitRegexPatterns()
     g_regexCount = 0
 
-    ' 1. 标准中文（第N章/回/节/卷，含中文数字，含〇，含大写中文数字壹贰叁…）
+    ' 1. 标准中文（第N章/回/节/卷，含中文数字，含〇/○，含大写/繁体数字壹贰…萬，含全角数字）
     g_regexCount = g_regexCount + 1
     g_regexNames(g_regexCount) = "标准中文（第N章/回/节/卷，含中文数字含〇含大写）"
-    g_regexPatterns(g_regexCount) = "^第([0-9一二三四五六七八九十百千万零〇两壹贰叁肆伍陆柒捌玖拾佰仟]+)(章|回|节|卷)(\s*)(.*)$"
+    g_regexPatterns(g_regexCount) = "^[ \t　]*第([0-9０-９一二三四五六七八九十百千万亿億零〇○两兩壹貳贰叁參肆伍陸陆柒捌玖拾佰仟廿卅卌皕萬]+)(章|回|节|卷)(?:[ \t　]+(.*))?$"
     g_regexUnitGroups(g_regexCount) = 1    ' SubMatches(1) = 单位词
     g_regexDefaultUnits(g_regexCount) = "章"
 
-    ' 2. 纯阿拉伯数字（第N章/回/节/卷）
+    ' 2. 纯阿拉伯数字（第N章/回/节/卷，含全角数字）
     g_regexCount = g_regexCount + 1
     g_regexNames(g_regexCount) = "纯阿拉伯数字（第N章/回/节/卷）"
-    g_regexPatterns(g_regexCount) = "^第(\d+)(章|回|节|卷)(\s*)(.*)$"
+    g_regexPatterns(g_regexCount) = "^[ \t　]*第([0-9０-９]+)(章|回|节|卷)(?:[ \t　]+(.*))?$"
     g_regexUnitGroups(g_regexCount) = 1
     g_regexDefaultUnits(g_regexCount) = "章"
 
     ' 3. 英文Chapter（Chapter N - Title）
     g_regexCount = g_regexCount + 1
     g_regexNames(g_regexCount) = "英文Chapter（Chapter N - Title）"
-    g_regexPatterns(g_regexCount) = "^[Cc]hapter\s+(\d+)(\s*[:\.\-]?\s*)(.*)$"
+    g_regexPatterns(g_regexCount) = "^[ \t　]*[Cc]hapter\s+([0-9０-９]+)(?:[ \t　]*[:\.\-]?[ \t　]+(.*))?$"
     g_regexUnitGroups(g_regexCount) = -1   ' 无单位组
     g_regexDefaultUnits(g_regexCount) = "Chapter"
 
     ' 4. 序章/楔子/番外（无章号）
     g_regexCount = g_regexCount + 1
     g_regexNames(g_regexCount) = "序章/楔子/番外（无章号）"
-    g_regexPatterns(g_regexCount) = "^(序章|楔子|尾声|番外|引子|后记|终章|序言|前言)(\s*)(.*)$"
+    g_regexPatterns(g_regexCount) = "^[ \t　]*(序章|楔子|尾声|番外|引子|后记|终章|序言|前言)(?:[ \t　]+(.*))?$"
     g_regexUnitGroups(g_regexCount) = -1
     g_regexDefaultUnits(g_regexCount) = "章"
 
     ' 5. 数字+标题（无"第"字，如 1章 标题）
     g_regexCount = g_regexCount + 1
     g_regexNames(g_regexCount) = "数字+标题（无""第""字，如 1章 标题）"
-    g_regexPatterns(g_regexCount) = "^(\d+)(章|回|节|卷)(\s*)(.*)$"
+    g_regexPatterns(g_regexCount) = "^[ \t　]*([0-9０-９]+)(章|回|节|卷)(?:[ \t　]+(.*))?$"
     g_regexUnitGroups(g_regexCount) = 1
     g_regexDefaultUnits(g_regexCount) = "章"
 
     ' 6. 精简中文（仅章节，含〇，限1-7字）—— 参考清洁工具正则
     g_regexCount = g_regexCount + 1
     g_regexNames(g_regexCount) = "精简中文（仅章节，含〇，限1-7字）"
-    g_regexPatterns(g_regexCount) = "^第([零〇一二三四五六七八九十百千两]{1,7})(章|节)(\s*)(.*)$"
+    g_regexPatterns(g_regexCount) = "^[ \t　]*第([零〇○一二三四五六七八九十百千两兩]{1,7})(章|节)(?:[ \t　]+(.*))?$"
     g_regexUnitGroups(g_regexCount) = 1
     g_regexDefaultUnits(g_regexCount) = "章"
 
     ' 7. 宽松匹配（第+任意内容+章/回/节/卷）—— 适配非标准格式
     g_regexCount = g_regexCount + 1
     g_regexNames(g_regexCount) = "宽松匹配（第+任意内容+章/回/节/卷）"
-    g_regexPatterns(g_regexCount) = "^第(.+?)(章|回|节|卷)(\s*)(.*)$"
+    g_regexPatterns(g_regexCount) = "^[ \t　]*第(.+?)(章|回|节|卷)(?:[ \t　]+(.*))?$"
     g_regexUnitGroups(g_regexCount) = 1
     g_regexDefaultUnits(g_regexCount) = "章"
 
     ' 8. 纯数字起始（3-4位数字开头，如 001 标题）
     g_regexCount = g_regexCount + 1
     g_regexNames(g_regexCount) = "纯数字起始（3-4位数字开头，如 001 标题）"
-    g_regexPatterns(g_regexCount) = "^\d{3,4}.*"
+    g_regexPatterns(g_regexCount) = "^[ \t　]*([0-9０-９]{3,4})(?:[ \t　]+(.*))?$"
     g_regexUnitGroups(g_regexCount) = -1   ' 无单位组
     g_regexDefaultUnits(g_regexCount) = "章"
 
@@ -213,7 +213,8 @@ Private Function SelectRegexPattern() As Boolean
                                   "示例：" & vbCrLf & _
                                   "  ^第(\d+)章\s*(.*)$" & vbCrLf & _
                                   "  ^卷(\d+)\s*(.*)$" & vbCrLf & _
-                                  "  ^Section\s+(\d+)(.*)$", _
+                                  "  ^Section\s+(\d+)(.*)$" & vbCrLf & vbCrLf & _
+                                  "提示：数字建议写 [0-9０-９] 以同时匹配半角/全角数字。", _
                                   "自定义正则", "")
         If StrPtr(customPattern) = 0 Then
             SelectRegexPattern = False
@@ -1155,7 +1156,7 @@ Private Sub ScanChapters(lines() As String, ByVal lineCount As Long, _
         ReDim g_selPatterns(0 To 0)
         ReDim g_selUnitGroups(0 To 0)
         ReDim g_selDefaultUnits(0 To 0)
-        g_selPatterns(0) = "^第([0-9一二三四五六七八九十百千万零〇两壹贰叁肆伍陆柒捌玖拾佰仟]+)(章|回|节|卷)(\s*)(.*)$"
+        g_selPatterns(0) = "^[ \t　]*第([0-9０-９一二三四五六七八九十百千万亿億零〇○两兩壹貳贰叁參肆伍陸陆柒捌玖拾佰仟廿卅卌皕萬]+)(章|回|节|卷)(?:[ \t　]+(.*))?$"
         g_selUnitGroups(0) = 1
         g_selDefaultUnits(0) = "章"
         g_selCount = 1
