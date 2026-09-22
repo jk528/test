@@ -43,31 +43,43 @@ End If
 WriteLog "=== ColorTxt Analysis launcher ==="
 WriteLog "Project: " & projectDir
 
-' ---- 1) is vite already listening? ----
+' ---- 1) check if vite is already listening ----
 ready = CheckPort(port)
 If ready Then
-    WriteLog "vite already listening on port " & port & " - reuse it"
-Else
-    WriteLog "vite not running - starting dev server..."
-    objShell.Run """" & viteBat & """", 2, False   ' 2 = minimized
-    startedVite = True
-
-    ' ---- 2) wait for port 5173 (max 60s) ----
-    tries = 0
-    Do While tries < 60
-        WScript.Sleep 1000
-        tries = tries + 1
-        If CheckPort(port) Then
-            WriteLog "vite listening after " & tries & "s"
-            Exit Do
-        End If
-    Loop
-    If Not CheckPort(port) Then
-        WriteLog "WARNING: vite not listening after 60s, continuing..."
+    If IsElectronRunning() Then
+        WriteLog "vite + electron both running - nothing to do"
+        WScript.Quit 0
     End If
+    ' vite is alive but electron is gone: kill stale vite so we can restart cleanly
+    Dim killed
+    killed = KillPortOwners(port)
+    WriteLog "vite running but electron gone - killed " & killed & " stale process(es)"
+    WScript.Sleep 3000   ' wait for port to be released
 End If
 
-' ---- 3) wait for electron window process (max 30s) ----
+' ---- 2) start dev server ----
+WriteLog "starting dev server..."
+objShell.Run """" & viteBat & """", 2, False   ' 2 = minimized
+startedVite = True
+
+' ---- 3) wait for port 5173 (max 60s) ----
+tries = 0
+Do While tries < 60
+    WScript.Sleep 1000
+    tries = tries + 1
+    If CheckPort(port) Then
+        WriteLog "vite listening after " & tries & "s"
+        Exit Do
+    End If
+Loop
+If Not CheckPort(port) Then
+    WriteLog "ERROR: vite not listening after 60s"
+    MsgBox "Vite dev server failed to start within 60s." & vbCrLf & _
+           "Check log: " & vbCrLf & logFile, 16, "ColorTxt Analysis"
+    WScript.Quit 1
+End If
+
+' ---- 4) wait for electron window process (max 30s) ----
 electronSeen = False
 tries = 0
 Do While tries < 30
@@ -80,12 +92,12 @@ Do While tries < 30
     tries = tries + 1
 Loop
 If Not electronSeen Then
-    WriteLog "WARNING: no electron process detected within 30s"
-    MsgBox "ColorTxt dev server started, but the app window did not appear." & vbCrLf & _
-           "Check the minimized window / log: " & vbCrLf & logFile, 48, "ColorTxt Analysis"
+    WriteLog "ERROR: no electron process detected within 30s"
+    MsgBox "Dev server started, but the app window did not appear." & vbCrLf & _
+           "Check log: " & vbCrLf & logFile, 48, "ColorTxt Analysis"
+Else
+    WriteLog "=== launcher finished ==="
 End If
-
-WriteLog "=== launcher finished ==="
 
 ' ============================================================
 '  helpers
@@ -118,4 +130,25 @@ Function IsElectronRunning()
     Set exec = objShell.Exec("tasklist /FI ""IMAGENAME eq electron.exe""")
     output = exec.StdOut.ReadAll
     IsElectronRunning = InStr(output, "electron.exe") > 0
+End Function
+
+' Kill all processes listening on the given port (returns count killed)
+Function KillPortOwners(portNum)
+    Dim exec, output, lines, i, line, parts, pid, count
+    Set exec = objShell.Exec("netstat -ano")
+    output = exec.StdOut.ReadAll
+    lines = Split(output, vbCrLf)
+    count = 0
+    For i = 0 To UBound(lines)
+        line = Trim(lines(i))
+        If InStr(line, ":" & portNum & " ") > 0 And InStr(line, "LISTENING") > 0 Then
+            parts = Split(line)
+            pid = parts(UBound(parts))
+            If IsNumeric(pid) And CLng(pid) > 0 Then
+                objShell.Run "taskkill /PID " & pid & " /F", 0, True
+                count = count + 1
+            End If
+        End If
+    Next
+    KillPortOwners = count
 End Function
