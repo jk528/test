@@ -1,4 +1,4 @@
-[colortxt] === 2026/09/22 ÖÜ¶þ 13:33:54.38 === 
+[colortxt] === 2026/09/22 ÖÜ¶þ 13:48:37.19 === 
 [colortxt] node: 
 v24.15.0
 [colortxt] npm: 
@@ -16,7 +16,7 @@ rendering chunks...
 [2mdist/main/[22m[36mai/rag/embedding/worker.js                 [39m[1m[2m    3.72 kB[22m[1m[22m
 [2mdist/main/[22m[36mchunks/index-BbfI3uLC.js                   [39m[1m[33m1,649.25 kB[39m[22m
 [2mdist/main/[22m[36mindex.js                                   [39m[1m[33m5,410.08 kB[39m[22m
-[32mâœ“ built in 25.35s[39m
+[32mâœ“ built in 18.27s[39m
 [32m
 build the electron main process successfully[39m
 [90m
@@ -27,7 +27,7 @@ transforming...
 [32mâœ“[39m 14 modules transformed.
 rendering chunks...
 [2mdist/preload/[22m[36mindex.js  [39m[1m[2m44.06 kB[22m[1m[22m
-[32mâœ“ built in 368ms[39m
+[32mâœ“ built in 511ms[39m
 [32m
 build the electron preload files successfully[39m
 [90m
@@ -41,5 +41,5 @@ build the electron preload files successfully[39m
 start electron app...
 [39m
 
-(node:12328) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(node:5060) ExperimentalWarning: SQLite is an experimental feature and might change at any time
 (Use `electron --trace-warnings ...` to show where the warning was created)
