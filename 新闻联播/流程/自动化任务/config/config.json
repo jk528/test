@@ -37,9 +37,9 @@
     }
   },
   "paths": {
-    "python_exe": "python",
+    "python_exe": "C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
     "python_fallbacks": [
-      "C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+      "python",
       "py"
     ],
     "script_dir": "../分阶段生成方案",
