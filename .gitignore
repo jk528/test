@@ -14,15 +14,15 @@ dist/
 *.local
 
 # ColorTxt 源码：内嵌的独立 Git 仓库（远程 GitHub），不作为 gitlink 纳入本仓库
-彩读分析/.temp/ColorTxt/
+阅读器项目/彩读分析/.temp/ColorTxt/
 
 # Rust / Tauri 构建产物
 **/src-tauri/target/
 target/
 
 # 本机环境安装脚本产物（红楼梦范例）
-/红楼梦范例/install_dev_env.log
-/红楼梦范例/install_fix.log
+/阅读器项目/红楼梦范例/install_dev_env.log
+/阅读器项目/红楼梦范例/install_fix.log
 
 # 密钥与本地配置（严禁提交）
 .env
