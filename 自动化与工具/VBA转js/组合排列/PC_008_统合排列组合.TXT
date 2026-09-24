@@ -43,7 +43,9 @@ Private Const TYPE_REP_COMB As Long = 2     ' 组合放回
 Private Const TYPE_NOREP_PERM As Long = 3   ' 排列不放回
 Private Const TYPE_REP_PERM As Long = 4     ' 排列放回
 
-Private Const MAX_ENUM As Long = 10000000   ' 枚举安全上限
+Private Const MAX_ENUM As Long = 10000000   ' 枚举安全上限（内存保护）
+Private Const MAX_ROWS As Long = 1048576    ' 工作表最大行数（写入保护）
+Private Const MAX_COLS As Long = 16384      ' 工作表最大列数（写入保护）
 
 ' ============================================================
 ' 统一入口：功能主菜单
@@ -765,46 +767,61 @@ Public Sub 演示_枚举生成_范围()
     blockRow = 4
     totalItems = 0#
     For k = kStart To kEnd
-        ' 数量上限检查
+        ' 数量上限检查（溢出保护：m^k 等超大值视为超过上限，不中断）
+        On Error Resume Next
         expect = CountByType(m, k, typeInput)
+        If Err.Number <> 0 Then expect = MAX_ENUM + 1#
+        On Error GoTo 0
         If expect > MAX_ENUM Then
+            ' 超出内存保护上限：提示后跳过（留一空行，排版与其他块一致）
             ws.Cells(blockRow, 1).Value = "== k = " & k & " | 数量 " & Format(expect, "#,##0") & " 超过上限 " & MAX_ENUM & "，已跳过 =="
-            blockRow = blockRow + 1
+            blockRow = blockRow + 2
+        ElseIf 2 * k + 1 > MAX_COLS Then
+            ' 输出列数超出工作表列数：提示后跳过
+            ws.Cells(blockRow, 1).Value = "== k = " & k & " | 列数 " & (2 * k + 1) & " 超过工作表列数上限 " & MAX_COLS & "，已跳过 =="
+            blockRow = blockRow + 2
         Else
             ' 基于索引生成
             res = EnumerateIdx(m, k, typeInput)
             If IsArray(res) Then
                 cnt = UBound(res) - LBound(res) + 1
-                totalItems = totalItems + cnt
 
-                ' 块标题
-                ws.Cells(blockRow, 1).Value = "== k = " & k & " | 类型 " & GetTypeText(typeInput) & " | 项数 " & cnt & " =="
-                blockRow = blockRow + 1
+                ' 行数保护：数据块最后一行是否超出工作表最大行数
+                If blockRow + cnt - 1 > MAX_ROWS Then
+                    ws.Cells(blockRow, 1).Value = "== k = " & k & " | 项数 " & Format(cnt, "#,##0") & " 超出工作表剩余行数，已跳过 =="
+                    blockRow = blockRow + 2
+                Else
+                    totalItems = totalItems + cnt
 
-                ' 表头：序号 + 元素列 + 映射列（参考 PC_004）
-                ws.Cells(blockRow, 1).Value = "序号"
-                For j = 1 To k
-                    ws.Cells(blockRow, 1 + j).Value = "元素" & j
-                    ws.Cells(blockRow, 1 + k + j).Value = "映射" & j
-                Next j
-                blockRow = blockRow + 1
+                    ' 块标题
+                    ws.Cells(blockRow, 1).Value = "== k = " & k & " | 类型 " & GetTypeText(typeInput) & " | 项数 " & cnt & " =="
+                    blockRow = blockRow + 1
 
-                ' 数据块：元素 = Arr(索引)，映射 = 索引
-                ReDim out2D(1 To cnt, 1 To 2 * k + 1)
-                For i = 1 To cnt
-                    item = res(LBound(res) + i - 1)
-                    out2D(i, 1) = i
+                    ' 表头：序号 + 元素列 + 映射列（参考 PC_004）
+                    ws.Cells(blockRow, 1).Value = "序号"
                     For j = 1 To k
-                        idxv = CLng(item(LBound(item) + j - 1))
-                        out2D(i, 1 + j) = Arr(LBound(Arr) + idxv - 1)
-                        out2D(i, 1 + k + j) = idxv
+                        ws.Cells(blockRow, 1 + j).Value = "元素" & j
+                        ws.Cells(blockRow, 1 + k + j).Value = "映射" & j
                     Next j
-                Next i
-                ws.Range(ws.Cells(blockRow, 1), ws.Cells(blockRow + cnt - 1, 2 * k + 1)).Value = out2D
-                blockRow = blockRow + cnt + 1   ' 块后留一空行
+                    blockRow = blockRow + 1
+
+                    ' 数据块：元素 = Arr(索引)，映射 = 索引
+                    ReDim out2D(1 To cnt, 1 To 2 * k + 1)
+                    For i = 1 To cnt
+                        item = res(LBound(res) + i - 1)
+                        out2D(i, 1) = i
+                        For j = 1 To k
+                            idxv = CLng(item(LBound(item) + j - 1))
+                            out2D(i, 1 + j) = Arr(LBound(Arr) + idxv - 1)
+                            out2D(i, 1 + k + j) = idxv
+                        Next j
+                    Next i
+                    ws.Range(ws.Cells(blockRow, 1), ws.Cells(blockRow + cnt - 1, 2 * k + 1)).Value = out2D
+                    blockRow = blockRow + cnt + 1   ' 块后留一空行
+                End If
             Else
                 ws.Cells(blockRow, 1).Value = "== k = " & k & " | 无法生成（参数非法或超出上限） =="
-                blockRow = blockRow + 1
+                blockRow = blockRow + 2   ' 留一空行，排版与其他块一致
             End If
         End If
     Next k
