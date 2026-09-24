@@ -13,7 +13,7 @@ Option Explicit
 '   Type 4: 排列放回 n^k
 '
 ' 数值约定：
-'   0 = 不可选择。不放回类型 k > n 时不可选择，矩阵中填 0（不再留空）；
+'   0 = 不可选择。任何类型 k > n 时均不可选择，矩阵中填 0（不再留空）；
 '       放回类型 n = 0 且 k > 0 时同样不可选择，计数函数返回 0。
 '
 ' 使用方式：
@@ -66,8 +66,8 @@ End Function
 
 ' —— 组合放回 C(n+k-1,k)
 Public Function CountCombRepet(ByVal n As Long, ByVal k As Long) As Double
-    If k < 0 Or n < 1 Then
-        CountCombRepet = 0#
+    If k < 0 Or k > n Or n < 1 Then
+        CountCombRepet = 0#            ' 0 = 不可选择（k > n 或 n=0 且 k>0）
         Exit Function
     End If
     If k = 0 Then
@@ -97,8 +97,8 @@ End Function
 
 ' —— 排列放回 n^k
 Public Function CountPermRepet(ByVal n As Long, ByVal k As Long) As Double
-    If k < 0 Then
-        CountPermRepet = 0#
+    If k < 0 Or k > n Then
+        CountPermRepet = 0#            ' 0 = 不可选择（k > n）
         Exit Function
     End If
     If k = 0 Then
@@ -240,7 +240,7 @@ Public Function EnumerateCombRepet(ByVal arr As Variant, ByVal k As Long) As Var
         Exit Function
     End If
     n = UBound(arr) - LBound(arr) + 1
-    If k < 1 Or n < 1 Then
+    If k < 1 Or k > n Or n < 1 Then   ' 0 = 不可选择（k > n）
         EnumerateCombRepet = Empty
         Exit Function
     End If
@@ -325,7 +325,7 @@ Public Function EnumeratePermRepet(ByVal arr As Variant, ByVal k As Long) As Var
         Exit Function
     End If
     n = UBound(arr) - LBound(arr) + 1
-    If k < 1 Or n < 1 Then
+    If k < 1 Or k > n Or n < 1 Then   ' 0 = 不可选择（k > n）
         EnumeratePermRepet = Empty
         Exit Function
     End If
@@ -543,8 +543,7 @@ Public Function 构建_排列组合四象限_矩阵(ByVal nMax As Long, ByVal ty
         ' k=1..nMax
         For k = 1 To nMax
             If typeNo = TYPE_REP_COMB Or typeNo = TYPE_REP_PERM Then
-                ' 放回类型：对所有 k 都有意义
-                ' n = 0 且 k > 0 时不可选择，计数函数返回 0
+                ' 放回类型：k > n 或 n=0 且 k>0 时不可选择，计数函数返回 0
                 val = CountByType(n, k, typeNo)
                 outArr(row, colStart + k) = val
                 sumRow = sumRow + val

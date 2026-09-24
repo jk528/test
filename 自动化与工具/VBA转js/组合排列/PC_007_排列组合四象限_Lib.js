@@ -9,7 +9,7 @@
 //   Type 4: 排列放回 n^k                元素可重复，计顺序
 //
 // 数值约定：
-//   0 = 不可选择。不放回类型 k > n 时不可选择，矩阵中填 0（不再留空）；
+//   0 = 不可选择。任何类型 k > n 时均不可选择，矩阵中填 0（不再留空）；
 //       放回类型 n = 0 且 k > 0 时同样不可选择，计数函数返回 0。
 //
 // ======================== 引入方式 ========================
@@ -79,7 +79,7 @@
     // 计数：C(n+k-1,k) 组合放回
     // ----------------------------------------------------------
     function countCombRepet(n, k) {
-        if (k < 0 || n < 1) return 0;
+        if (k < 0 || k > n || n < 1) return 0;   // 0 = 不可选择（k > n 或 n=0 且 k>0）
         if (k === 0) return 1;
         return countCombNoRepet(n + k - 1, k);
     }
@@ -101,7 +101,7 @@
     // 计数：n^k 排列放回
     // ----------------------------------------------------------
     function countPermRepet(n, k) {
-        if (k < 0) return 0;
+        if (k < 0 || k > n) return 0;   // 0 = 不可选择（k > n）
         if (k === 0) return 1;
         return Math.pow(n, k);
     }
@@ -150,7 +150,7 @@
     function enumerateCombRepet(arr, k) {
         if (!Array.isArray(arr) || arr.length === 0) return null;
         var n = arr.length;
-        if (k < 1) return null;
+        if (k < 1 || k > n) return null;   // 0 = 不可选择（k > n）
         var total = countCombRepet(n, k);
         if (total > MAX_ENUM) return null;
         var result = [];
@@ -202,7 +202,7 @@
     function enumeratePermRepet(arr, k) {
         if (!Array.isArray(arr) || arr.length === 0) return null;
         var n = arr.length;
-        if (k < 1) return null;
+        if (k < 1 || k > n) return null;   // 0 = 不可选择（k > n）
         var total = countPermRepet(n, k);
         if (total > MAX_ENUM) return null;
         var result = [];
@@ -295,8 +295,7 @@
             for (var k = 1; k <= nMax; k++) {
                 var val;
                 if (type === TYPE.REP_COMB || type === TYPE.REP_PERM) {
-                    // 放回类型：对所有 k 都有意义
-                    // n=0 且 k>0 时不可选择，计数函数返回 0
+                    // 放回类型：k>n 或 n=0 且 k>0 时不可选择，计数函数返回 0
                     val = count(n, k, type);
                     outArr[rowIdx][colStart + k] = val;
                     sumRow += val;

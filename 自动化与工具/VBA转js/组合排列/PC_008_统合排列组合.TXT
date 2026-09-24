@@ -21,7 +21,7 @@ Option Explicit
 '   Type 4: 排列放回   n^k           (元素可重复 · 镜像)
 '
 ' 数值约定（沿用 PC_007）：
-'   0 = 不可选择。不放回类型 k>n 时矩阵填 0（不再留空）；
+'   0 = 不可选择。任何类型 k>n 时矩阵填 0（不再留空）；
 '       放回类型 n=0 且 k>0 时同样不可选择，计数函数返回 0。
 '
 ' 提供 API：
@@ -269,8 +269,8 @@ End Function
 
 ' —— 组合放回 C(n+k-1,k)
 Public Function CountCombRepet(ByVal n As Long, ByVal k As Long) As Double
-    If k < 0 Or n < 1 Then
-        CountCombRepet = 0#            ' 0 = 不可选择（n=0 且 k>0）
+    If k < 0 Or k > n Or n < 1 Then
+        CountCombRepet = 0#            ' 0 = 不可选择（k > n 或 n=0 且 k>0）
         Exit Function
     End If
     If k = 0 Then
@@ -300,8 +300,8 @@ End Function
 
 ' —— 排列放回 n^k
 Public Function CountPermRepet(ByVal n As Long, ByVal k As Long) As Double
-    If k < 0 Then
-        CountPermRepet = 0#            ' 0 = 不可选择
+    If k < 0 Or k > n Then
+        CountPermRepet = 0#            ' 0 = 不可选择（k > n）
         Exit Function
     End If
     If k = 0 Then
@@ -363,7 +363,7 @@ Public Function EnumerateCombRepetIdx(ByVal m As Long, ByVal k As Long) As Varia
     Dim i As Long, count As Double
     Dim idx() As Long, brr() As Variant, cur() As Variant
     Dim done As Boolean, p As Long, outIndex As Long
-    If k < 1 Or m < 1 Then EnumerateCombRepetIdx = Empty: Exit Function
+    If k < 1 Or k > m Or m < 1 Then EnumerateCombRepetIdx = Empty: Exit Function   ' 0 = 不可选择（k > m）
     count = CombinationDD(m + k - 1, k)
     If count > MAX_ENUM Then EnumerateCombRepetIdx = Empty: Exit Function
     ReDim brr(1 To CLng(count))
@@ -436,7 +436,7 @@ Public Function EnumeratePermRepetIdx(ByVal m As Long, ByVal k As Long) As Varia
     Dim i As Long, kk As Double
     Dim idx() As Long, res() As Variant, result() As Variant
     Dim done As Boolean, R As Long
-    If k < 1 Or m < 1 Then EnumeratePermRepetIdx = Empty: Exit Function
+    If k < 1 Or k > m Or m < 1 Then EnumeratePermRepetIdx = Empty: Exit Function   ' 0 = 不可选择（k > m）
     kk = m ^ k
     If kk > MAX_ENUM Then EnumeratePermRepetIdx = Empty: Exit Function
     ReDim result(1 To CLng(kk))
@@ -515,8 +515,7 @@ Public Function 构建_排列组合四象限_矩阵(ByVal nMax As Long, ByVal ty
         ' k=1..nMax
         For k = 1 To nMax
             If typeNo = TYPE_REP_COMB Or typeNo = TYPE_REP_PERM Then
-                ' 放回类型：对所有 k 都有意义
-                ' n=0 且 k>0 时不可选择，计数函数返回 0
+                ' 放回类型：k > n 或 n=0 且 k>0 时不可选择，计数函数返回 0
                 val = CountByType(n, k, typeNo)
                 outArr(row, colStart + k) = val
                 sumRow = sumRow + val
