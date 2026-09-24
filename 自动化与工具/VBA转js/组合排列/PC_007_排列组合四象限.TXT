@@ -12,6 +12,10 @@ Option Explicit
 '   Type 3: 排列不放回 A(n, k) = n!/(n-k)!
 '   Type 4: 排列放回 n^k
 '
+' 数值约定：
+'   0 = 不可选择。不放回类型 k > n 时不可选择，矩阵中填 0（不再留空）；
+'       放回类型 n = 0 且 k > 0 时同样不可选择，计数函数返回 0。
+'
 ' 使用方式：
 '   1. 打开 WPS/Excel → Alt+F11 进入 VBA 编辑器
 '   2. 插入 → 模块
@@ -540,17 +544,18 @@ Public Function 构建_排列组合四象限_矩阵(ByVal nMax As Long, ByVal ty
         For k = 1 To nMax
             If typeNo = TYPE_REP_COMB Or typeNo = TYPE_REP_PERM Then
                 ' 放回类型：对所有 k 都有意义
+                ' n = 0 且 k > 0 时不可选择，计数函数返回 0
                 val = CountByType(n, k, typeNo)
                 outArr(row, colStart + k) = val
                 sumRow = sumRow + val
             Else
-                ' 不放回：k > n 时无意义
+                ' 不放回：k > n 时不可选择，填 0（不再留空）
                 If k <= n Then
                     val = CountByType(n, k, typeNo)
                     outArr(row, colStart + k) = val
                     sumRow = sumRow + val
                 Else
-                    outArr(row, colStart + k) = vbNullString
+                    outArr(row, colStart + k) = 0#   ' 0 = 不可选择（k > n）
                 End If
             End If
         Next k

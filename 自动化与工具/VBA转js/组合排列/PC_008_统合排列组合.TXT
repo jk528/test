@@ -1,0 +1,880 @@
+Attribute VB_Name = "PC_008_统合排列组合"
+Option Explicit
+
+' ============================================================
+' PC_008_统合排列组合.TXT
+' 统合多脚本优点的 VBA 范例（单一模块，无外部依赖）
+'
+' 统合来源：
+'   - 以 PC_007（排列组合四象限）为底本：四象限计数/矩阵/枚举主体
+'   - 参考 PC_001（三角）：元素“镜像/去镜像”的说法、工作表命名风格
+'   - 参考 PC_004（映射全排列）：单元格范围选择输入、二维数组行/列优先、
+'     元素与映射双列输出
+'   - 参考 PC_002（排列组合）：枚举生成支持“参照范围 + 数值
+'     (all / 单值 k / 区间 k1-k2)”的逻辑
+'   - 参考 PC_005（选择范围全排列）：范围选择输入的去空单元格选项
+'
+' 四象限定义（镜像说法沿用 PC_001）：
+'   Type 1: 组合不放回 C(n,k)        (元素不重复 · 去镜像)
+'   Type 2: 组合放回   C(n+k-1,k)    (元素可重复 · 去镜像)
+'   Type 3: 排列不放回 A(n,k)        (元素不重复 · 镜像)
+'   Type 4: 排列放回   n^k           (元素可重复 · 镜像)
+'
+' 数值约定（沿用 PC_007）：
+'   0 = 不可选择。不放回类型 k>n 时矩阵填 0（不再留空）；
+'       放回类型 n=0 且 k>0 时同样不可选择，计数函数返回 0。
+'
+' 提供 API：
+'   CountByType(n, k, type)                统一计数入口
+'   构建_排列组合四象限_矩阵(n, type)      矩阵：带表头二维数组
+'   EnumerateIdx(m, k, type)               枚举：基于索引生成具体列表
+'     （配合 RangeTo1DArrayOpt 可实现“元素 + 映射”双列输出）
+'
+' 入口宏：
+'   统合_排列组合_主菜单()   统一入口（选择功能）
+'   生成_四象限矩阵()        矩阵生成（N 数值输入）
+'   演示_单点查询()          单点查询（n、k 数值输入）
+'   演示_枚举生成_范围()     枚举生成（参照范围 + 数值）
+' ============================================================
+
+' —— 常量：象限类型
+Private Const TYPE_NOREP_COMB As Long = 1   ' 组合不放回
+Private Const TYPE_REP_COMB As Long = 2     ' 组合放回
+Private Const TYPE_NOREP_PERM As Long = 3   ' 排列不放回
+Private Const TYPE_REP_PERM As Long = 4     ' 排列放回
+
+Private Const MAX_ENUM As Long = 10000000   ' 枚举安全上限
+
+' ============================================================
+' 统一入口：功能主菜单
+' ============================================================
+Public Sub 统合_排列组合_主菜单()
+    Dim op As Variant
+    op = Application.InputBox( _
+        prompt:="请选择功能：" & vbCrLf & vbCrLf & _
+                "1 = 生成四象限矩阵（N 数值输入）" & vbCrLf & _
+                "2 = 单点查询（n、k 数值输入）" & vbCrLf & _
+                "3 = 枚举生成（参照范围 + 数值）" & vbCrLf & vbCrLf & _
+                "提示：类型均为 1=组合不放回 / 2=组合放回 / " & vbCrLf & _
+                "3=排列不放回 / 4=排列放回", _
+        Title:="PC8_统合排列组合", Default:="1", Type:=1)
+    If op = False Then Exit Sub
+    If Not IsNumeric(op) Or CLng(op) < 1 Or CLng(op) > 3 Then
+        MsgBox "请输入 1..3。", vbExclamation
+        Exit Sub
+    End If
+    Select Case CLng(op)
+        Case 1: Call 生成_四象限矩阵
+        Case 2: Call 演示_单点查询
+        Case 3: Call 演示_枚举生成_范围
+    End Select
+End Sub
+
+' ============================================================
+' 工具函数：数组与计数（移植自 PC_002）
+' ============================================================
+
+' 0基→1基一维数组（若非数组返回Empty）
+Public Function ToOneBased(ByVal Arr As Variant) As Variant
+    Dim i As Long, n As Long, result As Variant
+    If Not IsArray(Arr) Then
+        ToOneBased = Empty
+        Exit Function
+    End If
+    If LBound(Arr) = 1 Then
+        ToOneBased = Arr
+        Exit Function
+    End If
+    n = UBound(Arr) - LBound(Arr) + 1
+    ReDim result(1 To n)
+    For i = 1 To n
+        result(i) = Arr(LBound(Arr) + i - 1)
+    Next i
+    ToOneBased = result
+End Function
+
+' 拷贝 1 基一维数组（避免别名引用）
+Public Function Clone1D(ByVal a As Variant) As Variant
+    Dim i As Long, n As Long, b As Variant
+    If Not IsArray(a) Then
+        Clone1D = a
+        Exit Function
+    End If
+    n = UBound(a) - LBound(a) + 1
+    ReDim b(1 To n)
+    For i = 1 To n
+        b(i) = a(LBound(a) + i - 1)
+    Next i
+    Clone1D = b
+End Function
+
+' C(n, r) 使用 Double 安全计算（避免中间溢出）
+Public Function CombinationDD(ByVal n As Long, ByVal R As Long) As Double
+    Dim i As Long, res As Double
+    If R < 0 Or R > n Then CombinationDD = 0#: Exit Function
+    If R = 0 Or R = n Then CombinationDD = 1#: Exit Function
+    If R > n - R Then R = n - R
+    res = 1#
+    For i = 1 To R
+        res = res * (n - R + i) / i
+    Next i
+    CombinationDD = res
+End Function
+
+' P(m,n) = m*(m-1)*...*(m-n+1) 使用 Double 计算
+Public Function PermCount(ByVal m As Long, ByVal n As Long) As Double
+    Dim i As Long, res As Double
+    If n < 0 Or n > m Then PermCount = 0#: Exit Function
+    res = 1#
+    For i = 0 To n - 1
+        res = res * (m - i)
+    Next i
+    PermCount = res
+End Function
+
+' 一维嵌套数组 → 二维数组（便于写表）
+Public Function TransposeNestedTo2D(ByVal List As Variant) As Variant
+    Dim rows As Long, cols As Long, i As Long, j As Long
+    Dim item As Variant, outArr As Variant
+    If Not IsArray(List) Then
+        TransposeNestedTo2D = List
+        Exit Function
+    End If
+    rows = UBound(List) - LBound(List) + 1
+    If rows < 1 Then
+        TransposeNestedTo2D = List
+        Exit Function
+    End If
+    item = List(LBound(List))
+    If IsArray(item) Then
+        cols = UBound(item) - LBound(item) + 1
+    Else
+        cols = 1
+    End If
+    ReDim outArr(1 To rows, 1 To cols)
+    For i = 1 To rows
+        item = List(LBound(List) + i - 1)
+        If IsArray(item) Then
+            For j = 1 To cols
+                outArr(i, j) = item(LBound(item) + j - 1)
+            Next j
+        Else
+            outArr(i, 1) = item
+        End If
+    Next i
+    TransposeNestedTo2D = outArr
+End Function
+
+' 检查值是否为“空”（Empty/Null/空白字符串）—— 去空选项专用
+Private Function IsEmptyOrBlank(ByVal v As Variant) As Boolean
+    If IsEmpty(v) Then IsEmptyOrBlank = True: Exit Function
+    If IsNull(v) Then IsEmptyOrBlank = True: Exit Function
+    If VarType(v) = vbString Then
+        If Len(Trim$(v)) = 0 Then IsEmptyOrBlank = True
+    End If
+End Function
+
+' 从选区读取 1 基一维数组（参考 PC_002/PC_005）
+' 参数：rowMajor = True 按行优先 / False 按列优先（参考 PC_004）
+'       skipEmpty = True 去除空单元格（参考 PC_005）
+Public Function RangeTo1DArrayOpt(ByVal rng As Range, ByVal rowMajor As Boolean, _
+                                  ByVal skipEmpty As Boolean) As Variant
+    Dim src As Variant, result() As Variant, finalArr() As Variant
+    Dim i As Long, j As Long, idx As Long, m As Long, n As Long
+    Dim v As Variant, cnt As Long
+    If rng Is Nothing Then RangeTo1DArrayOpt = Empty: Exit Function
+
+    src = rng.Value
+    If Not IsArray(src) Then
+        ' 单单元格
+        If skipEmpty And IsEmptyOrBlank(src) Then
+            RangeTo1DArrayOpt = Empty
+        Else
+            ReDim finalArr(1 To 1)
+            finalArr(1) = src
+            RangeTo1DArrayOpt = finalArr
+        End If
+        Exit Function
+    End If
+
+    m = UBound(src, 1): n = UBound(src, 2)
+    ReDim result(1 To m * n)
+    idx = 1
+    If rowMajor Then
+        For i = 1 To m
+            For j = 1 To n
+                v = src(i, j)
+                If (Not skipEmpty) Or (Not IsEmptyOrBlank(v)) Then
+                    result(idx) = v: idx = idx + 1
+                End If
+            Next j
+        Next i
+    Else
+        For j = 1 To n
+            For i = 1 To m
+                v = src(i, j)
+                If (Not skipEmpty) Or (Not IsEmptyOrBlank(v)) Then
+                    result(idx) = v: idx = idx + 1
+                End If
+            Next j
+        Next i
+    End If
+
+    cnt = idx - 1
+    If cnt < 1 Then RangeTo1DArrayOpt = Empty: Exit Function
+    ReDim finalArr(1 To cnt)
+    For i = 1 To cnt
+        finalArr(i) = result(i)
+    Next i
+    RangeTo1DArrayOpt = finalArr
+End Function
+
+' 获取或创建工作表（命名风格参考 PC_001）
+Public Function GetOrInitWorksheet(ByVal Name As String) As Worksheet
+    Dim ws As Worksheet
+    On Error Resume Next
+    Set ws = ThisWorkbook.Worksheets(Name)
+    On Error GoTo 0
+    If ws Is Nothing Then
+        Set ws = ThisWorkbook.Worksheets.Add
+        On Error Resume Next
+        ws.Name = Name
+        On Error GoTo 0
+    End If
+    Set GetOrInitWorksheet = ws
+End Function
+
+' ============================================================
+' 计数函数（移植自 PC_007，0 = 不可选择约定）
+' ============================================================
+
+' —— 组合不放回 C(n,k)
+Public Function CountCombNoRepet(ByVal n As Long, ByVal k As Long) As Double
+    Dim res As Double, i As Long
+    If k < 0 Or k > n Then
+        CountCombNoRepet = 0#          ' 0 = 不可选择（k > n）
+        Exit Function
+    End If
+    If k = 0 Or k = n Then
+        CountCombNoRepet = 1#
+        Exit Function
+    End If
+    If k > n - k Then k = n - k        ' 对称性优化
+    res = 1#
+    For i = 1 To k
+        res = res * (n - k + i) / i
+    Next i
+    CountCombNoRepet = CDbl(CLng(res)) ' 修正浮点
+End Function
+
+' —— 组合放回 C(n+k-1,k)
+Public Function CountCombRepet(ByVal n As Long, ByVal k As Long) As Double
+    If k < 0 Or n < 1 Then
+        CountCombRepet = 0#            ' 0 = 不可选择（n=0 且 k>0）
+        Exit Function
+    End If
+    If k = 0 Then
+        CountCombRepet = 1#
+        Exit Function
+    End If
+    CountCombRepet = CountCombNoRepet(n + k - 1, k)
+End Function
+
+' —— 排列不放回 A(n,k)
+Public Function CountPermNoRepet(ByVal n As Long, ByVal k As Long) As Double
+    Dim res As Double, i As Long
+    If k < 0 Or k > n Then
+        CountPermNoRepet = 0#          ' 0 = 不可选择（k > n）
+        Exit Function
+    End If
+    If k = 0 Then
+        CountPermNoRepet = 1#
+        Exit Function
+    End If
+    res = 1#
+    For i = 0 To k - 1
+        res = res * (n - i)
+    Next i
+    CountPermNoRepet = res
+End Function
+
+' —— 排列放回 n^k
+Public Function CountPermRepet(ByVal n As Long, ByVal k As Long) As Double
+    If k < 0 Then
+        CountPermRepet = 0#            ' 0 = 不可选择
+        Exit Function
+    End If
+    If k = 0 Then
+        CountPermRepet = 1#
+        Exit Function
+    End If
+    CountPermRepet = n ^ k
+End Function
+
+' —— 统一计数入口
+Public Function CountByType(ByVal n As Long, ByVal k As Long, ByVal typeNo As Long) As Double
+    Select Case typeNo
+        Case TYPE_NOREP_COMB: CountByType = CountCombNoRepet(n, k)
+        Case TYPE_REP_COMB:   CountByType = CountCombRepet(n, k)
+        Case TYPE_NOREP_PERM: CountByType = CountPermNoRepet(n, k)
+        Case TYPE_REP_PERM:   CountByType = CountPermRepet(n, k)
+        Case Else:            CountByType = 0#
+    End Select
+End Function
+
+' ============================================================
+' 枚举函数（移植自 PC_002 排列组合）
+' 返回：一维嵌套数组，每项是长度为 k 的 1 基索引数组
+'       （基于索引 1..m 生成，便于输出“元素 + 映射”双列）
+' ============================================================
+
+' —— 集合不放回组合：C(m,k)
+Public Function EnumerateCombNoRepetIdx(ByVal m As Long, ByVal k As Long) As Variant
+    Dim count As Double, result() As Variant, res() As Variant
+    Dim outIndex As Long, i As Long
+    If k < 1 Or k > m Then EnumerateCombNoRepetIdx = Empty: Exit Function
+    count = CombinationDD(m, k)
+    If count > MAX_ENUM Then EnumerateCombNoRepetIdx = Empty: Exit Function
+    ReDim result(1 To CLng(count))
+    ReDim res(1 To k)
+    outIndex = 0
+    GenComb_NoRepet m, k, 1, 1, res, result, outIndex
+    EnumerateCombNoRepetIdx = result
+End Function
+
+Private Sub GenComb_NoRepet(ByVal m As Long, ByVal k As Long, ByVal startIdx As Long, _
+                            ByVal depth As Long, ByRef res() As Variant, _
+                            ByRef result() As Variant, ByRef outIndex As Long)
+    Dim i As Long, maxI As Long
+    If depth > k Then
+        outIndex = outIndex + 1
+        result(outIndex) = Clone1D(res)
+        Exit Sub
+    End If
+    maxI = m - (k - depth)
+    For i = startIdx To maxI
+        res(depth) = i
+        GenComb_NoRepet m, k, i + 1, depth + 1, res, result, outIndex
+    Next i
+End Sub
+
+' —— 集合放回组合：C(m+k-1,k) 非递减索引
+Public Function EnumerateCombRepetIdx(ByVal m As Long, ByVal k As Long) As Variant
+    Dim i As Long, count As Double
+    Dim idx() As Long, brr() As Variant, cur() As Variant
+    Dim done As Boolean, p As Long, outIndex As Long
+    If k < 1 Or m < 1 Then EnumerateCombRepetIdx = Empty: Exit Function
+    count = CombinationDD(m + k - 1, k)
+    If count > MAX_ENUM Then EnumerateCombRepetIdx = Empty: Exit Function
+    ReDim brr(1 To CLng(count))
+    ReDim idx(1 To k)
+    For i = 1 To k
+        idx(i) = 1
+    Next i
+    outIndex = 0
+    Do While Not done
+        ReDim cur(1 To k)
+        For i = 1 To k
+            cur(i) = idx(i)
+        Next i
+        outIndex = outIndex + 1
+        brr(outIndex) = Clone1D(cur)
+        p = k
+        Do While p >= 1
+            If idx(p) < m Then
+                idx(p) = idx(p) + 1
+                For i = p + 1 To k
+                    idx(i) = idx(p)
+                Next i
+                Exit Do
+            Else
+                p = p - 1
+            End If
+        Loop
+        If p = 0 Then done = True
+    Loop
+    EnumerateCombRepetIdx = brr
+End Function
+
+' —— 排列不放回：A(m,k) 索引不重复排列
+Public Function EnumeratePermNoRepetIdx(ByVal m As Long, ByVal k As Long) As Variant
+    Dim kk As Double
+    Dim used() As Boolean, res() As Variant, result() As Variant
+    Dim R As Long
+    If k < 1 Or k > m Then EnumeratePermNoRepetIdx = Empty: Exit Function
+    kk = PermCount(m, k)
+    If kk > MAX_ENUM Then EnumeratePermNoRepetIdx = Empty: Exit Function
+    ReDim result(1 To CLng(kk))
+    ReDim used(1 To m)
+    ReDim res(1 To k)
+    R = 0
+    SolverPermNoRepet m, k, used, res, 1, result, R
+    EnumeratePermNoRepetIdx = result
+End Function
+
+Private Sub SolverPermNoRepet(ByVal m As Long, ByVal k As Long, ByRef used() As Boolean, _
+                              ByRef res() As Variant, ByVal depth As Long, _
+                              ByRef result() As Variant, ByRef R As Long)
+    Dim i As Long
+    If depth > k Then
+        R = R + 1
+        result(R) = Clone1D(res)
+        Exit Sub
+    End If
+    For i = 1 To m
+        If Not used(i) Then
+            used(i) = True
+            res(depth) = i
+            SolverPermNoRepet m, k, used, res, depth + 1, result, R
+            used(i) = False
+        End If
+    Next i
+End Sub
+
+' —— 排列放回：m^k 有放回排列（顺序敏感）
+Public Function EnumeratePermRepetIdx(ByVal m As Long, ByVal k As Long) As Variant
+    Dim i As Long, kk As Double
+    Dim idx() As Long, res() As Variant, result() As Variant
+    Dim done As Boolean, R As Long
+    If k < 1 Or m < 1 Then EnumeratePermRepetIdx = Empty: Exit Function
+    kk = m ^ k
+    If kk > MAX_ENUM Then EnumeratePermRepetIdx = Empty: Exit Function
+    ReDim result(1 To CLng(kk))
+    ReDim idx(1 To k)
+    For i = 1 To k
+        idx(i) = 1
+    Next i
+    R = 0
+    Do While Not done
+        ReDim res(1 To k)
+        For i = 1 To k
+            res(i) = idx(i)
+        Next i
+        R = R + 1
+        result(R) = Clone1D(res)
+        i = k
+        Do While i >= 1
+            If idx(i) < m Then
+                idx(i) = idx(i) + 1
+                Exit Do
+            Else
+                idx(i) = 1
+                i = i - 1
+            End If
+        Loop
+        If i = 0 Then done = True
+    Loop
+    EnumeratePermRepetIdx = result
+End Function
+
+' —— 统一枚举入口：基于索引生成，返回一维嵌套数组（每项为 1 基索引数组）
+Public Function EnumerateIdx(ByVal m As Long, ByVal k As Long, ByVal typeNo As Long) As Variant
+    Select Case typeNo
+        Case TYPE_NOREP_COMB: EnumerateIdx = EnumerateCombNoRepetIdx(m, k)
+        Case TYPE_REP_COMB:   EnumerateIdx = EnumerateCombRepetIdx(m, k)
+        Case TYPE_NOREP_PERM: EnumerateIdx = EnumeratePermNoRepetIdx(m, k)
+        Case TYPE_REP_PERM:   EnumerateIdx = EnumeratePermRepetIdx(m, k)
+        Case Else:            EnumerateIdx = Empty
+    End Select
+End Function
+
+' ============================================================
+' 矩阵构建（移植自 PC_007，0 = 不可选择约定）
+' ============================================================
+
+' —— 构建排列组合四象限矩阵二维数组
+' 行：n = 0..nMax；列：k = 0..nMax
+Public Function 构建_排列组合四象限_矩阵(ByVal nMax As Long, ByVal typeNo As Long) As Variant
+    Dim rowsTotal As Long, colsTotal As Long
+    Dim outArr() As Variant
+    Dim colStart As Long
+    Dim n As Long, k As Long, row As Long
+    Dim sumRow As Double, val As Double
+
+    rowsTotal = nMax + 2
+    colsTotal = nMax + 3
+    colStart = 3
+    ReDim outArr(1 To rowsTotal, 1 To colsTotal)
+
+    ' 表头
+    outArr(1, 1) = "总和"
+    outArr(1, 2) = "总数"
+    For k = 0 To nMax
+        outArr(1, colStart + k) = "选" & k & "个"
+    Next k
+
+    row = 2
+    For n = 0 To nMax
+        outArr(row, 2) = n
+        sumRow = 0#
+
+        ' k=0: 恒为 1
+        outArr(row, colStart + 0) = 1#
+        sumRow = sumRow + 1#
+
+        ' k=1..nMax
+        For k = 1 To nMax
+            If typeNo = TYPE_REP_COMB Or typeNo = TYPE_REP_PERM Then
+                ' 放回类型：对所有 k 都有意义
+                ' n=0 且 k>0 时不可选择，计数函数返回 0
+                val = CountByType(n, k, typeNo)
+                outArr(row, colStart + k) = val
+                sumRow = sumRow + val
+            Else
+                ' 不放回：k > n 时不可选择，填 0（不再留空）
+                If k <= n Then
+                    val = CountByType(n, k, typeNo)
+                    outArr(row, colStart + k) = val
+                    sumRow = sumRow + val
+                Else
+                    outArr(row, colStart + k) = 0#   ' 0 = 不可选择（k > n）
+                End If
+            End If
+        Next k
+
+        outArr(row, 1) = sumRow
+        row = row + 1
+    Next n
+
+    构建_排列组合四象限_矩阵 = outArr
+End Function
+
+' ============================================================
+' 入口：矩阵生成（优化 InputBox 窗体，参考 PC_001 命名）
+' ============================================================
+Public Sub 生成_四象限矩阵()
+    Dim typeChoice As Variant, NInput As Variant
+    Dim typeInput As Long, n As Long
+    Dim ws As Worksheet, outArr As Variant
+    Dim maxVal As Double
+    Dim typesToGenerate() As Long
+    Dim t As Long
+    Dim cfgType As Long, sheetName As String
+
+    typeChoice = Application.InputBox(prompt:= _
+        "请选择类型：" & vbCrLf & vbCrLf & _
+        "1 = 组合不放回 C(n,k)      (元素不重复·去镜像)" & vbCrLf & _
+        "2 = 组合放回 C(n+k-1,k)    (元素可重复·去镜像)" & vbCrLf & _
+        "3 = 排列不放回 A(n,k)      (元素不重复·镜像)" & vbCrLf & _
+        "4 = 排列放回 n^k           (元素可重复·镜像)" & vbCrLf & _
+        "5 = 全部生成（all）" & vbCrLf & vbCrLf & _
+        "说明：矩阵中 0 = 不可选择（k>n 或 n=0 且 k>0）", _
+        Title:="PC8_矩阵生成-类型", Default:="5", Type:=1)
+    If typeChoice = False Then Exit Sub
+    If Not IsNumeric(typeChoice) Then
+        MsgBox "类型必须是 1..5 的整数。", vbExclamation
+        Exit Sub
+    End If
+    typeInput = CLng(typeChoice)
+    If typeInput < 1 Or typeInput > 5 Then
+        MsgBox "类型必须是 1..5 的整数。", vbExclamation
+        Exit Sub
+    End If
+
+    NInput = Application.InputBox(prompt:="请输入总数最大值 N（>=0）：", _
+        Title:="PC8_矩阵生成-N", Default:="10", Type:=1)
+    If NInput = False Then Exit Sub
+    If Not IsNumeric(NInput) Or CLng(NInput) < 0 Then
+        MsgBox "N 必须为 >= 0 的整数。", vbExclamation
+        Exit Sub
+    End If
+    n = CLng(NInput)
+
+    ' 大数预警
+    maxVal = CountByType(n, CLng(n / 2), TYPE_NOREP_COMB)
+    If maxVal > 1E+14 Then
+        If MsgBox("N=" & n & " 时部分值可能超出精确表示范围 (2^53)，" & vbCrLf & _
+                  "结果将出现浮点精度损失。" & vbCrLf & vbCrLf & _
+                  "是否继续？", vbYesNo + vbExclamation, "大数精度预警") <> vbYes Then Exit Sub
+    End If
+
+    If typeInput = 5 Then
+        ReDim typesToGenerate(1 To 4)
+        typesToGenerate(1) = 1: typesToGenerate(2) = 2
+        typesToGenerate(3) = 3: typesToGenerate(4) = 4
+    Else
+        ReDim typesToGenerate(1 To 1)
+        typesToGenerate(1) = typeInput
+    End If
+
+    For t = 1 To UBound(typesToGenerate)
+        cfgType = typesToGenerate(t)
+        sheetName = GetSheetName("四象限", cfgType)   ' 命名风格参考 PC_001
+
+        outArr = 构建_排列组合四象限_矩阵(n, cfgType)
+        Set ws = GetOrInitWorksheet(sheetName)
+        ws.Cells.Clear
+        ws.Range(ws.Cells(1, 1), ws.Cells(UBound(outArr, 1), UBound(outArr, 2))).Value = outArr
+        ws.Columns.AutoFit
+    Next t
+
+    MsgBox "已生成矩阵（N=0.." & n & "）。" & vbCrLf & _
+           "说明：矩阵中 0 = 不可选择。", vbInformation
+End Sub
+
+' ============================================================
+' 入口：单点查询（移植自 PC_007，输出带上“镜像”说法）
+' ============================================================
+Public Sub 演示_单点查询()
+    Dim nInput As Variant, kInput As Variant
+    Dim n As Long, k As Long
+    Dim msg As String
+
+    nInput = Application.InputBox(prompt:="请输入 n：", _
+        Title:="PC8_单点查询-n", Default:="5", Type:=1)
+    If nInput = False Then Exit Sub
+    If Not IsNumeric(nInput) Then
+        MsgBox "n 必须是整数", vbExclamation
+        Exit Sub
+    End If
+    n = CLng(nInput)
+
+    kInput = Application.InputBox(prompt:="请输入 k：", _
+        Title:="PC8_单点查询-k", Default:="2", Type:=1)
+    If kInput = False Then Exit Sub
+    If Not IsNumeric(kInput) Then
+        MsgBox "k 必须是整数", vbExclamation
+        Exit Sub
+    End If
+    k = CLng(kInput)
+
+    msg = "n=" & n & ", k=" & k & vbCrLf & vbCrLf
+    msg = msg & "组合不放回 C(n,k)   (去镜像) = " & CountCombNoRepet(n, k) & vbCrLf
+    msg = msg & "组合放回 C(n+k-1,k) (去镜像) = " & CountCombRepet(n, k) & vbCrLf
+    msg = msg & "排列不放回 A(n,k)   (镜像)   = " & CountPermNoRepet(n, k) & vbCrLf
+    msg = msg & "排列放回 n^k        (镜像)   = " & CountPermRepet(n, k) & vbCrLf & vbCrLf
+    msg = msg & "说明：0 = 不可选择（k>n 或 n=0 且 k>0）"
+
+    MsgBox msg, vbInformation, "PC8_排列组合单点查询"
+End Sub
+
+' ============================================================
+' 入口：枚举生成（参照范围 + 数值）
+' 流程：选择范围 → 行/列优先 → 去空选项 → 选择类型 → all/k/k1-k2
+' 输出：每个 k 一个数据块：序号 + 元素列 + 映射列（参考 PC_004）
+' ============================================================
+Public Sub 演示_枚举生成_范围()
+    Dim selectedRange As Range
+    Dim Arr As Variant
+    Dim rowMajor As Boolean, skipEmpty As Boolean
+    Dim typeInput As Long
+    Dim kRangeInput As String
+    Dim kStart As Long, kEnd As Long, m As Long
+    Dim ws As Worksheet, sheetName As String
+    Dim k As Long, i As Long, j As Long
+    Dim res As Variant, item As Variant
+    Dim cnt As Long, idxv As Long
+    Dim out2D() As Variant
+    Dim blockRow As Long
+    Dim totalItems As Double
+    Dim lm As Variant, sk As Variant, tp As Variant
+    Dim expect As Double
+
+    ' —— 1. 单元格范围选择输入（参考 PC_004/PC_002）
+    On Error Resume Next
+    Set selectedRange = Application.InputBox( _
+        prompt:="请选择数据区域（支持单格、单行、单列或矩形二维区域）：", _
+        Title:="PC8_枚举生成-选择范围", Type:=8)
+    On Error GoTo 0
+    If selectedRange Is Nothing Then Exit Sub
+
+    ' —— 2. 二维区域时询问“行优先 / 列优先”（参考 PC_004）
+    rowMajor = True
+    If selectedRange.Rows.Count > 1 And selectedRange.Columns.Count > 1 Then
+        lm = Application.InputBox( _
+            prompt:="选择范围是 " & selectedRange.Rows.Count & " 行 × " & _
+                    selectedRange.Columns.Count & " 列。" & vbCrLf & vbCrLf & _
+                    "二维数组展开方式：" & vbCrLf & _
+                    "1 = 按行优先（逐行读取）" & vbCrLf & _
+                    "2 = 按列优先（逐列读取）", _
+            Title:="PC8_枚举生成-展开方式", Default:="1", Type:=1)
+        If lm = False Then Exit Sub
+        If Not IsNumeric(lm) Or (CLng(lm) <> 1 And CLng(lm) <> 2) Then
+            MsgBox "请输入 1 或 2。", vbExclamation
+            Exit Sub
+        End If
+        rowMajor = (CLng(lm) = 1)
+    End If
+
+    ' —— 3. 是否去除空单元格（参考 PC_005）
+    sk = Application.InputBox( _
+        prompt:="是否去除选择范围内的空单元格？" & vbCrLf & vbCrLf & _
+                "1 = 去除空单元格（空单元格不参与计算）" & vbCrLf & _
+                "2 = 保留空单元格（空字符串也算一个元素）", _
+        Title:="PC8_枚举生成-去空选项", Default:="1", Type:=1)
+    If sk = False Then Exit Sub
+    If Not IsNumeric(sk) Or (CLng(sk) <> 1 And CLng(sk) <> 2) Then
+        MsgBox "请输入 1 或 2。", vbExclamation
+        Exit Sub
+    End If
+    skipEmpty = (CLng(sk) = 1)
+
+    ' —— 4. 扁平化为 1 基一维数组
+    Arr = RangeTo1DArrayOpt(selectedRange, rowMajor, skipEmpty)
+    If Not IsArray(Arr) Then
+        MsgBox "选择区域内无有效数据（可能全部为空）。", vbExclamation
+        Exit Sub
+    End If
+    m = UBound(Arr) - LBound(Arr) + 1
+
+    ' —— 5. 选择类型（镜像说法沿用 PC_001）
+    tp = Application.InputBox( _
+        prompt:="请选择类型：" & vbCrLf & vbCrLf & _
+                "1 = 组合不放回 C(m,k)      (元素不重复·去镜像)" & vbCrLf & _
+                "2 = 组合放回 C(m+k-1,k)    (元素可重复·去镜像)" & vbCrLf & _
+                "3 = 排列不放回 A(m,k)      (元素不重复·镜像)" & vbCrLf & _
+                "4 = 排列放回 m^k           (元素可重复·镜像)" & vbCrLf & vbCrLf & _
+                "有效元素数 m = " & m, _
+        Title:="PC8_枚举生成-类型", Default:="1", Type:=1)
+    If tp = False Then Exit Sub
+    If Not IsNumeric(tp) Or CLng(tp) < 1 Or CLng(tp) > 4 Then
+        MsgBox "类型必须是 1..4。", vbExclamation
+        Exit Sub
+    End If
+    typeInput = CLng(tp)
+
+    ' —— 6. 组合长度：all / 单值 k / 区间 k1-k2（参考 PC_002）
+    kRangeInput = CStr(Application.InputBox( _
+        prompt:="组合长度：" & vbCrLf & _
+                "all      = 全部（1.." & m & "）" & vbCrLf & _
+                "单值 k   = 只生成 k 个" & vbCrLf & _
+                "k1-k2    = 区间内全部", _
+        Title:="PC8_枚举生成-长度", Default:="all", Type:=2))
+    If kRangeInput = "False" Then Exit Sub   ' 用户取消
+    If Len(kRangeInput) = 0 Then Exit Sub
+    If Not ParseComboRange(kRangeInput, m, kStart, kEnd) Then
+        MsgBox "组合长度输入非法，请输入 all、单值k或区间k1-k2（范围：1.." & m & "）。", vbExclamation
+        Exit Sub
+    End If
+
+    ' —— 7. 输出工作表（命名风格参考 PC_001/PC_002）
+    sheetName = GetSheetName("枚举", typeInput)
+    Set ws = GetOrInitWorksheet(sheetName)
+    ws.Cells.Clear
+    ws.Range("A1:H1").Value = Array("功能", "输入", "类型", "k范围", "行/列", "去空", "有效元素", "总项数")
+
+    ' 写入汇总信息
+    ws.Cells(2, 1).Value = "枚举生成（参照范围+数值）"
+    ws.Cells(2, 2).Value = selectedRange.Address
+    ws.Cells(2, 3).Value = GetTypeText(typeInput)
+    ws.Cells(2, 4).Value = kRangeInput
+    ws.Cells(2, 5).Value = IIf(rowMajor, "行优先", "列优先")
+    ws.Cells(2, 6).Value = IIf(skipEmpty, "去空", "保留空")
+    ws.Cells(2, 7).Value = m
+    ws.Cells(2, 8).Value = "计算中…"
+
+    blockRow = 4
+    totalItems = 0#
+    For k = kStart To kEnd
+        ' 数量上限检查
+        expect = CountByType(m, k, typeInput)
+        If expect > MAX_ENUM Then
+            ws.Cells(blockRow, 1).Value = "== k = " & k & " | 数量 " & Format(expect, "#,##0") & " 超过上限 " & MAX_ENUM & "，已跳过 =="
+            blockRow = blockRow + 1
+        Else
+            ' 基于索引生成
+            res = EnumerateIdx(m, k, typeInput)
+            If IsArray(res) Then
+                cnt = UBound(res) - LBound(res) + 1
+                totalItems = totalItems + cnt
+
+                ' 块标题
+                ws.Cells(blockRow, 1).Value = "== k = " & k & " | 类型 " & GetTypeText(typeInput) & " | 项数 " & cnt & " =="
+                blockRow = blockRow + 1
+
+                ' 表头：序号 + 元素列 + 映射列（参考 PC_004）
+                ws.Cells(blockRow, 1).Value = "序号"
+                For j = 1 To k
+                    ws.Cells(blockRow, 1 + j).Value = "元素" & j
+                    ws.Cells(blockRow, 1 + k + j).Value = "映射" & j
+                Next j
+                blockRow = blockRow + 1
+
+                ' 数据块：元素 = Arr(索引)，映射 = 索引
+                ReDim out2D(1 To cnt, 1 To 2 * k + 1)
+                For i = 1 To cnt
+                    item = res(LBound(res) + i - 1)
+                    out2D(i, 1) = i
+                    For j = 1 To k
+                        idxv = CLng(item(LBound(item) + j - 1))
+                        out2D(i, 1 + j) = Arr(LBound(Arr) + idxv - 1)
+                        out2D(i, 1 + k + j) = idxv
+                    Next j
+                Next i
+                ws.Range(ws.Cells(blockRow, 1), ws.Cells(blockRow + cnt - 1, 2 * k + 1)).Value = out2D
+                blockRow = blockRow + cnt + 1   ' 块后留一空行
+            Else
+                ws.Cells(blockRow, 1).Value = "== k = " & k & " | 无法生成（参数非法或超出上限） =="
+                blockRow = blockRow + 1
+            End If
+        End If
+    Next k
+
+    ws.Cells(2, 8).Value = Format(totalItems, "#,##0")
+    ws.Columns.AutoFit
+    MsgBox "已生成 " & Format(totalItems, "#,##0") & " 条结果到工作表【" & sheetName & "】。" & vbCrLf & _
+           "范围：k = " & kStart & " - " & kEnd & "；类型：" & GetTypeText(typeInput) & vbCrLf & _
+           "展开：" & IIf(rowMajor, "行优先", "列优先") & "；" & IIf(skipEmpty, "已去空", "保留空") & vbCrLf & _
+           "输出格式：序号 + 元素 + 映射（参考 PC_004）", vbInformation
+End Sub
+
+' ============================================================
+' 工具：类型文本 / 工作表命名 / 范围解析
+' ============================================================
+
+' —— 类型中文说明（镜像说法沿用 PC_001）
+Private Function GetTypeText(ByVal typeNo As Long) As String
+    Select Case typeNo
+        Case TYPE_NOREP_COMB: GetTypeText = "组合不放回 C(n,k)"
+        Case TYPE_REP_COMB:   GetTypeText = "组合放回 C(n+k-1,k)"
+        Case TYPE_NOREP_PERM: GetTypeText = "排列不放回 A(n,k)"
+        Case TYPE_REP_PERM:   GetTypeText = "排列放回 n^k"
+        Case Else:            GetTypeText = "未知类型"
+    End Select
+End Function
+
+' —— 工作表命名（风格参考 PC_001：前缀_类型_公式）
+Private Function GetSheetName(ByVal prefix As String, ByVal typeNo As Long) As String
+    Select Case typeNo
+        Case TYPE_NOREP_COMB: GetSheetName = prefix & "_组合不放回_Cnk"
+        Case TYPE_REP_COMB:   GetSheetName = prefix & "_组合放回_Cnk"
+        Case TYPE_NOREP_PERM: GetSheetName = prefix & "_排列不放回_Ank"
+        Case TYPE_REP_PERM:   GetSheetName = prefix & "_排列放回_nk"
+        Case Else:            GetSheetName = prefix & "_未知"
+    End Select
+End Function
+
+' —— 解析组合长度输入：all / 单值 k / 区间 k1-k2（移植自 PC_002）
+Private Function ParseComboRange(ByVal s As String, ByVal n As Long, _
+                                 ByRef kStart As Long, ByRef kEnd As Long) As Boolean
+    Dim t As String, p() As String
+    s = Trim$(s)
+    If Len(s) = 0 Then ParseComboRange = False: Exit Function
+    t = LCase$(s)
+    t = Replace(t, "，", "-")
+    t = Replace(t, "；", "-")
+    t = Replace(t, " ", "")
+
+    If t = "all" Then
+        kStart = 1: kEnd = n
+        ParseComboRange = True
+        Exit Function
+    End If
+
+    If InStr(t, "-") > 0 Then
+        p = Split(t, "-")
+        If UBound(p) <> 1 Then ParseComboRange = False: Exit Function
+        If Not IsNumeric(p(0)) Or Not IsNumeric(p(1)) Then ParseComboRange = False: Exit Function
+        kStart = CLng(p(0)): kEnd = CLng(p(1))
+    Else
+        If Not IsNumeric(t) Then ParseComboRange = False: Exit Function
+        kStart = CLng(t): kEnd = CLng(t)
+    End If
+
+    If kStart < 1 Or kEnd < 1 Or kStart > kEnd Or kEnd > n Then
+        ParseComboRange = False
+    Else
+        ParseComboRange = True
+    End If
+    Exit Function
+End Function

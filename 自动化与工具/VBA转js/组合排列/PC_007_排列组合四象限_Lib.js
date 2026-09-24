@@ -8,6 +8,10 @@
 //   Type 3: 排列不放回 A(n, k) = n!/(n-k)! 元素不重复，计顺序
 //   Type 4: 排列放回 n^k                元素可重复，计顺序
 //
+// 数值约定：
+//   0 = 不可选择。不放回类型 k > n 时不可选择，矩阵中填 0（不再留空）；
+//       放回类型 n = 0 且 k > 0 时同样不可选择，计数函数返回 0。
+//
 // ======================== 引入方式 ========================
 // 方式1（WPS 宏）：将本文件代码粘贴到调用脚本顶部；或通过宏属性引用
 // 方式2（Node.js）：const PC = require('./PC_007_排列组合四象限_Lib.js');
@@ -292,17 +296,18 @@
                 var val;
                 if (type === TYPE.REP_COMB || type === TYPE.REP_PERM) {
                     // 放回类型：对所有 k 都有意义
+                    // n=0 且 k>0 时不可选择，计数函数返回 0
                     val = count(n, k, type);
                     outArr[rowIdx][colStart + k] = val;
                     sumRow += val;
                 } else {
-                    // 不放回：k > n 时无意义，留空
+                    // 不放回：k > n 时不可选择，填 0（不再留空）
                     if (k <= n) {
                         val = count(n, k, type);
                         outArr[rowIdx][colStart + k] = val;
                         sumRow += val;
                     } else {
-                        outArr[rowIdx][colStart + k] = "";
+                        outArr[rowIdx][colStart + k] = 0;   // 0 = 不可选择（k > n）
                     }
                 }
             }
