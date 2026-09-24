@@ -105,8 +105,8 @@ Public Function CountPermRepet(ByVal n As Long, ByVal k As Long) As Double
 End Function
 
 ' —— 统一计数入口
-Public Function CountByType(ByVal n As Long, ByVal k As Long, ByVal type As Long) As Double
-    Select Case type
+Public Function CountByType(ByVal n As Long, ByVal k As Long, ByVal typeNo As Long) As Double
+    Select Case typeNo
         Case TYPE_NOREP_COMB: CountByType = CountCombNoRepet(n, k)
         Case TYPE_REP_COMB:   CountByType = CountCombRepet(n, k)
         Case TYPE_NOREP_PERM: CountByType = CountPermNoRepet(n, k)
@@ -122,7 +122,10 @@ Public Sub 生成_排列组合四象限矩阵()
     Dim typeChoice As Variant, NInput As Variant
     Dim typeInput As Long, n As Long
     Dim ws As Worksheet, outArr As Variant
-    Dim sheetName As String
+    Dim maxVal As Double
+    Dim typesToGenerate() As Long
+    Dim t As Long
+    Dim cfgType As Long, cfgName As String
 
     typeChoice = Application.InputBox(prompt:= _
         "请选择类型：" & vbCrLf & _
@@ -153,16 +156,12 @@ Public Sub 生成_排列组合四象限矩阵()
     n = CLng(NInput)
 
     ' 大数预警
-    Dim maxVal As Double
     maxVal = CountByType(n, CLng(n / 2), TYPE_NOREP_COMB)
     If maxVal > 1E+14 Then
         If MsgBox("N=" & n & " 时部分值可能超出精确表示范围 (2^53)，" & vbCrLf & _
                   "结果将出现浮点精度损失。" & vbCrLf & vbCrLf & _
                   "是否继续？", vbYesNo + vbExclamation, "大数精度预警") <> vbYes Then Exit Sub
     End If
-
-    Dim typesToGenerate() As Long
-    Dim t As Long
 
     If typeInput = 5 Then
         ReDim typesToGenerate(1 To 4)
@@ -174,7 +173,6 @@ Public Sub 生成_排列组合四象限矩阵()
     End If
 
     For t = 1 To UBound(typesToGenerate)
-        Dim cfgType As Long, cfgName As String
         cfgType = typesToGenerate(t)
         cfgName = GetTypeName(cfgType)
 
@@ -197,7 +195,6 @@ End Sub
 Public Function EnumerateCombNoRepet(ByVal arr As Variant, ByVal k As Long) As Variant
     Dim n As Long, total As Long
     Dim result() As Variant
-    Dim usedArr() As Boolean
     Dim resArr() As Long
     Dim idx As Long
 
@@ -363,8 +360,8 @@ Public Function EnumeratePermRepet(ByVal arr As Variant, ByVal k As Long) As Var
 End Function
 
 ' —— 统一枚举入口
-Public Function EnumerateByType(ByVal arr As Variant, ByVal k As Long, ByVal type As Long) As Variant
-    Select Case type
+Public Function EnumerateByType(ByVal arr As Variant, ByVal k As Long, ByVal typeNo As Long) As Variant
+    Select Case typeNo
         Case TYPE_NOREP_COMB: EnumerateByType = EnumerateCombNoRepet(arr, k)
         Case TYPE_REP_COMB:   EnumerateByType = EnumerateCombRepet(arr, k)
         Case TYPE_NOREP_PERM: EnumerateByType = EnumeratePermNoRepet(arr, k)
@@ -412,13 +409,18 @@ Public Sub 演示_枚举生成()
     Dim arr() As Variant, result As Variant
     Dim n As Long, i As Long, j As Long
     Dim ws As Worksheet
+    Dim raw() As String, item As String
+    Dim k As Long
+    Dim total As Double
+    Dim rowCount As Long
+    Dim header() As Variant
+    Dim rowData() As Variant
 
     dataInput = Application.InputBox(prompt:="请输入元素列表（逗号分隔）：" & vbCrLf & "例如: A,B,C,D", _
         Title:="枚举生成-元素", Default:="A,B,C", Type:=2)
     If dataInput = False Then Exit Sub
 
     ' 解析字符串数组
-    Dim raw() As String, item As String
     raw = Split(CStr(dataInput), ",")
     n = 0
     For i = 0 To UBound(raw)
@@ -441,7 +443,6 @@ Public Sub 演示_枚举生成()
         MsgBox "k 必须是整数", vbExclamation
         Exit Sub
     End If
-    Dim k As Long
     k = CLng(kInput)
 
     typeInput = Application.InputBox(prompt:= _
@@ -464,7 +465,6 @@ Public Sub 演示_枚举生成()
 
     result = EnumerateByType(arr, k, typeInput)
     If IsEmpty(result) Then
-        Dim total As Double
         total = CountByType(n, k, typeInput)
         If total > MAX_ENUM Then
             MsgBox "结果数量 = " & total & " 超过上限 " & MAX_ENUM & "，无法枚举。", vbExclamation, "数量过大"
@@ -474,14 +474,12 @@ Public Sub 演示_枚举生成()
         Exit Sub
     End If
 
-    Dim rowCount As Long
     rowCount = UBound(result, 1) - LBound(result, 1) + 1
 
     Set ws = GetOrInitWorksheet("枚举结果")
     ws.Cells.Clear
 
     ' 表头
-    Dim header() As Variant
     ReDim header(1 To k + 1)
     For i = 1 To k
         header(i) = "第" & i & "位"
@@ -490,7 +488,6 @@ Public Sub 演示_枚举生成()
     ws.Range(ws.Cells(1, 1), ws.Cells(1, k + 1)).Value = header
 
     ' 数据
-    Dim rowData() As Variant
     ReDim rowData(1 To rowCount, 1 To k + 1)
     For i = 1 To rowCount
         For j = 1 To k
@@ -511,7 +508,7 @@ End Sub
 
 ' —— 构建排列组合四象限矩阵二维数组
 ' 行：n = 0..nMax；列：k = 0..nMax
-Public Function 构建_排列组合四象限_矩阵(ByVal nMax As Long, ByVal type As Long) As Variant
+Public Function 构建_排列组合四象限_矩阵(ByVal nMax As Long, ByVal typeNo As Long) As Variant
     Dim rowsTotal As Long, colsTotal As Long
     Dim outArr() As Variant
     Dim colStart As Long
@@ -541,15 +538,15 @@ Public Function 构建_排列组合四象限_矩阵(ByVal nMax As Long, ByVal ty
 
         ' k=1..nMax
         For k = 1 To nMax
-            If type = TYPE_REP_COMB Or type = TYPE_REP_PERM Then
+            If typeNo = TYPE_REP_COMB Or typeNo = TYPE_REP_PERM Then
                 ' 放回类型：对所有 k 都有意义
-                val = CountByType(n, k, type)
+                val = CountByType(n, k, typeNo)
                 outArr(row, colStart + k) = val
                 sumRow = sumRow + val
             Else
                 ' 不放回：k > n 时无意义
                 If k <= n Then
-                    val = CountByType(n, k, type)
+                    val = CountByType(n, k, typeNo)
                     outArr(row, colStart + k) = val
                     sumRow = sumRow + val
                 Else
@@ -570,8 +567,8 @@ End Function
 ' ============================================================
 
 ' —— 获取类型中文名
-Private Function GetTypeName(ByVal type As Long) As String
-    Select Case type
+Private Function GetTypeName(ByVal typeNo As Long) As String
+    Select Case typeNo
         Case TYPE_NOREP_COMB: GetTypeName = "排列组合_组合不放回_C(n,k)"
         Case TYPE_REP_COMB:   GetTypeName = "排列组合_组合放回_C(n+k-1,k)"
         Case TYPE_NOREP_PERM: GetTypeName = "排列组合_排列不放回_A(n,k)"
@@ -597,9 +594,8 @@ End Function
 Private Sub RecCombNoRepet(ByVal arr As Variant, ByVal arrBase As Long, ByVal n As Long, _
                            ByVal k As Long, ByVal depth As Long, ByRef resArr() As Long, _
                            ByRef result() As Variant, ByRef idx As Long)
-    Dim i As Long
+    Dim i As Long, j As Long
     If depth > k Then
-        Dim j As Long
         For j = 1 To k
             result(idx, j) = arr(arrBase + resArr(j) - 1)
         Next j
