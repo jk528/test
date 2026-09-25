@@ -76,14 +76,14 @@ Private Sub InitRegexPatterns()
     ' 1. 标准中文（第N章/回/节/卷，含中文数字，含〇/○，含大写/繁体数字壹贰…萬，含全角数字）
     g_regexCount = g_regexCount + 1
     g_regexNames(g_regexCount) = "标准中文（第N章/回/节/卷，含中文数字含〇含大写）"
-    g_regexPatterns(g_regexCount) = "^[ \t　]*第([0-9０-９一二三四五六七八九十百千万亿億零〇○两兩壹貳贰叁參肆伍陸陆柒捌玖拾佰仟廿卅卌皕萬]+)(章|回|节|卷)(?:[ \t　]+(.*))?$"
+    g_regexPatterns(g_regexCount) = "^[ \t　]*第([0-9０-９一二三四五六七八九十百千万亿億零〇○两兩壹貳贰叁參肆伍陸陆柒捌玖拾佰仟廿卅卌皕萬]+)(章|回|节|卷)(?:[ \t　：:]+(.*))?$"
     g_regexUnitGroups(g_regexCount) = 1    ' SubMatches(1) = 单位词
     g_regexDefaultUnits(g_regexCount) = "章"
 
     ' 2. 纯阿拉伯数字（第N章/回/节/卷，含全角数字）
     g_regexCount = g_regexCount + 1
     g_regexNames(g_regexCount) = "纯阿拉伯数字（第N章/回/节/卷）"
-    g_regexPatterns(g_regexCount) = "^[ \t　]*第([0-9０-９]+)(章|回|节|卷)(?:[ \t　]+(.*))?$"
+    g_regexPatterns(g_regexCount) = "^[ \t　]*第([0-9０-９]+)(章|回|节|卷)(?:[ \t　：:]+(.*))?$"
     g_regexUnitGroups(g_regexCount) = 1
     g_regexDefaultUnits(g_regexCount) = "章"
 
@@ -97,35 +97,35 @@ Private Sub InitRegexPatterns()
     ' 4. 序章/楔子/番外（无章号）
     g_regexCount = g_regexCount + 1
     g_regexNames(g_regexCount) = "序章/楔子/番外（无章号）"
-    g_regexPatterns(g_regexCount) = "^[ \t　]*(序章|楔子|尾声|番外|引子|后记|终章|序言|前言)(?:[ \t　]+(.*))?$"
+    g_regexPatterns(g_regexCount) = "^[ \t　]*(序章|楔子|尾声|番外|引子|后记|终章|序言|前言)(?:[ \t　：:]+(.*))?$"
     g_regexUnitGroups(g_regexCount) = -1
     g_regexDefaultUnits(g_regexCount) = "章"
 
     ' 5. 数字+标题（无"第"字，如 1章 标题）
     g_regexCount = g_regexCount + 1
     g_regexNames(g_regexCount) = "数字+标题（无""第""字，如 1章 标题）"
-    g_regexPatterns(g_regexCount) = "^[ \t　]*([0-9０-９]+)(章|回|节|卷)(?:[ \t　]+(.*))?$"
+    g_regexPatterns(g_regexCount) = "^[ \t　]*([0-9０-９]+)(章|回|节|卷)(?:[ \t　：:]+(.*))?$"
     g_regexUnitGroups(g_regexCount) = 1
     g_regexDefaultUnits(g_regexCount) = "章"
 
     ' 6. 精简中文（仅章节，含〇，限1-7字）—— 参考清洁工具正则
     g_regexCount = g_regexCount + 1
     g_regexNames(g_regexCount) = "精简中文（仅章节，含〇，限1-7字）"
-    g_regexPatterns(g_regexCount) = "^[ \t　]*第([零〇○一二三四五六七八九十百千两兩]{1,7})(章|节)(?:[ \t　]+(.*))?$"
+    g_regexPatterns(g_regexCount) = "^[ \t　]*第([零〇○一二三四五六七八九十百千两兩]{1,7})(章|节)(?:[ \t　：:]+(.*))?$"
     g_regexUnitGroups(g_regexCount) = 1
     g_regexDefaultUnits(g_regexCount) = "章"
 
     ' 7. 宽松匹配（第+任意内容+章/回/节/卷）—— 适配非标准格式
     g_regexCount = g_regexCount + 1
     g_regexNames(g_regexCount) = "宽松匹配（第+任意内容+章/回/节/卷）"
-    g_regexPatterns(g_regexCount) = "^[ \t　]*第(.+?)(章|回|节|卷)(?:[ \t　]+(.*))?$"
+    g_regexPatterns(g_regexCount) = "^[ \t　]*第(.+?)(章|回|节|卷)(?:[ \t　：:]+(.*))?$"
     g_regexUnitGroups(g_regexCount) = 1
     g_regexDefaultUnits(g_regexCount) = "章"
 
     ' 8. 纯数字起始（3-4位数字开头，如 001 标题）
     g_regexCount = g_regexCount + 1
     g_regexNames(g_regexCount) = "纯数字起始（3-4位数字开头，如 001 标题）"
-    g_regexPatterns(g_regexCount) = "^[ \t　]*([0-9０-９]{3,4})(?:[ \t　]+(.*))?$"
+    g_regexPatterns(g_regexCount) = "^[ \t　]*([0-9０-９]{3,4})(?:[ \t　：:]+(.*))?$"
     g_regexUnitGroups(g_regexCount) = -1   ' 无单位组
     g_regexDefaultUnits(g_regexCount) = "章"
 
@@ -167,7 +167,8 @@ Private Function SelectRegexPattern() As Boolean
         Exit Function
     End If
 
-    ' 解析多选输入（逗号或空格分隔）
+    ' 解析多选输入（逗号或空格分隔；先归一化全角分隔符/全角数字）
+    inputVal = NormalizeSeparators(inputVal)
     inputVal = Replace(Trim(inputVal), " ", ",")
     Do While InStr(inputVal, ",,") > 0
         inputVal = Replace(inputVal, ",,", ",")
@@ -604,6 +605,7 @@ Public Sub 拆分TXT()
                               "  100,2     同时合并两者", _
                               "清洁模式", "100,1")
         If StrPtr(cleanInput) = 0 Then Exit Sub
+        cleanInput = NormalizeSeparators(cleanInput)
         cleanParts = Split(Trim(cleanInput), ",")
         If UBound(cleanParts) > 1 Then
             MsgBox "格式错误，请输入 N 或 N,flag", vbExclamation, "提示"
@@ -647,6 +649,7 @@ Public Sub 拆分TXT()
         chunkStr = InputBox(prompt, "聚合拆分 - 输入格式", "40,3")
 
         If StrPtr(chunkStr) = 0 Then Exit Sub   ' 用户取消
+        chunkStr = NormalizeSeparators(chunkStr)
         If Len(Trim(chunkStr)) = 0 Then
             MsgBox "未输入格式。", vbExclamation, "提示"
             Exit Sub
@@ -1156,7 +1159,7 @@ Private Sub ScanChapters(lines() As String, ByVal lineCount As Long, _
         ReDim g_selPatterns(0 To 0)
         ReDim g_selUnitGroups(0 To 0)
         ReDim g_selDefaultUnits(0 To 0)
-        g_selPatterns(0) = "^[ \t　]*第([0-9０-９一二三四五六七八九十百千万亿億零〇○两兩壹貳贰叁參肆伍陸陆柒捌玖拾佰仟廿卅卌皕萬]+)(章|回|节|卷)(?:[ \t　]+(.*))?$"
+        g_selPatterns(0) = "^[ \t　]*第([0-9０-９一二三四五六七八九十百千万亿億零〇○两兩壹貳贰叁參肆伍陸陆柒捌玖拾佰仟廿卅卌皕萬]+)(章|回|节|卷)(?:[ \t　：:]+(.*))?$"
         g_selUnitGroups(0) = 1
         g_selDefaultUnits(0) = "章"
         g_selCount = 1
@@ -1426,6 +1429,31 @@ NextPart:
         groupCount = groupCount + 1
     End If
     ParseGroups = ""
+End Function
+
+'------------------------------------------------------------------------------
+' 归一化用户输入的全角分隔符与全角数字为半角（用于序号/参数/聚合格式解析）
+'   - 全角逗号 ，→ ,   全角竖线 ｜→ |   全角空格 　→ 空格
+'   - 全角数字 ０-９ → 0-9
+'   注意：不用于自定义正则/单位词，避免破坏其中故意保留的全角字符
+'------------------------------------------------------------------------------
+Private Function NormalizeSeparators(ByVal s As String) As String
+    Dim r As String
+    r = s
+    r = Replace(r, "，", ",")        ' 全角逗号 U+FF0C
+    r = Replace(r, "｜", "|")        ' 全角竖线 U+FF5C
+    r = Replace(r, "　", " ")        ' 全角空格 U+3000
+    r = Replace(r, "０", "0")
+    r = Replace(r, "１", "1")
+    r = Replace(r, "２", "2")
+    r = Replace(r, "３", "3")
+    r = Replace(r, "４", "4")
+    r = Replace(r, "５", "5")
+    r = Replace(r, "６", "6")
+    r = Replace(r, "７", "7")
+    r = Replace(r, "８", "8")
+    r = Replace(r, "９", "9")
+    NormalizeSeparators = r
 End Function
 
 '------------------------------------------------------------------------------
