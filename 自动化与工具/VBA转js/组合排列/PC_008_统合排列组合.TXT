@@ -218,8 +218,8 @@ Public Function RangeTo1DArrayOpt(ByVal rng As Range, ByVal rowMajor As Boolean,
                 If (Not skipEmpty) Or (Not IsEmptyOrBlank(v)) Then
                     result(idx) = v: idx = idx + 1
                 End If
-            Next j
-        Next i
+            Next i
+        Next j
     End If
 
     cnt = idx - 1
@@ -234,15 +234,22 @@ End Function
 ' 获取或创建工作表（命名风格参考 PC_001）
 Public Function GetOrInitWorksheet(ByVal Name As String) As Worksheet
     Dim ws As Worksheet
-    On Error Resume Next
-    Set ws = ThisWorkbook.Worksheets(Name)
-    On Error GoTo 0
+    Dim i As Long
+
+    ' 按名称查找工作表（不用 On Error Resume Next，避免掩盖错误导致返回 Nothing）
+    For i = 1 To ThisWorkbook.Worksheets.Count
+        If ThisWorkbook.Worksheets(i).Name = Name Then
+            Set ws = ThisWorkbook.Worksheets(i)
+            Exit For
+        End If
+    Next i
+
+    ' 找不到则新建并命名
     If ws Is Nothing Then
         Set ws = ThisWorkbook.Worksheets.Add
-        On Error Resume Next
         ws.Name = Name
-        On Error GoTo 0
     End If
+
     Set GetOrInitWorksheet = ws
 End Function
 
@@ -666,7 +673,8 @@ Public Sub 演示_枚举生成_范围()
     Dim res As Variant, item As Variant
     Dim cnt As Long, idxv As Long
     Dim out2D() As Variant
-    Dim blockRow As Long
+    Dim infoRow As Long, dataRow As Long
+    Const dataCol As Long = 10
     Dim totalItems As Double
     Dim lm As Variant, sk As Variant, tp As Variant
     Dim expect As Double
@@ -764,7 +772,10 @@ Public Sub 演示_枚举生成_范围()
     ws.Cells(2, 7).Value = m
     ws.Cells(2, 8).Value = "计算中…"
 
-    blockRow = 4
+    ' —— 左下区：每个 k 的摘要（并列布局，参考 PC_002）
+    ws.Range("A4:D4").Value = Array("k", "项数", "每项长度", "状态")
+    infoRow = 5        ' 摘要行，从第 5 行开始
+    dataRow = 1        ' 数据块起始行，各 k 垂直连续衔接
     totalItems = 0#
     For k = kStart To kEnd
         ' 数量上限检查（溢出保护：m^k 等超大值视为超过上限，不中断）
@@ -773,13 +784,17 @@ Public Sub 演示_枚举生成_范围()
         If Err.Number <> 0 Then expect = MAX_ENUM + 1#
         On Error GoTo 0
         If expect > MAX_ENUM Then
-            ' 超出内存保护上限：提示后跳过（留一空行，排版与其他块一致）
-            ws.Cells(blockRow, 1).Value = "== k = " & k & " | 数量 " & Format(expect, "#,##0") & " 超过上限 " & MAX_ENUM & "，已跳过 =="
-            blockRow = blockRow + 2
+            ws.Cells(infoRow, 1).Value = k
+            ws.Cells(infoRow, 2).Value = Format(expect, "#,##0")
+            ws.Cells(infoRow, 3).Value = k
+            ws.Cells(infoRow, 4).Value = "数量超出上限，已跳过"
+            infoRow = infoRow + 1
         ElseIf 2 * k + 1 > MAX_COLS Then
-            ' 输出列数超出工作表列数：提示后跳过
-            ws.Cells(blockRow, 1).Value = "== k = " & k & " | 列数 " & (2 * k + 1) & " 超过工作表列数上限 " & MAX_COLS & "，已跳过 =="
-            blockRow = blockRow + 2
+            ws.Cells(infoRow, 1).Value = k
+            ws.Cells(infoRow, 2).Value = 0
+            ws.Cells(infoRow, 3).Value = k
+            ws.Cells(infoRow, 4).Value = "列数超出工作表列数上限，已跳过"
+            infoRow = infoRow + 1
         Else
             ' 基于索引生成
             res = EnumerateIdx(m, k, typeInput)
@@ -787,25 +802,23 @@ Public Sub 演示_枚举生成_范围()
                 cnt = UBound(res) - LBound(res) + 1
 
                 ' 行数保护：数据块最后一行是否超出工作表最大行数
-                If blockRow + cnt - 1 > MAX_ROWS Then
-                    ws.Cells(blockRow, 1).Value = "== k = " & k & " | 项数 " & Format(cnt, "#,##0") & " 超出工作表剩余行数，已跳过 =="
-                    blockRow = blockRow + 2
+                If dataRow + cnt - 1 > MAX_ROWS Then
+                    ws.Cells(infoRow, 1).Value = k
+                    ws.Cells(infoRow, 2).Value = cnt
+                    ws.Cells(infoRow, 3).Value = k
+                    ws.Cells(infoRow, 4).Value = "超出工作表剩余行数，已跳过"
+                    infoRow = infoRow + 1
                 Else
                     totalItems = totalItems + cnt
 
-                    ' 块标题
-                    ws.Cells(blockRow, 1).Value = "== k = " & k & " | 类型 " & GetTypeText(typeInput) & " | 项数 " & cnt & " =="
-                    blockRow = blockRow + 1
+                    ' 左区摘要：每个 k 的对应数值
+                    ws.Cells(infoRow, 1).Value = k
+                    ws.Cells(infoRow, 2).Value = cnt
+                    ws.Cells(infoRow, 3).Value = k
+                    ws.Cells(infoRow, 4).Value = "正常"
+                    infoRow = infoRow + 1
 
-                    ' 表头：序号 + 元素列 + 映射列（参考 PC_004）
-                    ws.Cells(blockRow, 1).Value = "序号"
-                    For j = 1 To k
-                        ws.Cells(blockRow, 1 + j).Value = "元素" & j
-                        ws.Cells(blockRow, 1 + k + j).Value = "映射" & j
-                    Next j
-                    blockRow = blockRow + 1
-
-                    ' 数据块：元素 = Arr(索引)，映射 = 索引
+                    ' 右区数据块：序号 + 元素 + 映射（元素 = Arr(索引)，映射 = 索引）
                     ReDim out2D(1 To cnt, 1 To 2 * k + 1)
                     For i = 1 To cnt
                         item = res(LBound(res) + i - 1)
@@ -816,12 +829,15 @@ Public Sub 演示_枚举生成_范围()
                             out2D(i, 1 + k + j) = idxv
                         Next j
                     Next i
-                    ws.Range(ws.Cells(blockRow, 1), ws.Cells(blockRow + cnt - 1, 2 * k + 1)).Value = out2D
-                    blockRow = blockRow + cnt + 1   ' 块后留一空行
+                    ws.Cells(dataRow, dataCol).Resize(cnt, 2 * k + 1).Value = out2D
+                    dataRow = dataRow + cnt   ' 各 k 数据块垂直连续衔接（参考 PC_002）
                 End If
             Else
-                ws.Cells(blockRow, 1).Value = "== k = " & k & " | 无法生成（参数非法或超出上限） =="
-                blockRow = blockRow + 2   ' 留一空行，排版与其他块一致
+                ws.Cells(infoRow, 1).Value = k
+                ws.Cells(infoRow, 2).Value = 0
+                ws.Cells(infoRow, 3).Value = k
+                ws.Cells(infoRow, 4).Value = "无法生成（参数非法或超出上限）"
+                infoRow = infoRow + 1
             End If
         End If
     Next k
@@ -831,7 +847,7 @@ Public Sub 演示_枚举生成_范围()
     MsgBox "已生成 " & Format(totalItems, "#,##0") & " 条结果到工作表【" & sheetName & "】。" & vbCrLf & _
            "范围：k = " & kStart & " - " & kEnd & "；类型：" & GetTypeText(typeInput) & vbCrLf & _
            "展开：" & IIf(rowMajor, "行优先", "列优先") & "；" & IIf(skipEmpty, "已去空", "保留空") & vbCrLf & _
-           "输出格式：序号 + 元素 + 映射（参考 PC_004）", vbInformation
+           "输出布局：左汇总 + 右数据并列；数据 = 序号 + 元素 + 映射（参考 PC_002/PC_004）", vbInformation
 End Sub
 
 ' ============================================================
