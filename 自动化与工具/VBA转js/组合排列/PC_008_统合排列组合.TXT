@@ -802,7 +802,7 @@ Public Sub 演示_枚举生成_范围()
                 cnt = UBound(res) - LBound(res) + 1
 
                 ' 行数保护：数据块最后一行是否超出工作表最大行数
-                If dataRow + cnt - 1 > MAX_ROWS Then
+                If dataRow + cnt + 1 > MAX_ROWS Then
                     ws.Cells(infoRow, 1).Value = k
                     ws.Cells(infoRow, 2).Value = cnt
                     ws.Cells(infoRow, 3).Value = k
@@ -818,7 +818,15 @@ Public Sub 演示_枚举生成_范围()
                     ws.Cells(infoRow, 4).Value = "正常"
                     infoRow = infoRow + 1
 
-                    ' 右区数据块：序号 + 元素 + 映射（元素 = Arr(索引)，映射 = 索引）
+                    ' 右区数据块：标题行（计数 / 元素 / 映射 三组前缀，分隔开）
+                    ws.Cells(dataRow, dataCol).Value = "计数"
+                    For j = 1 To k
+                        ws.Cells(dataRow, dataCol + j).Value = "元素" & j
+                        ws.Cells(dataRow, dataCol + k + j).Value = "映射" & j
+                    Next j
+                    dataRow = dataRow + 1
+
+                    ' 数据：元素 = Arr(索引)，映射 = 索引
                     ReDim out2D(1 To cnt, 1 To 2 * k + 1)
                     For i = 1 To cnt
                         item = res(LBound(res) + i - 1)
@@ -830,7 +838,7 @@ Public Sub 演示_枚举生成_范围()
                         Next j
                     Next i
                     ws.Cells(dataRow, dataCol).Resize(cnt, 2 * k + 1).Value = out2D
-                    dataRow = dataRow + cnt   ' 各 k 数据块垂直连续衔接（参考 PC_002）
+                    dataRow = dataRow + cnt + 1   ' 数据后留一空行，分隔不同 k 块
                 End If
             Else
                 ws.Cells(infoRow, 1).Value = k
@@ -847,7 +855,7 @@ Public Sub 演示_枚举生成_范围()
     MsgBox "已生成 " & Format(totalItems, "#,##0") & " 条结果到工作表【" & sheetName & "】。" & vbCrLf & _
            "范围：k = " & kStart & " - " & kEnd & "；类型：" & GetTypeText(typeInput) & vbCrLf & _
            "展开：" & IIf(rowMajor, "行优先", "列优先") & "；" & IIf(skipEmpty, "已去空", "保留空") & vbCrLf & _
-           "输出布局：左汇总 + 右数据并列；数据 = 序号 + 元素 + 映射（参考 PC_002/PC_004）", vbInformation
+           "输出布局：左汇总 + 右数据并列；数据 = 计数 + 元素 + 映射（参考 PC_002/PC_004）", vbInformation
 End Sub
 
 ' ============================================================
