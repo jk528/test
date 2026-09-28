@@ -1,0 +1,14 @@
+﻿[08:34:22] ========== 红楼读析 开发环境安装开始 ==========
+[08:34:22] 是否管理员: False
+[08:34:22] 执行策略设置失败: Security error.
+[08:34:22] winget: C:\Users\代\AppData\Local\Microsoft\WindowsApps\winget.exe
+[08:34:22] ---- winget install Python.Python.3.12 ----
+[08:34:32] winget Python.Python.3.12 退出码 = -1978335189
+[08:34:35] Python 安装后验证:  -> 未找到
+[08:34:35] ---- winget install Rustlang.Rustup ----
+[08:34:40] winget Rustlang.Rustup 退出码 = -1978335216
+[08:34:43] === 注意：接下来可能弹出 UAC 用户账户控制，请点“是” ===
+[08:34:43] ---- winget install OpenJS.NodeJS.LTS ----
+[08:44:29] winget OpenJS.NodeJS.LTS 退出码 = 0
+[08:44:37] === 安装 MSVC C++ Build Tools（约 3GB，UAC 可能再弹一次，请点“是”）===
+[08:44:37] ---- winget install Microsoft.VisualStudio.2022.BuildTools ----

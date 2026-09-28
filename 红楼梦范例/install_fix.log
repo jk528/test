@@ -1,0 +1,151 @@
+﻿[08:51:14] ==== fix python + rust start ====
+[08:51:14] winget --force Python.Python.3.12 ...
+[08:51:18] py:    -\|/-\|/-\ 
+[08:51:18] py: 已找到 Python 3.12 [Python.Python.3.12] 版本 3.12.10
+[08:51:18] py: 此应用程序由其所有者授权给你。
+[08:51:18] py: Microsoft 对第三方程序包概不负责，也不向第三方程序包授予任何许可证。
+[08:51:18] py: 正在下载 https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe
+[08:52:09] py:    -\|/- 
+[08:52:09] py: 
+[08:52:09] py:   █▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒  1024 KB / 25.7 MB
+[08:52:09] py:   ██▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒  2.00 MB / 25.7 MB
+[08:52:09] py:   ███▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒  3.00 MB / 25.7 MB
+[08:52:09] py:   ████▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒  4.00 MB / 25.7 MB
+[08:52:09] py:   █████▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒  5.00 MB / 25.7 MB
+[08:52:09] py:   ██████▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒  6.00 MB / 25.7 MB
+[08:52:09] py:   ████████▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒  7.00 MB / 25.7 MB
+[08:52:09] py:   █████████▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒  8.00 MB / 25.7 MB
+[08:52:09] py:   ██████████▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒  9.00 MB / 25.7 MB
+[08:52:09] py:   ███████████▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒  10.0 MB / 25.7 MB
+[08:52:09] py:   ████████████▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒  11.0 MB / 25.7 MB
+[08:52:09] py:   █████████████▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒  12.0 MB / 25.7 MB
+[08:52:09] py:   ███████████████▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒  13.0 MB / 25.7 MB
+[08:52:09] py:   ████████████████▒▒▒▒▒▒▒▒▒▒▒▒▒▒  14.0 MB / 25.7 MB
+[08:52:09] py:   █████████████████▒▒▒▒▒▒▒▒▒▒▒▒▒  15.0 MB / 25.7 MB
+[08:52:09] py:   ██████████████████▒▒▒▒▒▒▒▒▒▒▒▒  16.0 MB / 25.7 MB
+[08:52:09] py:   ███████████████████▒▒▒▒▒▒▒▒▒▒▒  17.0 MB / 25.7 MB
+[08:52:09] py:   ████████████████████▒▒▒▒▒▒▒▒▒▒  18.0 MB / 25.7 MB
+[08:52:09] py:   ██████████████████████▒▒▒▒▒▒▒▒  19.0 MB / 25.7 MB
+[08:52:09] py:   ███████████████████████▒▒▒▒▒▒▒  20.0 MB / 25.7 MB
+[08:52:09] py:   ████████████████████████▒▒▒▒▒▒  21.0 MB / 25.7 MB
+[08:52:09] py:   █████████████████████████▒▒▒▒▒  22.0 MB / 25.7 MB
+[08:52:09] py:   ██████████████████████████▒▒▒▒  23.0 MB / 25.7 MB
+[08:52:09] py:   ███████████████████████████▒▒▒  24.0 MB / 25.7 MB
+[08:52:09] py:   █████████████████████████████▒  25.0 MB / 25.7 MB
+[08:52:09] py:   ██████████████████████████████  25.7 MB / 25.7 MB
+[08:52:09] py: 已成功验证安装程序哈希
+[08:52:09] py: 正在启动程序包安装...
+[08:53:20] py:    -\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\| 
+[08:53:20] py: 已成功安装
+[08:53:21] python winget exit=0
+[08:53:24] PYTHON OK: Python 3.12.10
+[08:53:24] winget Rustlang.Rustup (no scope) ...
+[08:53:24] rustup:    - 
+[08:53:26] rustup:    -\ 
+[08:53:26] rustup: 已找到 Rustup: the Rust toolchain installer [Rustlang.Rustup] 版本 1.29.1
+[08:53:26] rustup: 此应用程序由其所有者授权给你。
+[08:53:26] rustup: Microsoft 对第三方程序包概不负责，也不向第三方程序包授予任何许可证。
+[08:53:26] rustup: 正在下载 https://static.rust-lang.org/rustup/archive/1.29.1/x86_64-pc-windows-msvc/rustup-init.exe
+[08:53:34] rustup:    -\|/-\ 
+[08:53:34] rustup: 
+[08:53:34] rustup:   ██▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒  1024 KB / 12.1 MB
+[08:53:34] rustup:   ████▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒  2.00 MB / 12.1 MB
+[08:53:34] rustup:   ███████▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒  3.00 MB / 12.1 MB
+[08:53:34] rustup:   █████████▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒  4.00 MB / 12.1 MB
+[08:53:34] rustup:   ████████████▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒  5.00 MB / 12.1 MB
+[08:53:34] rustup:   ██████████████▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒  6.00 MB / 12.1 MB
+[08:53:34] rustup:   █████████████████▒▒▒▒▒▒▒▒▒▒▒▒▒  7.00 MB / 12.1 MB
+[08:53:34] rustup:   ███████████████████▒▒▒▒▒▒▒▒▒▒▒  8.00 MB / 12.1 MB
+[08:53:34] rustup:   ██████████████████████▒▒▒▒▒▒▒▒  9.00 MB / 12.1 MB
+[08:53:34] rustup:   ████████████████████████▒▒▒▒▒▒  10.0 MB / 12.1 MB
+[08:53:34] rustup:   ███████████████████████████▒▒▒  11.0 MB / 12.1 MB
+[08:53:34] rustup:   █████████████████████████████▒  12.0 MB / 12.1 MB
+[08:53:34] rustup:   ██████████████████████████████  12.1 MB / 12.1 MB
+[08:53:34] rustup: 已成功验证安装程序哈希
+[08:53:35] rustup: 正在启动程序包安装...
+[08:54:50] rustup:    -\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\|/-\ 
+[08:54:50] rustup: 已成功安装
+[08:54:51] rustup winget exit=0
+[08:54:54] install stable-x86_64-pc-windows-msvc toolchain ...
+[08:54:56] tc: info: using existing install for stable-x86_64-pc-windows-msvc
+[08:54:56] tc: info: default toolchain set to stable-x86_64-pc-windows-msvc
+[08:54:56] tc: 
+[08:54:56] tc:   stable-x86_64-pc-windows-msvc unchanged - rustc 1.98.1 (48a229cea 2026-09-01)
+[08:54:56] tc: 
+[08:54:57] CARGO OK: cargo 1.98.1 (797e8a9bc 2026-08-05)
+[08:54:57] creating venv ...
+[08:55:14] pip install (tsinghua mirror) ...
+[08:55:17] pip: Looking in indexes: https://pypi.tuna.tsinghua.edu.cn/simple
+[08:55:17] pip: Requirement already satisfied: pip in a:\huaweimovedata\users\代\desktop\gitee\test\红楼梦范例\.venv\lib\site-packages (25.0.1)
+[08:55:17] pip: Collecting pip
+[08:55:17] pip:   Downloading https://pypi.tuna.tsinghua.edu.cn/packages/f3/6e/1736e5b4ae2b778ef2f81c47d797de9f891d4d8acb047a24ca37a60294dd/pip-26.2.1-py3-none-any.whl (1.8 MB)
+[08:55:18] pip:      ---------------------------------------- 1.8/1.8 MB 9.0 MB/s eta 0:00:00
+[08:55:18] pip: Installing collected packages: pip
+[08:55:18] pip:   Attempting uninstall: pip
+[08:55:18] pip:     Found existing installation: pip 25.0.1
+[08:55:18] pip:     Uninstalling pip-25.0.1:
+[08:55:18] pip:       Successfully uninstalled pip-25.0.1
+[08:55:28] pip: Successfully installed pip-26.2.1
+[08:55:31] pip: Looking in indexes: https://pypi.tuna.tsinghua.edu.cn/simple
+[08:55:32] pip: Collecting jieba
+[08:55:32] pip:   Downloading jieba-0.42.1.tar.gz (19.2 MB)
+[08:55:34] pip:      ---------------------------------------- 19.2/19.2 MB 10.2 MB/s  0:00:01
+[08:55:35] pip:   Installing build dependencies: started
+[08:55:41] pip:   Installing build dependencies: finished with status 'done'
+[08:55:41] pip:   Getting requirements to build wheel: started
+[08:55:45] pip:   Getting requirements to build wheel: finished with status 'done'
+[08:55:45] pip:   Preparing metadata (pyproject.toml): started
+[08:55:46] pip:   Preparing metadata (pyproject.toml): finished with status 'done'
+[08:55:46] pip: Collecting openai
+[08:55:46] pip:   Downloading openai-3.14.1-py3-none-any.whl (2.0 MB)
+[08:55:46] pip:      ---------------------------------------- 2.0/2.0 MB 10.1 MB/s  0:00:00
+[08:55:47] pip: Collecting jinja2
+[08:55:47] pip:   Downloading jinja2-3.1.6-py3-none-any.whl (134 kB)
+[08:55:47] pip: Collecting pydantic
+[08:55:47] pip:   Downloading pydantic-2.13.5-py3-none-any.whl (472 kB)
+[08:55:48] pip: Collecting python-dotenv
+[08:55:48] pip:   Downloading python_dotenv-1.2.3-py3-none-any.whl (22 kB)
+[08:55:48] pip: Collecting loguru
+[08:55:48] pip:   Downloading loguru-0.7.3-py3-none-any.whl (61 kB)
+[08:55:48] pip: Collecting anyio<5,>=4.10.0 (from openai)
+[08:55:48] pip:   Downloading anyio-4.15.1-py3-none-any.whl (132 kB)
+[08:55:48] pip: Collecting httpx2<3,>=2.7.0 (from openai)
+[08:55:48] pip:   Downloading httpx2-2.13.0-py3-none-any.whl (95 kB)
+[08:55:49] pip: Collecting jiter<1,>=0.16.0 (from openai)
+[08:55:49] pip:   Downloading jiter-0.17.0-cp312-cp312-win_amd64.whl (227 kB)
+[08:55:49] pip: Collecting sniffio (from openai)
+[08:55:49] pip:   Downloading sniffio-1.3.1-py3-none-any.whl (10 kB)
+[08:55:49] pip: Collecting typing-extensions<5,>=4.14 (from openai)
+[08:55:49] pip:   Downloading typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+[08:55:49] pip: Collecting annotated-types>=0.6.0 (from pydantic)
+[08:55:49] pip:   Downloading annotated_types-0.8.0-py3-none-any.whl (13 kB)
+[08:55:52] pip: Collecting pydantic-core==2.46.5 (from pydantic)
+[08:55:53] pip:   Downloading pydantic_core-2.46.5-cp312-cp312-win_amd64.whl (2.0 MB)
+[08:55:53] pip:      ---------------------------------------- 2.0/2.0 MB 8.1 MB/s  0:00:00
+[08:55:53] pip: Collecting typing-inspection>=0.4.2 (from pydantic)
+[08:55:53] pip:   Downloading typing_inspection-0.4.4-py3-none-any.whl (14 kB)
+[08:55:53] pip: Collecting idna>=2.8 (from anyio<5,>=4.10.0->openai)
+[08:55:53] pip:   Downloading idna-3.19-py3-none-any.whl (68 kB)
+[08:55:53] pip: Collecting httpcore2==2.13.0 (from httpx2<3,>=2.7.0->openai)
+[08:55:53] pip:   Downloading httpcore2-2.13.0-py3-none-any.whl (83 kB)
+[08:55:53] pip: Collecting truststore>=0.10 (from httpx2<3,>=2.7.0->openai)
+[08:55:53] pip:   Downloading truststore-0.10.4-py3-none-any.whl (18 kB)
+[08:55:53] pip: Collecting h11>=0.16 (from httpcore2==2.13.0->httpx2<3,>=2.7.0->openai)
+[08:55:53] pip:   Downloading h11-0.16.0-py3-none-any.whl (37 kB)
+[08:55:54] pip: Collecting MarkupSafe>=2.0 (from jinja2)
+[08:55:54] pip:   Downloading markupsafe-3.0.3-cp312-cp312-win_amd64.whl (15 kB)
+[08:55:54] pip: Collecting colorama>=0.3.4 (from loguru)
+[08:55:54] pip:   Downloading colorama-0.4.6-py2.py3-none-any.whl (25 kB)
+[08:55:54] pip: Collecting win32-setctime>=1.0.0 (from loguru)
+[08:55:54] pip:   Downloading win32_setctime-1.2.0-py3-none-any.whl (4.1 kB)
+[08:55:54] pip: Building wheels for collected packages: jieba
+[08:55:54] pip:   Building wheel for jieba (pyproject.toml): started
+[08:56:02] pip:   Building wheel for jieba (pyproject.toml): finished with status 'done'
+[08:56:02] pip:   Created wheel for jieba: filename=jieba-0.42.1-py3-none-any.whl size=19314527 sha256=623ff48a0b7d85e49760c08d7e6ac9367ebe7d268606139b80be414aa0e4dac1
+[08:56:02] pip:   Stored in directory: c:\users\代\appdata\local\pip\cache\wheels\7b\3a\3e\1bf625b8dd63d53265aad527b244647c679dff9b60588a324f
+[08:56:02] pip: Successfully built jieba
+[08:56:02] pip: Installing collected packages: jieba, win32-setctime, typing-extensions, truststore, sniffio, python-dotenv, MarkupSafe, jiter, idna, h11, colorama, annotated-types, typing-inspection, pydantic-core, loguru, jinja2, httpcore2, anyio, pydantic, httpx2, openai
+[08:56:50] pip: 
+[08:56:50] pip: Successfully installed MarkupSafe-3.0.3 annotated-types-0.8.0 anyio-4.15.1 colorama-0.4.6 h11-0.16.0 httpcore2-2.13.0 httpx2-2.13.0 idna-3.19 jieba-0.42.1 jinja2-3.1.6 jiter-0.17.0 loguru-0.7.3 openai-3.14.1 pydantic-2.13.5 pydantic-core-2.46.5 python-dotenv-1.2.3 sniffio-1.3.1 truststore-0.10.4 typing-extensions-4.16.0 typing-inspection-0.4.4 win32-setctime-1.2.0
+[08:56:51] VENV CHECK: jieba ok | py 3.12.10
+[08:56:51] ==== fix python + rust done ====
