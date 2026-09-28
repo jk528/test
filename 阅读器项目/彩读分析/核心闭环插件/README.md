@@ -48,11 +48,18 @@
 | `plugin_04_coloring.py` | ✅ | 仅标准库 `re`/`html` |
 | `plugin_05_catalog_jump.py` | ✅ | 仅标准库，`import` 了 `plugin_03` 的 `Chapter` |
 | `plugin_06_bookmark_progress.py` | ✅ | 仅标准库 `sqlite3` |
+| `main.py` | ✅ | 串联 6 插件，零额外依赖 |
+| `gui_app.py` | ✅ | `PyQt6`（唯一 GUI 依赖，`pip install PyQt6`） |
 
 ## 四、运行方式
 
 ```bash
 cd 核心闭环插件
+
+# PyQt6 图形原型（打开即见《红楼梦》样章，可上色/跳转/记书签）
+pip install PyQt6                        # 唯一 GUI 依赖
+python gui_app.py                        # 打开窗口
+python gui_app.py --selftest             # 无头自检（不弹窗，验证桥接逻辑）
 
 # 串成最小闭环（6 环全链路一次跑通：导入→编码→章节→上色→跳转→书签）
 python main.py
