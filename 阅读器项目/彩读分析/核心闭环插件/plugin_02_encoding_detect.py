@@ -100,10 +100,13 @@ def _setup_console():
 
 def _demo():
     _setup_console()
+    # 注：无 BOM 的 UTF-16 短样本是 charset 检测的公认难点（BOM 分支无法命中、
+    # chardet 对短样本也常判断失败），故这里用带 BOM 的 UTF-16 演示标准场景。
+    # GBK/GB2312 经 chardet 常被归并为超集 GB18030，解码兼容、不影响正确性。
     samples = {
         "UTF-8（无 BOM）": "红楼梦第一回 甄士隐梦幻识通灵".encode("utf-8"),
         "UTF-8（带 BOM）": b"\xef\xbb\xbf" + "红楼梦第一回".encode("utf-8"),
-        "UTF-16 LE": "红楼梦第一回".encode("utf-16-le"),
+        "UTF-16 LE（带BOM）": b"\xff\xfe" + "红楼梦第一回".encode("utf-16-le"),
         "GBK（中文 ANSI）": "红楼梦第一回 甄士隐梦幻识通灵".encode("gbk"),
         "ASCII 纯英文": b"hello world, chapter 01",
     }

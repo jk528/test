@@ -54,6 +54,9 @@
 ```bash
 cd 核心闭环插件
 
+# 串成最小闭环（6 环全链路一次跑通：导入→编码→章节→上色→跳转→书签）
+python main.py
+
 # 逐个独立运行（每个都带内置演示数据，不需要任何输入就能看效果）
 python plugin_01_file_import.py
 python plugin_02_encoding_detect.py
