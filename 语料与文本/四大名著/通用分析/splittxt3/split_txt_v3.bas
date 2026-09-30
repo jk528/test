@@ -614,9 +614,17 @@ Public Function CnToInt(ByVal s As String) As Long
     For i = 0 To 9
         ss = Replace(ss, ChrW(&HFF10 + i), CStr(i))
     Next i
-    ' 纯数字直接转
+    ' 纯数字直接转（防溢出：超过Long范围返回0）
     If IsDigits(ss) Then
+        If Len(ss) > 10 Then  ' Long最大约21亿，10位以内安全
+            CnToInt = 0
+            Set cnNum = Nothing
+            Exit Function
+        End If
+        On Error Resume Next
         CnToInt = CLng(ss)
+        If Err.Number <> 0 Then CnToInt = 0
+        On Error GoTo 0
         Set cnNum = Nothing
         Exit Function
     End If
@@ -672,7 +680,12 @@ NextChar3:
     Next i
 
     If lastDigit > 0 Then current = current + lastDigit
+    
+    ' 防溢出：结果超过Long范围返回0
+    On Error Resume Next
     CnToInt = total + section + current
+    If Err.Number <> 0 Then CnToInt = 0
+    On Error GoTo 0
     Set cnNum = Nothing
 End Function
 
@@ -2029,13 +2042,24 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
 
     ' 七、各策略效果预览
     AddRptLine lines_arr, rptIdx, String(50, "-")
-    AddRptLine lines_arr, rptIdx, "【七、各去重策略效果预览（扁平模式）】"
+    AddRptLine lines_arr, rptIdx, "【七、各策略组合效果预览（扁平模式）】"
+    
+    ' v3.2 修复：原代码将 lis/sort 作为去重策略传入导致溢出
+    ' 正确做法：6种组合（去重策略 + 排序策略配对），与Python版一致
+    Dim comboLabels() As String, comboDedup() As String, comboSort() As String
+    ReDim comboLabels(0 To 5)
+    ReDim comboDedup(0 To 5)
+    ReDim comboSort(0 To 5)
+    comboLabels(0) = "adjacent":      comboDedup(0) = "adjacent":  comboSort(0) = "none"
+    comboLabels(1) = "first":         comboDedup(1) = "first":     comboSort(1) = "none"
+    comboLabels(2) = "longest":       comboDedup(2) = "longest":   comboSort(2) = "none"
+    comboLabels(3) = "none+lis":      comboDedup(3) = "none":      comboSort(3) = "lis"
+    comboLabels(4) = "longest+lis":   comboDedup(4) = "longest":   comboSort(4) = "lis"
+    comboLabels(5) = "longest+sort":  comboDedup(5) = "longest":   comboSort(5) = "sort"
 
-    strategies = Array("adjacent", "first", "longest", "lis", "sort")
-    stratNames = Array("adjacent", "first", "longest", "lis", "sort")
-
-    For s_idx = 0 To UBound(strategies)
-        ApplyDedup strategies(s_idx), "flat"
+    For s_idx = 0 To 5
+        ApplyDedup comboDedup(s_idx), "flat"
+        ApplySort comboSort(s_idx), "flat"
         tmpIdx = dedup_indices
         tmpCnt = dedup_count
 
@@ -2051,7 +2075,7 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
             End If
         Next p
 
-        AddRptLine lines_arr, rptIdx, "  " & Left(strategies(s_idx) & Space(12), 12) & _
+        AddRptLine lines_arr, rptIdx, "  " & Left(comboLabels(s_idx) & Space(14), 14) & _
                 ": 剩" & Format(tmpCnt, "@@@") & "章, 乱序" & Format(oooAfter, "@@@") & "处"
     Next s_idx
 
