@@ -993,6 +993,9 @@ Private Sub DedupLIS(ByVal volMode As String, _
     Dim prevArr() As Long, lisIdx() As Long
     Dim left As Long, right As Long, pos As Long
     Dim curr As Long, cnt As Long
+    Dim tailLen As Long
+    Dim vol_i As Long, ch_i As Long
+    Dim mid As Long
 
     GetChapterIndices chapIdx, chapCnt
     If chapCnt = 0 Then outCount = 0: Exit Sub
@@ -1006,11 +1009,9 @@ Private Sub DedupLIS(ByVal volMode As String, _
         prevArr(i) = -1
     Next i
 
-    Dim tailLen As Long
     tailLen = 0
 
     For i = 0 To n - 1
-        Dim vol_i As Long, ch_i As Long
         vol_i = ch_vols(chapIdx(i))
         ch_i = ch_nums(chapIdx(i))
         If ch_i = 0 Then ch_i = -1  ' 无号章节放最前面
@@ -1019,7 +1020,6 @@ Private Sub DedupLIS(ByVal volMode As String, _
         ' 二分查找：找第一个 >= (vol_i, ch_i) 的位置
         left = 0: right = tailLen
         Do While left < right
-            Dim mid As Long
             mid = (left + right) \ 2
             If tailVals_vol(mid) < vol_i Then
                 left = mid + 1
@@ -1084,12 +1084,20 @@ End Sub
 Private Sub DedupSort(ByVal volMode As String, _
         ByRef outIndices() As Long, ByRef outCount As Long)
     Dim chapIdx() As Long, chapCnt As Long
-    Dim i As Long
+    Dim i As Long, j As Long
     Dim best As Object, orderKeys As Object
     Dim key As String
+    Dim specialKeys As Object, normalKeys As Object
+    Dim k As Variant
+    Dim nc As Long
+    Dim ki As String, kj As String
+    Dim vi As Long, ci As Long, vj As Long, cj As Long
+    Dim totalCnt As Long, idx As Long
 
     Set best = CreateObject("Scripting.Dictionary")
     Set orderKeys = CreateObject("Scripting.Dictionary")
+    Set specialKeys = CreateObject("Scripting.Dictionary")
+    Set normalKeys = CreateObject("Scripting.Dictionary")
 
     GetChapterIndices chapIdx, chapCnt
     If chapCnt = 0 Then outCount = 0: Exit Sub
@@ -1112,11 +1120,6 @@ Private Sub DedupSort(ByVal volMode As String, _
     Next i
 
     ' 第二步：分离 special 和 normal，分别排序
-    Dim specialKeys As Object, normalKeys As Object
-    Set specialKeys = CreateObject("Scripting.Dictionary")
-    Set normalKeys = CreateObject("Scripting.Dictionary")
-
-    Dim k As Variant
     For Each k In best.Keys
         If Left(k, 2) = "S|" Then
             specialKeys.Add specialKeys.Count, k
@@ -1126,12 +1129,9 @@ Private Sub DedupSort(ByVal volMode As String, _
     Next k
 
     ' 对 normalKeys 按 (卷号, 章号) 排序（简单冒泡，数量不大）
-    Dim nc As Long, j As Long
     nc = normalKeys.Count
     For i = 0 To nc - 2
         For j = i + 1 To nc - 1
-            Dim ki As String, kj As String
-            Dim vi As Long, ci As Long, vj As Long, cj As Long
             ki = normalKeys(i): kj = normalKeys(j)
             ParseDedupKey ki, volMode, vi, ci
             ParseDedupKey kj, volMode, vj, cj
@@ -1142,10 +1142,8 @@ Private Sub DedupSort(ByVal volMode As String, _
     Next i
 
     ' 合并输出：special在前，normal在后
-    Dim totalCnt As Long
     totalCnt = specialKeys.Count + normalKeys.Count
     ReDim outIndices(0 To totalCnt - 1)
-    Dim idx As Long
     idx = 0
     For i = 0 To specialKeys.Count - 1
         outIndices(idx) = best(specialKeys(i))
@@ -1233,10 +1231,62 @@ End Sub
 ' 深度分析核心
 '------------------------------------------------------------------------------
 Private Sub DeepAnalyzeFile(ByVal filePath As String)
-    Dim fso As Object, content As String
+    ' ===== 所有变量集中声明（Option Explicit 要求必须声明）=====
+    Dim fso As Object
+    Dim content As String
     Dim lines() As String, lineCount As Long
     Dim tRead As Double, tScan As Double, t0 As Double
     Dim report As String, lines_arr() As String, rptIdx As Long
+    
+    ' 统计用
+    Dim volCnt As Long, chapCnt As Long, i As Long
+    Dim k As Variant           ' 用于 For Each 循环（字典键）
+    
+    ' 卷结构分析
+    Dim volSet As Object, volUnitSet As Object, volChapterCnt As Object
+    Dim curVol As Long, curVolLabel As String
+    Dim vk As Variant          ' volChapterCnt 的键枚举
+    Dim volChs As Object
+    Dim firstVolKey As String, secondVolKey As String
+    Dim firstDone As Boolean
+    Dim vkey As String, vvkey As String
+    Dim commonCnt As Long, commonList As String, cn As Long
+    Dim firstSet As Object, secondSet As Object
+    
+    ' 重复分析
+    Dim flatMap As Object
+    Dim numKey As String
+    Dim uniqueCnt As Long, dupCnt As Long
+    Dim topNums() As String, topCounts() As Long, topCount As Long
+    Dim vv As Long, insPos As Long, mv As Long
+    Dim countDist As Object
+    Dim cc As String
+    
+    ' 乱序分析
+    Dim oooCnt As Long, maxDrop As Long, prevNum As Long
+    Dim maxDropInfo_prev As Long, maxDropInfo_cur As Long
+    Dim drop As Long
+    
+    ' 多轨检测
+    Dim adjDup As Long, prevChIdx As Long
+    Dim adjRatio As Double
+    Dim seqLen As Long, maxSeq As Long
+    
+    ' 格式多样性
+    Dim patCnt As Object, unitCnt As Object
+    
+    ' 章号连续性
+    Dim numSet As Object, minNum As Long, maxNum As Long
+    Dim expected As Long, missing As Long
+    Dim missList As String, missCount As Long, nn As Long
+    
+    ' 各策略预览
+    Dim strategies As Variant, stratNames As Variant
+    Dim s_idx As Long, tmpIdx() As Long, tmpCnt As Long, oooAfter As Long, p As Long
+    
+    ' 输出
+    Dim outPath As String
+    ' ================================================================
 
     Set fso = CreateObject("Scripting.FileSystemObject")
     If Not fso.FileExists(filePath) Then
@@ -1270,7 +1320,6 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
     AddRptLine lines_arr, rptIdx, "编码: " & g_detectedEnc
 
     ' 统计卷和章
-    Dim volCnt As Long, chapCnt As Long, i As Long
     volCnt = 0: chapCnt = 0
     For i = 0 To ch_count - 1
         If ch_levels(i) = "volume" Then volCnt = volCnt + 1
@@ -1284,13 +1333,9 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
     AddRptLine lines_arr, rptIdx, String(50, "-")
     AddRptLine lines_arr, rptIdx, "【一、卷/部结构分析】"
     If volCnt > 0 Then
-        Dim volSet As Object
         Set volSet = CreateObject("Scripting.Dictionary")
-        Dim volUnitSet As Object
         Set volUnitSet = CreateObject("Scripting.Dictionary")
-        Dim volChapterCnt As Object
         Set volChapterCnt = CreateObject("Scripting.Dictionary")
-        Dim curVol As Long, curVolLabel As String
 
         curVol = 0
         curVolLabel = "无卷"
@@ -1314,25 +1359,21 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
         AddRptLine lines_arr, rptIdx, "  不同卷号数: " & volSet.Count
         AddRptLine lines_arr, rptIdx, "  卷单位词: " & JoinDictKeys(volUnitSet)
         AddRptLine lines_arr, rptIdx, "  各卷章节数:"
-        Dim vk As Variant
         For Each vk In volChapterCnt.Keys
             AddRptLine lines_arr, rptIdx, "    " & vk & ": " & volChapterCnt(vk) & " 章"
         Next vk
 
         ' 卷间章号重复检测
         If volSet.Count >= 2 Then
-            Dim volChs As Object
             Set volChs = CreateObject("Scripting.Dictionary")
             curVol = 0
-            Dim firstVolKey As String, secondVolKey As String
-            Dim firstDone As Boolean
             firstDone = False
             firstVolKey = ""
+            secondVolKey = ""
 
             For i = 0 To ch_count - 1
                 If ch_levels(i) = "volume" Then
                     curVol = ch_vols(i)
-                    Dim vkey As String
                     vkey = "vol_" & curVol
                     If Not volChs.Exists(vkey) Then
                         volChs.Add vkey, CreateObject("Scripting.Dictionary")
@@ -1344,7 +1385,6 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
                         End If
                     End If
                 ElseIf ch_levels(i) = "chapter" And ch_nums(i) > 0 Then
-                    Dim vvkey As String
                     vvkey = "vol_" & curVol
                     If Not volChs.Exists(vvkey) Then _
                         volChs.Add vvkey, CreateObject("Scripting.Dictionary")
@@ -1354,10 +1394,8 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
             Next i
 
             If Len(firstVolKey) > 0 And Len(secondVolKey) > 0 Then
-                Dim commonCnt As Long, commonList As String, cn As Long
                 commonCnt = 0
                 commonList = ""
-                Dim firstSet As Object, secondSet As Object
                 Set firstSet = volChs(firstVolKey)
                 Set secondSet = volChs(secondVolKey)
                 If firstSet.Count > 0 And secondSet.Count > 0 Then
@@ -1394,18 +1432,15 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
     AddRptLine lines_arr, rptIdx, "【二、重复章节分析】"
     AddRptLine lines_arr, rptIdx, "  扁平视角（忽略卷）:"
 
-    Dim flatMap As Object
     Set flatMap = CreateObject("Scripting.Dictionary")
     For i = 0 To ch_count - 1
         If ch_levels(i) = "chapter" And ch_nums(i) > 0 Then
-            Dim numKey As String
             numKey = CStr(ch_nums(i))
             If Not flatMap.Exists(numKey) Then flatMap.Add numKey, 0
             flatMap(numKey) = flatMap(numKey) + 1
         End If
     Next i
 
-    Dim uniqueCnt As Long, dupCnt As Long
     uniqueCnt = flatMap.Count
     dupCnt = 0
     For Each k In flatMap.Keys
@@ -1417,23 +1452,18 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
 
     If dupCnt > 0 Then
         ' 找重复最严重的10个
-        Dim topNums() As String, topCounts() As Long, topCount As Long
         topCount = 0
         ReDim topNums(0 To 9)
         ReDim topCounts(0 To 9)
 
         For Each k In flatMap.Keys
             If flatMap(k) > 1 Then
-                ' 插入到排序数组
-                Dim vv As Long
                 vv = flatMap(k)
-                Dim insPos As Long
                 insPos = topCount
                 Do While insPos > 0 And topCounts(insPos - 1) < vv
                     insPos = insPos - 1
                 Loop
                 If insPos < 10 Then
-                    Dim mv As Long
                     For mv = IIf(topCount < 9, topCount, 9) To insPos + 1 Step -1
                         topNums(mv) = topNums(mv - 1)
                         topCounts(mv) = topCounts(mv - 1)
@@ -1452,10 +1482,8 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
         Next i
 
         ' 重复次数分布
-        Dim countDist As Object
         Set countDist = CreateObject("Scripting.Dictionary")
         For Each k In flatMap.Keys
-            Dim cc As String
             cc = CStr(flatMap(k))
             If Not countDist.Exists(cc) Then countDist.Add cc, 0
             countDist(cc) = countDist(cc) + 1
@@ -1475,8 +1503,6 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
     AddRptLine lines_arr, rptIdx, "【三、乱序分析】"
     AddRptLine lines_arr, rptIdx, "  扁平视角（忽略卷）:"
 
-    Dim oooCnt As Long, maxDrop As Long, prevNum As Long
-    Dim maxDropInfo_prev As Long, maxDropInfo_cur As Long
     oooCnt = 0: maxDrop = 0: prevNum = 0
     maxDropInfo_prev = 0: maxDropInfo_cur = 0
 
@@ -1484,7 +1510,6 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
         If ch_levels(i) = "chapter" And ch_nums(i) > 0 Then
             If prevNum > 0 And ch_nums(i) < prevNum Then
                 oooCnt = oooCnt + 1
-                Dim drop As Long
                 drop = prevNum - ch_nums(i)
                 If drop > maxDrop Then
                     maxDrop = drop
@@ -1508,7 +1533,6 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
     AddRptLine lines_arr, rptIdx, "【四、多轨目录检测】"
 
     ' 相邻双标题比例
-    Dim adjDup As Long, prevChIdx As Long
     adjDup = 0: prevChIdx = -1
     For i = 0 To ch_count - 1
         If ch_levels(i) = "chapter" And ch_nums(i) > 0 Then
@@ -1522,7 +1546,6 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
         End If
     Next i
 
-    Dim adjRatio As Double
     If chapCnt > 0 Then adjRatio = adjDup / chapCnt
     AddRptLine lines_arr, rptIdx, "  相邻双标题数: " & adjDup & " (占比 " & Format(adjRatio, "0.0%") & ")"
     If adjRatio > 0.3 Then
@@ -1531,7 +1554,6 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
 
     ' 最长连续递增段
     If chapCnt > 1 Then
-        Dim seqLen As Long, maxSeq As Long
         seqLen = 1: maxSeq = 1
         prevNum = 0
         For i = 0 To ch_count - 1
@@ -1552,7 +1574,6 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
     ' 五、格式多样性
     AddRptLine lines_arr, rptIdx, String(50, "-")
     AddRptLine lines_arr, rptIdx, "【五、格式多样性分析】"
-    Dim patCnt As Object, unitCnt As Object
     Set patCnt = CreateObject("Scripting.Dictionary")
     Set unitCnt = CreateObject("Scripting.Dictionary")
     For i = 0 To ch_count - 1
@@ -1581,7 +1602,6 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
     ' 六、章号连续性
     AddRptLine lines_arr, rptIdx, String(50, "-")
     AddRptLine lines_arr, rptIdx, "【六、章号连续性分析】"
-    Dim numSet As Object, minNum As Long, maxNum As Long
     Set numSet = CreateObject("Scripting.Dictionary")
     minNum = 999999: maxNum = 0
     For i = 0 To ch_count - 1
@@ -1593,7 +1613,6 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
     Next i
 
     If numSet.Count > 0 Then
-        Dim expected As Long, missing As Long
         expected = maxNum - minNum + 1
         missing = expected - numSet.Count
         AddRptLine lines_arr, rptIdx, "  章号范围: " & minNum & " - " & maxNum
@@ -1602,7 +1621,6 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
         AddRptLine lines_arr, rptIdx, "  缺失章号数: " & missing
 
         If missing > 0 And missing < 100 Then
-            Dim missList As String, missCount As Long, nn As Long
             missList = ""
             missCount = 0
             For nn = minNum To maxNum
@@ -1625,11 +1643,9 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
     AddRptLine lines_arr, rptIdx, String(50, "-")
     AddRptLine lines_arr, rptIdx, "【七、各去重策略效果预览（扁平模式）】"
 
-    Dim strategies As Variant, stratNames As Variant
     strategies = Array("adjacent", "first", "longest", "lis", "sort")
     stratNames = Array("adjacent", "first", "longest", "lis", "sort")
 
-    Dim s_idx As Long, tmpIdx() As Long, tmpCnt As Long, oooAfter As Long, p As Long
     For s_idx = 0 To UBound(strategies)
         ApplyDedup strategies(s_idx), "flat"
         tmpIdx = dedup_indices
@@ -1676,7 +1692,6 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
     Debug.Print report
 
     ' 写报告文件
-    Dim outPath As String
     outPath = fso.GetParentFolderName(filePath) & "\" & fso.GetBaseName(filePath) & "_分析报告.txt"
     WriteTextUTF8NoBOM outPath, report
     MsgBox "分析完成！" & vbCrLf & _
