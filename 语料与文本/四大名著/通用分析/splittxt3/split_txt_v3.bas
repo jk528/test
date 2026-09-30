@@ -63,6 +63,7 @@ Private ch_units() As String       ' 单位词
 Private ch_levels() As String      ' chapter/volume/special
 Private ch_patterns() As String    ' 匹配的正则类型
 Private ch_bodyLines() As Long     ' 正文行数
+Private ch_isTOC() As Boolean      ' v3.2 新增：是否为目录区章节
 
 ' 原有数组（保持兼容）
 Private ch_starts() As Long
@@ -74,6 +75,11 @@ Private ch_unit As String
 ' 去重后的索引映射（原索引 → 是否保留，以及新顺序）
 Private dedup_indices() As Long    ' 去重后第i个 = 原第 dedup_indices(i) 个
 Private dedup_count As Long
+
+' v3.2 新增：目录区检测结果
+Private g_tocStartIdx As Long      ' 目录区起始索引
+Private g_tocEndIdx As Long        ' 目录区结束索引
+Private g_tocChapterCount As Long  ' 目录区章节数
 
 
 '==============================================================================
@@ -712,10 +718,16 @@ Private Sub ScanChaptersV3(lines() As String, ByVal lineCount As Long)
     ReDim ch_levels(0 To 127)
     ReDim ch_patterns(0 To 127)
     ReDim ch_bodyLines(0 To 127)
+    ReDim ch_isTOC(0 To 127)          ' v3.2 新增
     ch_count = 0
     ch_unit = g_selDefaultUnits(0)
     currentVol = 0
     currentVolUnit = ""
+    
+    ' 重置目录区检测
+    g_tocStartIdx = -1
+    g_tocEndIdx = -1
+    g_tocChapterCount = 0
 
     ' 预编译卷级正则
     Set regVol = CreateObject("VBScript.RegExp")
@@ -734,13 +746,17 @@ Private Sub ScanChaptersV3(lines() As String, ByVal lineCount As Long)
         Dim line As String
         line = lines(i)
         If Len(Trim(line)) = 0 Then GoTo NextLine5
+        
+        ' v3.2 新增：行归一化（用于正则匹配，不影响原始内容）
+        Dim normLine As String
+        normLine = NormalizeLineForMatch(line)
 
         matched = False
         matchRegIdx = -1
 
         ' 先检查卷级标题
-        If regVol.Test(line) Then
-            Set m = regVol.Execute(line)
+        If regVol.Test(normLine) Then
+            Set m = regVol.Execute(normLine)
             numStr = m(0).SubMatches(0)
             unitStr = m(0).SubMatches(1)
             chNum = CnToInt(numStr)
@@ -775,7 +791,7 @@ Private Sub ScanChaptersV3(lines() As String, ByVal lineCount As Long)
 
         ' 再检查章节级正则
         For r = 0 To g_selCount - 1
-            If regs(r).Test(line) Then
+            If regs(r).Test(normLine) Then
                 matched = True
                 matchRegIdx = r
                 Exit For
@@ -783,7 +799,7 @@ Private Sub ScanChaptersV3(lines() As String, ByVal lineCount As Long)
         Next r
 
         If matched Then
-            Set m = regs(matchRegIdx).Execute(line)
+            Set m = regs(matchRegIdx).Execute(normLine)
             Dim fullTitle As String
             fullTitle = Trim(m(0).Value)
 
@@ -1484,7 +1500,8 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
     Dim firstVolKey As String, secondVolKey As String
     Dim firstDone As Boolean
     Dim vkey As String, vvkey As String
-    Dim commonCnt As Long, commonList As String, cn As Long
+    Dim commonCnt As Long, commonList As String
+    Dim cnKey As Variant          ' For Each 遍历字典键必须用 Variant
     Dim firstSet As Object, secondSet As Object
     
     ' 重复分析
@@ -1633,15 +1650,15 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
                 Set firstSet = volChs(firstVolKey)
                 Set secondSet = volChs(secondVolKey)
                 If firstSet.Count > 0 And secondSet.Count > 0 Then
-                    For Each cn In firstSet.Keys
-                        If secondSet.Exists(cn) Then
+                    For Each cnKey In firstSet.Keys
+                        If secondSet.Exists(cnKey) Then
                             commonCnt = commonCnt + 1
                             If commonCnt <= 10 Then
                                 If Len(commonList) > 0 Then commonList = commonList & ","
-                                commonList = commonList & cn
+                                commonList = commonList & cnKey
                             End If
                         End If
-                    Next cn
+                    Next cnKey
                 End If
                 If commonCnt > 0 Then
                     AddRptLine lines_arr, rptIdx, ""
@@ -1694,8 +1711,14 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
             If flatMap(k) > 1 Then
                 vv = flatMap(k)
                 insPos = topCount
-                Do While insPos > 0 And topCounts(insPos - 1) < vv
-                    insPos = insPos - 1
+                ' 注意：VBA 的 And 不短路求值，必须分开判断，
+                ' 否则 insPos=0 时 topCounts(-1) 会报"下标越界"
+                Do While insPos > 0
+                    If topCounts(insPos - 1) < vv Then
+                        insPos = insPos - 1
+                    Else
+                        Exit Do
+                    End If
                 Loop
                 If insPos < 10 Then
                     For mv = IIf(topCount < 9, topCount, 9) To insPos + 1 Step -1
@@ -2837,6 +2860,61 @@ Private Function NormalizeSeparators(ByVal s As String) As String
     r = Replace(r, "６", "6"): r = Replace(r, "７", "7")
     r = Replace(r, "８", "8"): r = Replace(r, "９", "9")
     NormalizeSeparators = r
+End Function
+
+'------------------------------------------------------------------------------
+' v3.2 新增：行归一化（用于章节标题匹配前的预处理）
+'   处理：全角数字→半角、全角空格→半角、空白压缩、不可见字符清理、全角冒号统一
+'   注意：仅用于匹配正则，原始行内容保留用于输出
+'------------------------------------------------------------------------------
+Private Function NormalizeLineForMatch(ByVal s As String) As String
+    Dim r As String
+    Dim i As Long, c As String, code As Long
+    Dim result As String
+    Dim prevSpace As Boolean
+    
+    r = s
+    
+    ' 1. 全角数字 → 半角
+    r = Replace(r, "０", "0"): r = Replace(r, "１", "1")
+    r = Replace(r, "２", "2"): r = Replace(r, "３", "3")
+    r = Replace(r, "４", "4"): r = Replace(r, "５", "5")
+    r = Replace(r, "６", "6"): r = Replace(r, "７", "7")
+    r = Replace(r, "８", "8"): r = Replace(r, "９", "9")
+    
+    ' 2. 全角空格 → 半角空格
+    r = Replace(r, ChrW(12288), " ")   ' 全角空格
+    r = Replace(r, ChrW(&H3000), " ")   ' 另一种全角空格
+    
+    ' 3. 全角冒号 → 半角冒号（统一"第N章：标题"中的冒号）
+    r = Replace(r, "：", ":")
+    
+    ' 4. 清理不可见字符（保留常用的，移除零宽字符等）
+    r = Replace(r, ChrW(&H200B), "")   ' 零宽空格
+    r = Replace(r, ChrW(&H200C), "")   ' 零宽非连字符
+    r = Replace(r, ChrW(&H200D), "")   ' 零宽连字符
+    r = Replace(r, ChrW(&HFEFF), "")   ' BOM/零宽无间断空格
+    
+    ' 5. Tab → 空格
+    r = Replace(r, vbTab, " ")
+    
+    ' 6. 压缩多个连续空格为一个（提升正则匹配率）
+    result = ""
+    prevSpace = False
+    For i = 1 To Len(r)
+        c = Mid(r, i, 1)
+        If c = " " Then
+            If Not prevSpace Then
+                result = result & c
+                prevSpace = True
+            End If
+        Else
+            result = result & c
+            prevSpace = False
+        End If
+    Next i
+    
+    NormalizeLineForMatch = result
 End Function
 
 Private Function IsDigits(ByVal s As String) As Boolean
