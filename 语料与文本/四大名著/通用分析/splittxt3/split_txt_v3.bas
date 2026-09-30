@@ -1694,6 +1694,7 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
     AddRptLine lines_arr, rptIdx, "识别结构: 卷级 " & volCnt & " 个, 章节级 " & chapCnt & " 个"
     If g_tocChapterCount > 0 Then
         AddRptLine lines_arr, rptIdx, "              其中目录区 " & g_tocChapterCount & " 章（已跳过）"
+    End If
     AddRptLine lines_arr, rptIdx, "使用正则: " & g_regexName
     AddRptLine lines_arr, rptIdx, ""
 
