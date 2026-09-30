@@ -480,9 +480,14 @@ def dedup_sort(chapters, volume_mode='auto'):
 
 
 DEDUP_STRATEGIES = {
+    'none': None,
     'adjacent': dedup_adjacent,
     'first': dedup_first,
     'longest': dedup_longest,
+}
+
+SORT_STRATEGIES = {
+    'none': None,
     'lis': dedup_lis,
     'sort': dedup_sort,
 }
@@ -753,35 +758,55 @@ def deep_analyze(file_path):
                 if len(missing_list) > 30:
                     print(f"    ... 共{len(missing_list)}个")
 
-    # ---------- 7. 各策略效果预览 ----------
+    # ---------- 7. 各组合效果预览 ----------
     print()
     print("-" * 50)
-    print("【七、各去重策略效果预览（扁平模式）】")
-    for name, func in DEDUP_STRATEGIES.items():
+    print("【七、常用组合效果预览（扁平模式）】")
+    combos = [
+        ("adjacent+none",  "adjacent", "none"),
+        ("first+none",     "first",    "none"),
+        ("longest+none",   "longest",  "none"),
+        ("none+lis",       "none",     "lis"),
+        ("longest+lis",    "longest",  "lis"),
+        ("longest+sort",   "longest",  "sort"),
+    ]
+    for label, dedup_name, sort_name in combos:
         try:
-            deduped = func(chapters, 'flat')
+            result = chapters
+            if dedup_name != 'none':
+                dedup_func = DEDUP_STRATEGIES[dedup_name]
+                result = dedup_func(result, 'flat')
+            if sort_name != 'none':
+                sort_func = SORT_STRATEGIES[sort_name]
+                result = sort_func(result, 'flat')
             ooo_after = 0
             prev = 0
-            for ch in deduped:
+            for ch in result:
                 if ch['ch_num'] <= 0:
                     continue
                 if ch['ch_num'] < prev:
                     ooo_after += 1
                 prev = ch['ch_num']
-            print(f"  {name:12s}: 剩{len(deduped):4d}章, 乱序{ooo_after:4d}处")
+            print(f"  {label:14s}: 剩{len(result):4d}章, 乱序{ooo_after:4d}处")
         except Exception as e:
-            print(f"  {name:12s}: 错误 - {e}")
+            print(f"  {label:14s}: 错误 - {e}")
 
     if volumes:
         print(f"\n  【卷感知模式】")
-        for name, func in DEDUP_STRATEGIES.items():
+        for label, dedup_name, sort_name in combos:
             try:
-                deduped = func(chapters, 'auto')
+                result = chapters
+                if dedup_name != 'none':
+                    dedup_func = DEDUP_STRATEGIES[dedup_name]
+                    result = dedup_func(result, 'auto')
+                if sort_name != 'none':
+                    sort_func = SORT_STRATEGIES[sort_name]
+                    result = sort_func(result, 'auto')
                 # 卷感知乱序：同卷内比较
                 ooo_after = 0
                 prev_vol = None
                 prev_ch = 0
-                for ch in deduped:
+                for ch in result:
                     if ch['ch_num'] <= 0:
                         continue
                     v = ch.get('vol_num')
@@ -790,9 +815,9 @@ def deep_analyze(file_path):
                             ooo_after += 1
                     prev_vol = v
                     prev_ch = ch['ch_num']
-                print(f"  {name:12s}: 剩{len(deduped):4d}章, 卷内乱序{ooo_after:3d}处")
+                print(f"  {label:14s}: 剩{len(result):4d}章, 卷内乱序{ooo_after:3d}处")
             except Exception as e:
-                print(f"  {name:12s}: 错误 - {e}")
+                print(f"  {label:14s}: 错误 - {e}")
 
     # ---------- 8. 建议 ----------
     print()
@@ -804,16 +829,19 @@ def deep_analyze(file_path):
         suggestions.append("• 检测到多卷结构且卷间章号重复，建议启用卷感知模式")
         suggestions.append("  （--volume-mode auto 或 by_volume）")
 
-    if ooo_count > 10:
-        suggestions.append("• 乱序严重，推荐 sort 策略（最彻底）或 lis 策略（智能）")
+    if ooo_count > 10 and dup_flat:
+        suggestions.append("• 重复+乱序都严重，推荐 --dedup longest --sort sort（最彻底）")
+        suggestions.append("  或 --dedup none --sort lis（智能找主线，保留原文脉络）")
+    elif ooo_count > 10:
+        suggestions.append("• 乱序严重，推荐 --sort sort（最彻底）或 --sort lis（智能）")
     elif dup_flat:
-        suggestions.append("• 有重复但乱序轻微，推荐 longest 策略（保留内容最长的）")
+        suggestions.append("• 有重复但乱序轻微，推荐 --dedup longest --sort none（保留内容最长的且不改顺序）")
 
     if adj_ratio > 0.3:
-        suggestions.append("• 每章双标题明显，adjacent 策略即可解决大部分问题")
+        suggestions.append("• 每章双标题明显，--dedup adjacent 即可解决大部分问题")
 
     if not suggestions:
-        suggestions.append("• 文件质量较好，可根据需要选择策略")
+        suggestions.append("• 文件质量较好，可根据需要选择组合")
 
     for s in suggestions:
         print(f"  {s}")
@@ -846,7 +874,7 @@ def format_range(ch_start, ch_end, unit):
 # 拆分函数
 # ===========================================================================
 def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
-                     dedup_strategy='lis', volume_mode='auto',
+                     dedup_strategy='longest', sort_strategy='sort', volume_mode='auto',
                      generate_title_only=False, min_body_len=0, merge_flag=None):
     """按章节一一拆分"""
     t_total0 = time.time()
@@ -892,15 +920,33 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
         actual_vol_mode = 'flat'
 
     # 4. 去重
+    chapters = all_chapters
     t0 = time.time()
-    dedup_func = DEDUP_STRATEGIES.get(dedup_strategy)
-    if dedup_func is None:
-        print(f"[错误] 未知去重策略: {dedup_strategy}")
-        sys.exit(1)
-    chapters = dedup_func(all_chapters, actual_vol_mode)
+    if dedup_strategy != 'none':
+        dedup_func = DEDUP_STRATEGIES.get(dedup_strategy)
+        if dedup_func is None:
+            print(f"[错误] 未知去重策略: {dedup_strategy}")
+            sys.exit(1)
+        chapters = dedup_func(chapters, actual_vol_mode)
+        print(f"去重策略: {dedup_strategy}")
+    else:
+        print(f"去重策略: none（不处理）")
     t_dedup = time.time() - t0
-    print(f"去重策略: {dedup_strategy}")
     print(f"去重后章节: {len(chapters)}")
+
+    # 4b. 排序
+    t0 = time.time()
+    if sort_strategy != 'none':
+        sort_func = SORT_STRATEGIES.get(sort_strategy)
+        if sort_func is None:
+            print(f"[错误] 未知排序策略: {sort_strategy}")
+            sys.exit(1)
+        chapters = sort_func(chapters, actual_vol_mode)
+        print(f"排序策略: {sort_strategy}")
+    else:
+        print(f"排序策略: none（保持原文顺序）")
+    t_sort = time.time() - t0
+    print(f"排序后章节: {len(chapters)}")
 
     if not chapters:
         print("无有效章节，终止")
@@ -1077,8 +1123,8 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
 
 
 def split_by_groups(src, chunk_str="40,3", out_dir="", prefix="",
-                    serial_width=3, encoding=None, dedup_strategy='lis',
-                    volume_mode='auto'):
+                    serial_width=3, encoding=None, dedup_strategy='longest',
+                    sort_strategy='sort', volume_mode='auto'):
     """聚合拆分"""
     import math
 
@@ -1108,8 +1154,23 @@ def split_by_groups(src, chunk_str="40,3", out_dir="", prefix="",
     else:
         actual_vol_mode = volume_mode if volume_mode != 'by_volume' else 'volume'
 
-    dedup_func = DEDUP_STRATEGIES.get(dedup_strategy)
-    chapters = dedup_func(all_chapters, actual_vol_mode)
+    # 去重
+    chapters = all_chapters
+    if dedup_strategy != 'none':
+        dedup_func = DEDUP_STRATEGIES.get(dedup_strategy)
+        if dedup_func is None:
+            print(f"[错误] 未知去重策略: {dedup_strategy}")
+            sys.exit(1)
+        chapters = dedup_func(chapters, actual_vol_mode)
+
+    # 排序
+    if sort_strategy != 'none':
+        sort_func = SORT_STRATEGIES.get(sort_strategy)
+        if sort_func is None:
+            print(f"[错误] 未知排序策略: {sort_strategy}")
+            sys.exit(1)
+        chapters = sort_func(chapters, actual_vol_mode)
+
     t_scan = time.time() - t0
 
     unit = chapters[0].get('ch_unit', '章') if chapters else '章'
@@ -1117,8 +1178,9 @@ def split_by_groups(src, chunk_str="40,3", out_dir="", prefix="",
 
     print(f"识别章节(原始): {len(all_chapters)}")
     print(f"去重策略: {dedup_strategy}")
+    print(f"排序策略: {sort_strategy}")
     print(f"卷模式: {actual_vol_mode}")
-    print(f"去重后章节: {total}  单位: {unit}")
+    print(f"处理后章节: {total}  单位: {unit}")
     print(f"聚合格式: {chunk_str}")
 
     if total == 0:
@@ -1256,9 +1318,12 @@ def main():
                         help="手动指定源文件编码")
     parser.add_argument("--analyze", action="store_true",
                         help="深度分析：全面诊断所有问题")
-    parser.add_argument("--dedup", default="lis",
+    parser.add_argument("--dedup", default="longest",
                         choices=list(DEDUP_STRATEGIES.keys()),
-                        help="去重策略: adjacent/first/longest/lis/sort (默认: lis)")
+                        help="去重策略: none/adjacent/first/longest (默认: longest)")
+    parser.add_argument("--sort", default="sort",
+                        choices=list(SORT_STRATEGIES.keys()),
+                        help="排序策略: none/lis/sort (默认: sort)")
     parser.add_argument("--volume-mode", default="auto",
                         choices=["auto", "flat", "by_volume"],
                         help="卷级处理模式: auto(自动检测)/flat(扁平)/by_volume(按卷分目录)")
@@ -1295,13 +1360,13 @@ def main():
     try:
         if mode == "chapter":
             split_by_chapter(args.src, args.out, args.prefix, args.serial_width,
-                             args.encoding, args.dedup, args.volume_mode,
+                             args.encoding, args.dedup, args.sort, args.volume_mode,
                              args.keep_title_only, args.min_body_len, merge_flag)
         else:
             chunk_str = args.chunk if args.chunk else "40,3"
             split_by_groups(args.src, chunk_str, args.out, args.prefix,
                             args.serial_width, args.encoding, args.dedup,
-                            args.volume_mode)
+                            args.sort, args.volume_mode)
     except ValueError as e:
         print(f"[错误] {e}")
         sys.exit(1)

@@ -50,8 +50,9 @@ Private g_selDefaultUnits() As String
 Private g_selOrigIndices() As Long
 Private g_selCount As Long
 
-' --- v3 新增：去重与卷 ---
-Private g_dedupStrategy As String       ' adjacent/first/longest/lis/sort
+' --- v3 新增：去重、排序与卷 ---
+Private g_dedupStrategy As String       ' none/adjacent/first/longest
+Private g_sortStrategy As String        ' none/lis/sort
 Private g_volumeMode As String          ' auto/flat/by_volume
 
 ' --- 章节数据（v3 增强版，含章号/卷号/正文行数等）---
@@ -277,23 +278,21 @@ Private Function SelectDedupStrategy() As Boolean
     Dim prompt As String, inputVal As String
     Dim strategies As Variant, names As Variant, i As Long
 
-    strategies = Array("adjacent", "first", "longest", "lis", "sort")
-    names = Array("相邻重复去重（仅合并连续相同章号）", _
+    strategies = Array("none", "adjacent", "first", "longest")
+    names = Array("不去重", _
+                  "相邻重复去重（仅合并连续相同章号）", _
                   "保留首次出现（每章只留第一次）", _
-                  "保留内容最长的（每章留正文最多的）", _
-                  "最长递增子序列（智能找主线，去重+修序）★推荐", _
-                  "按章号重新排序（最彻底，章号齐全）★推荐")
+                  "保留内容最长的（每章留正文最多的）★推荐")
 
-    prompt = "请选择去重策略：" & vbCrLf & vbCrLf
+    prompt = "【步骤3/4】请选择去重策略：" & vbCrLf & vbCrLf
     For i = 0 To UBound(strategies)
         prompt = prompt & "  " & (i + 1) & ". " & names(i) & vbCrLf
     Next i
     prompt = prompt & vbCrLf & _
-             "建议：" & vbCrLf & _
-             "  • 仅双标题 → 1 (adjacent)" & vbCrLf & _
-             "  • 有重复但不乱 → 3 (longest)" & vbCrLf & _
-             "  • 重复+乱序 → 4 (lis) 或 5 (sort)" & vbCrLf & _
-             "  • 乱序严重 → 5 (sort)" & vbCrLf & vbCrLf & _
+             "说明：" & vbCrLf & _
+             "  • 只有双标题 → 2 (adjacent)" & vbCrLf & _
+             "  • 有重复想保留最多内容 → 4 (longest) ★" & vbCrLf & _
+             "  • 只想排序不去重 → 1 (none)" & vbCrLf & vbCrLf & _
              "请输入序号："
 
     inputVal = InputBox(prompt, "选择去重策略", "4")
@@ -319,6 +318,54 @@ Private Function SelectDedupStrategy() As Boolean
     g_dedupStrategy = strategies(i)
     Debug.Print "[去重策略] " & g_dedupStrategy & " - " & names(i)
     SelectDedupStrategy = True
+End Function
+
+'------------------------------------------------------------------------------
+' 排序策略选择对话框
+'------------------------------------------------------------------------------
+Private Function SelectSortStrategy() As Boolean
+    Dim prompt As String, inputVal As String
+    Dim strategies As Variant, names As Variant, i As Long
+
+    strategies = Array("none", "lis", "sort")
+    names = Array("不排序，保持原文顺序", _
+                  "最长递增子序列修序（智能找主线）", _
+                  "按章号完全重排（最彻底，章号齐全有序）★推荐")
+
+    prompt = "【步骤4/4】请选择排序策略：" & vbCrLf & vbCrLf
+    For i = 0 To UBound(strategies)
+        prompt = prompt & "  " & (i + 1) & ". " & names(i) & vbCrLf
+    Next i
+    prompt = prompt & vbCrLf & _
+             "说明：" & vbCrLf & _
+             "  • 只想去重不改顺序 → 1 (none)" & vbCrLf & _
+             "  • 乱序但想保留原文脉络 → 2 (lis)" & vbCrLf & _
+             "  • 乱序严重，要完全整齐 → 3 (sort) ★" & vbCrLf & vbCrLf & _
+             "请输入序号："
+
+    inputVal = InputBox(prompt, "选择排序策略", "3")
+    If StrPtr(inputVal) = 0 Then
+        SelectSortStrategy = False
+        Exit Function
+    End If
+
+    inputVal = Trim(inputVal)
+    If Not IsDigits(inputVal) Then
+        MsgBox "请输入数字序号。", vbExclamation, "提示"
+        SelectSortStrategy = False
+        Exit Function
+    End If
+
+    i = CLng(inputVal) - 1
+    If i < 0 Or i > UBound(strategies) Then
+        MsgBox "序号超出范围（1-" & (UBound(strategies) + 1) & "）。", vbExclamation, "提示"
+        SelectSortStrategy = False
+        Exit Function
+    End If
+
+    g_sortStrategy = strategies(i)
+    Debug.Print "[排序策略] " & g_sortStrategy & " - " & names(i)
+    SelectSortStrategy = True
 End Function
 
 '------------------------------------------------------------------------------
@@ -1184,16 +1231,203 @@ End Sub
 '   输出：dedup_indices, dedup_count（全局）
 '------------------------------------------------------------------------------
 Private Sub ApplyDedup(ByVal strategy As String, ByVal volMode As String)
+    If strategy = "none" Then
+        ' 不去重：直接使用所有章节
+        GetChapterIndices dedup_indices, dedup_count
+    Else
+        Select Case strategy
+            Case "adjacent": DedupAdjacent volMode, dedup_indices, dedup_count
+            Case "first":    DedupFirst volMode, dedup_indices, dedup_count
+            Case "longest":  DedupLongest volMode, dedup_indices, dedup_count
+            Case Else
+                MsgBox "未知去重策略：" & strategy, vbExclamation, "错误"
+                dedup_count = 0
+        End Select
+    End If
+End Sub
+
+'------------------------------------------------------------------------------
+' 排序（在去重结果基础上继续排序）
+'------------------------------------------------------------------------------
+Private Sub ApplySort(ByVal strategy As String, ByVal volMode As String)
+    If strategy = "none" Then Exit Sub   ' 不排序，保持去重结果
+    
     Select Case strategy
-        Case "adjacent": DedupAdjacent volMode, dedup_indices, dedup_count
-        Case "first":    DedupFirst volMode, dedup_indices, dedup_count
-        Case "longest":  DedupLongest volMode, dedup_indices, dedup_count
-        Case "lis":      DedupLIS volMode, dedup_indices, dedup_count
-        Case "sort":     DedupSort volMode, dedup_indices, dedup_count
+        Case "lis":  SortLISFromIndices volMode
+        Case "sort": SortFullFromIndices volMode
         Case Else
-            MsgBox "未知去重策略：" & strategy, vbExclamation, "错误"
+            MsgBox "未知排序策略：" & strategy, vbExclamation, "错误"
             dedup_count = 0
     End Select
+End Sub
+
+'------------------------------------------------------------------------------
+' 在 dedup_indices 基础上应用 LIS 排序（输入输出都是 dedup_indices）
+'------------------------------------------------------------------------------
+Private Sub SortLISFromIndices(ByVal volMode As String)
+    Dim n As Long, i As Long
+    Dim tails_val_vol() As Long, tails_val_ch() As Long
+    Dim tails_idx() As Long
+    Dim prevArr() As Long
+    Dim left As Long, right As Long, pos As Long
+    Dim tailLen As Long
+    Dim vol_i As Long, ch_i As Long
+    Dim mid As Long
+    Dim curr As Long
+    Dim resultIdx() As Long, resultCnt As Long
+    
+    n = dedup_count
+    If n = 0 Then Exit Sub
+    
+    ReDim tails_val_vol(0 To n - 1)
+    ReDim tails_val_ch(0 To n - 1)
+    ReDim tails_idx(0 To n - 1)
+    ReDim prevArr(0 To n - 1)
+    For i = 0 To n - 1
+        prevArr(i) = -1
+    Next i
+    
+    tailLen = 0
+    
+    For i = 0 To n - 1
+        Dim origIdx As Long
+        origIdx = dedup_indices(i)
+        vol_i = ch_vols(origIdx)
+        ch_i = ch_nums(origIdx)
+        If ch_i = 0 Then ch_i = -1   ' 无号章节放最前面
+        If volMode = "flat" Then vol_i = 0
+        
+        ' 二分查找：找第一个 >= (vol_i, ch_i) 的位置
+        left = 0: right = tailLen
+        Do While left < right
+            mid = (left + right) \ 2
+            If tails_val_vol(mid) < vol_i Then
+                left = mid + 1
+            ElseIf tails_val_vol(mid) > vol_i Then
+                right = mid
+            Else
+                If tails_val_ch(mid) < ch_i Then
+                    left = mid + 1
+                Else
+                    right = mid
+                End If
+            End If
+        Loop
+        pos = left
+        
+        If pos = tailLen Then
+            tails_val_vol(tailLen) = vol_i
+            tails_val_ch(tailLen) = ch_i
+            tails_idx(tailLen) = i
+            tailLen = tailLen + 1
+        Else
+            tails_val_vol(pos) = vol_i
+            tails_val_ch(pos) = ch_i
+            tails_idx(pos) = i
+        End If
+        
+        If pos > 0 Then
+            prevArr(i) = tails_idx(pos - 1)
+        End If
+    Next i
+    
+    ' 回溯
+    If tailLen = 0 Then
+        dedup_count = 0
+        Exit Sub
+    End If
+    
+    ReDim resultIdx(0 To tailLen - 1)
+    curr = tails_idx(tailLen - 1)
+    For i = tailLen - 1 To 0 Step -1
+        resultIdx(i) = dedup_indices(curr)
+        If i > 0 Then curr = prevArr(curr)
+    Next i
+    
+    ' 写回 dedup_indices
+    dedup_count = tailLen
+    For i = 0 To tailLen - 1
+        dedup_indices(i) = resultIdx(i)
+    Next i
+End Sub
+
+'------------------------------------------------------------------------------
+' 在 dedup_indices 基础上按(卷号,章号)完全重排
+'------------------------------------------------------------------------------
+Private Sub SortFullFromIndices(ByVal volMode As String)
+    Dim n As Long, i As Long, j As Long
+    Dim keys_vol() As Long, keys_ch() As Long
+    Dim origIdxArr() As Long
+    Dim isSpecial() As Boolean
+    Dim specialCnt As Long, normalCnt As Long
+    
+    n = dedup_count
+    If n = 0 Then Exit Sub
+    
+    ReDim keys_vol(0 To n - 1)
+    ReDim keys_ch(0 To n - 1)
+    ReDim origIdxArr(0 To n - 1)
+    ReDim isSpecial(0 To n - 1)
+    
+    ' 分离 special 和 normal
+    specialCnt = 0
+    normalCnt = 0
+    For i = 0 To n - 1
+        origIdxArr(i) = dedup_indices(i)
+        If ch_levels(origIdxArr(i)) = "special" Then
+            isSpecial(i) = True
+            specialCnt = specialCnt + 1
+        Else
+            isSpecial(i) = False
+            keys_vol(i) = ch_vols(origIdxArr(i))
+            If ch_nums(origIdxArr(i)) = 0 Then
+                keys_ch(i) = 999999
+            Else
+                keys_ch(i) = ch_nums(origIdxArr(i))
+            End If
+            If volMode = "flat" Then keys_vol(i) = 0
+            normalCnt = normalCnt + 1
+        End If
+    Next i
+    
+    ' 对 normal 章节按 (卷号, 章号) 冒泡排序（数量不大）
+    For i = 0 To n - 2
+        If isSpecial(i) Then GoTo next_sort_i
+        For j = i + 1 To n - 1
+            If isSpecial(j) Then GoTo next_sort_j
+            If keys_vol(i) > keys_vol(j) Or _
+               (keys_vol(i) = keys_vol(j) And keys_ch(i) > keys_ch(j)) Then
+                ' 交换
+                Dim tv As Long, tc As Long, ti As Long
+                Dim ts As Boolean
+                tv = keys_vol(i): keys_vol(i) = keys_vol(j): keys_vol(j) = tv
+                tc = keys_ch(i): keys_ch(i) = keys_ch(j): keys_ch(j) = tc
+                ti = origIdxArr(i): origIdxArr(i) = origIdxArr(j): origIdxArr(j) = ti
+                ts = isSpecial(i): isSpecial(i) = isSpecial(j): isSpecial(j) = ts
+            End If
+next_sort_j:
+        Next j
+next_sort_i:
+    Next i
+    
+    ' 写回：special 在前（保持原顺序），normal 在后（按排序后顺序）
+    Dim outIdx As Long
+    outIdx = 0
+    ' 先写 special
+    For i = 0 To n - 1
+        If isSpecial(i) Then
+            dedup_indices(outIdx) = origIdxArr(i)
+            outIdx = outIdx + 1
+        End If
+    Next i
+    ' 再写 normal（排序后的）
+    For i = 0 To n - 1
+        If Not isSpecial(i) Then
+            dedup_indices(outIdx) = origIdxArr(i)
+            outIdx = outIdx + 1
+        End If
+    Next i
+    ' dedup_count 不变
 End Sub
 
 
@@ -1749,7 +1983,8 @@ Public Sub 拆分TXTv3()
     g_tSelect = 0
     g_regexName = ""
     g_selCount = 0
-    g_dedupStrategy = "lis"
+    g_dedupStrategy = "longest"
+    g_sortStrategy = "sort"
     g_volumeMode = "auto"
 
     ' 步骤1：选择文件
@@ -1765,10 +2000,13 @@ Public Sub 拆分TXTv3()
     ' 步骤3：选择去重策略
     If Not SelectDedupStrategy() Then Exit Sub
 
-    ' 步骤4：选择卷模式
+    ' 步骤4：选择排序策略
+    If Not SelectSortStrategy() Then Exit Sub
+
+    ' 步骤5：选择卷模式
     If Not SelectVolumeMode() Then Exit Sub
 
-    ' 步骤5：选择拆分模式
+    ' 步骤6：选择拆分模式
     mode = MsgBox("请选择拆分模式：" & vbCrLf & vbCrLf & _
                   "  [是]  按章节一一拆分（每章一个文件）" & vbCrLf & _
                   "  [否]  聚合拆分（多章合并为一份）" & vbCrLf & _
@@ -1943,6 +2181,17 @@ Public Sub SplitByChapterV3(ByVal InputPath As String, _
 
     If dedup_count = 0 Then
         MsgBox "去重后无有效章节！", vbExclamation, "错误"
+        Exit Sub
+    End If
+
+    ' 4b. 排序
+    Dim tSort As Double
+    t0 = Timer
+    ApplySort g_sortStrategy, actualVolMode
+    tSort = Timer - t0
+
+    If dedup_count = 0 Then
+        MsgBox "排序后无有效章节！", vbExclamation, "错误"
         Exit Sub
     End If
 
@@ -2164,10 +2413,11 @@ NextChapterV3:
         skipDetail = skipDetail & shortBodyCount & "个正文不足"
     End If
 
-    extraInfo = "【去重信息】" & vbCrLf & _
+    extraInfo = "【去重+排序信息】" & vbCrLf & _
                "  去重策略：" & g_dedupStrategy & vbCrLf & _
+               "  排序策略：" & g_sortStrategy & vbCrLf & _
                "  卷模式：" & actualVolMode & vbCrLf & _
-               "  原始章节：" & ch_count & " → 去重后：" & dedup_count & vbCrLf
+               "  原始章节：" & ch_count & " → 处理后：" & dedup_count & vbCrLf
 
     If skippedCount > 0 Then
         topStr = top1 & "字"
@@ -2247,6 +2497,17 @@ Public Sub SplitByGroupsV3(ByVal InputPath As String, _
         Exit Sub
     End If
 
+    ' 4b. 排序
+    Dim tSort2 As Double
+    t0 = Timer
+    ApplySort g_sortStrategy, actualVolMode
+    tSort2 = Timer - t0
+
+    If dedup_count = 0 Then
+        MsgBox "排序后无有效章节！", vbExclamation, "错误"
+        Exit Sub
+    End If
+
     unitStr = ch_unit
 
     ' 5. 解析聚合格式
@@ -2281,8 +2542,9 @@ Public Sub SplitByGroupsV3(ByVal InputPath As String, _
     If Len(g_regexName) > 0 Then preview = preview & "正则：" & g_regexName & vbCrLf
     preview = preview & _
               "去重策略：" & g_dedupStrategy & vbCrLf & _
+              "排序策略：" & g_sortStrategy & vbCrLf & _
               "卷模式：" & actualVolMode & vbCrLf & _
-              "原始章节：" & ch_count & " → 去重后：" & dedup_count & vbCrLf & _
+              "原始章节：" & ch_count & " → 处理后：" & dedup_count & vbCrLf & _
               "单位：" & unitStr & vbCrLf & _
               "聚合格式：" & ChunkStr & vbCrLf & _
               "将生成 " & fileCount & " 个文件：" & vbCrLf
