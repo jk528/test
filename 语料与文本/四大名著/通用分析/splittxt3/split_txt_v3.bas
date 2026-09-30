@@ -1691,12 +1691,14 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
     
     ' 重复分析
     Dim flatMap As Object
-    Dim numKey As String
+    Dim numKey As Variant       ' For Each 遍历字典键必须用 Variant
     Dim uniqueCnt As Long, dupCnt As Long
     Dim topNums() As String, topCounts() As Long, topCount As Long
     Dim vv As Long, insPos As Long, mv As Long
     Dim countDist As Object
     Dim cc As String
+    Dim ti As Long              ' 示例循环变量
+    Dim ntKey As Variant        ' For Each 遍历标题字典键（必须 Variant）
     
     ' 乱序分析
     Dim oooCnt As Long, maxDrop As Long, prevNum As Long
@@ -1945,6 +1947,7 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
         Dim titleDiffCnt As Long, titleDiffArr() As Long
         Dim titleDiffTitles() As String, tdIdx As Long
         Dim normTitles As Object, chk As Long
+        Dim ntStr As String, tdTitles As String, ttIdx As Long
         ReDim titleDiffArr(0 To 9)
         ReDim titleDiffTitles(0 To 9)
         tdIdx = 0
@@ -1957,9 +1960,8 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
             Set normTitles = CreateObject("Scripting.Dictionary")
             For chk = 0 To ch_count - 1
                 If ch_levels(chk) = "chapter" And ch_nums(chk) = CLng(numKey) Then
-                    Dim nt As String
-                    nt = NormalizeTitle(ch_titles(chk))
-                    If Not normTitles.Exists(nt) Then normTitles.Add nt, 1
+                    ntStr = NormalizeTitle(ch_titles(chk))
+                    If Not normTitles.Exists(ntStr) Then normTitles.Add ntStr, 1
                 End If
             Next chk
             
@@ -1968,16 +1970,15 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
                 If tdIdx < 5 Then
                     titleDiffArr(tdIdx) = CLng(numKey)
                     ' 收集前几个不同的标题
-                    Dim tdTitles As String, ttIdx As Long
                     ttIdx = 0
                     tdTitles = ""
-                    For Each nt In normTitles.Keys
+                    For Each ntKey In normTitles.Keys
                         If ttIdx < 2 Then
                             If ttIdx > 0 Then tdTitles = tdTitles & " / "
-                            tdTitles = tdTitles & Left(CStr(nt), 15)
+                            tdTitles = tdTitles & Left(CStr(ntKey), 15)
                             ttIdx = ttIdx + 1
                         End If
-                    Next nt
+                    Next ntKey
                     titleDiffTitles(tdIdx) = tdTitles
                     tdIdx = tdIdx + 1
                 End If
@@ -2270,7 +2271,7 @@ Public Sub 拆分TXTv3()
     Dim mode As VbMsgBoxResult
     Dim chunkStr As String, prompt As String
     Dim cleanInput As String, cleanParts() As String
-    Dim cleanN As Long, cleanFlag As Long, flagStr As String
+    Dim cleanN As Long, cleanFlag As Long
 
     ' 初始化
     g_tTotal0 = Timer

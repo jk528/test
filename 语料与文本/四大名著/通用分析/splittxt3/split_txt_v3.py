@@ -1148,40 +1148,14 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
     t_write = time.time() - t0
     t_total = time.time() - t_total0
 
-    # 清洁模式合并
-    if merge_flag is not None and (merge_flag == 0 or merge_flag == 1):
+    # 清洁模式合并（仅输出保留≥N字的纯净正文，无报告头部）
+    if merge_flag is not None and kept_texts:
         src_name = os.path.splitext(os.path.basename(src))[0]
-        header_lines = [
-            "=" * 50,
-            f"清理说明：正文中文字数小于 {min_body_len} 的章节已跳过",
-            f"跳过章节：{skipped_count} 个",
-        ]
-        if skipped_chapters_list:
-            header_lines.append("跳过明细：")
-            for title, blen in skipped_chapters_list:
-                header_lines.append(f"  {title}（{blen}字）")
-            top3 = sorted(skipped_body_lens, reverse=True)[:3]
-            header_lines.append("前三正文：" + "、".join(f"{x}字" for x in top3))
-        header_lines.append(f"保留章节：{written_count} 个")
-
-        if merge_flag == 0 and skipped_texts:
-            header_lines.append(f"本文件内容：跳过章节（正文汉字 < {min_body_len}）")
-            header_lines.append("=" * 50)
-            merge_name = f"清理小于{min_body_len}_{src_name}.txt"
-            merge_path = os.path.join(out_dir, merge_name)
-            with open(merge_path, 'w', encoding='utf-8') as f:
-                f.write('\n'.join(header_lines) + '\n')
-                f.write('\n'.join(skipped_texts))
-            print(f"合并文件：{merge_name}（{len(skipped_texts)}章合并）")
-        elif merge_flag == 1 and kept_texts:
-            header_lines.append(f"本文件内容：保留章节（正文汉字 >= {min_body_len}）")
-            header_lines.append("=" * 50)
-            merge_name = f"保留大于等于{min_body_len}_{src_name}.txt"
-            merge_path = os.path.join(out_dir, merge_name)
-            with open(merge_path, 'w', encoding='utf-8') as f:
-                f.write('\n'.join(header_lines) + '\n')
-                f.write('\n'.join(kept_texts))
-            print(f"合并文件：{merge_name}（{len(kept_texts)}章合并）")
+        merge_name = f"保留大于等于{min_body_len}_{src_name}.txt"
+        merge_path = os.path.join(out_dir, merge_name)
+        with open(merge_path, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(kept_texts))
+        print(f"合并文件：{merge_name}（{len(kept_texts)}章合并）")
 
     # 报告
     print()
@@ -1419,8 +1393,8 @@ def main():
                         help="生成仅有标题/正文不足的章节文件")
     parser.add_argument("--min-body-len", type=int, default=0,
                         help="最小正文字数(0=不检测)")
-    parser.add_argument("--clean", default=None,
-                        help="清洁模式: N[,flag]")
+    parser.add_argument("--clean", default=None, type=int,
+                        help="清洁模式：N=最小正文字数，输出纯净正文（仅保留≥N字的章节）")
     parser.add_argument("--title-dedup", action="store_true", default=False,
                         help="标题级去重：去重键包含规范化标题，避免章号相同标题不同被误删")
     args = parser.parse_args()
@@ -1440,11 +1414,8 @@ def main():
 
     merge_flag = None
     if args.clean is not None:
-        clean_parts = args.clean.split(",")
-        clean_min = int(clean_parts[0])
-        clean_flag = int(clean_parts[1]) if len(clean_parts) > 1 else 1
-        args.min_body_len = clean_min
-        merge_flag = clean_flag
+        args.min_body_len = args.clean
+        merge_flag = 1  # 固定为保留模式
         mode = "chapter"
 
     try:
