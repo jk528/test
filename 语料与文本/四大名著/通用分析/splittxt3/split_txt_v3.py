@@ -334,25 +334,66 @@ def get_volumes(structures):
 
 
 # ===========================================================================
-# 去重策略（支持卷级感知）
+# 去重策略（支持卷级感知 + 标题级去重）
 # ===========================================================================
 
-def _dedup_key(ch, volume_mode):
-    """生成去重用的唯一键"""
+def _normalize_title(title):
+    """标题规范化：用于标题级去重时的键
+    处理：全角半角统一、空白压缩、标点清理、转小写
+    """
+    import re
+    if not title:
+        return ''
+    t = title.strip()
+    # 全角数字 → 半角
+    full_digits = '０１２３４５６７８９'
+    for i, d in enumerate(full_digits):
+        t = t.replace(d, str(i))
+    # 全角字母 → 半角（常见的）
+    full_alpha_lower = 'ａｂｃｄｅｆｇｈｉｊｋｌｍｎｏｐｑｒｓｔｕｖｗｘｙｚ'
+    full_alpha_upper = 'ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺ'
+    for i, c in enumerate(full_alpha_lower):
+        t = t.replace(c, chr(ord('a') + i))
+    for i, c in enumerate(full_alpha_upper):
+        t = t.replace(c, chr(ord('A') + i))
+    # 全角空格、全角冒号 → 半角
+    t = t.replace('\u3000', ' ').replace('：', ':')
+    # 零宽字符
+    for z in ['\u200b', '\u200c', '\u200d', '\ufeff']:
+        t = t.replace(z, '')
+    # 压缩空白
+    t = re.sub(r'\s+', '', t)
+    # 移除常见标点符号
+    t = re.sub(r'[，。、；：""''（）《》【】「」『』！？·…—\-—_,\.;:""\'\'\(\)\[\]<>!]', '', t)
+    # 转小写
+    t = t.lower()
+    return t
+
+
+def _dedup_key(ch, volume_mode, title_dedup=False):
+    """生成去重用的唯一键
+    title_dedup=True 时，键包含规范化标题，避免章号相同但标题不同的章节被误判为重复
+    """
+    base = []
     if volume_mode == 'flat' or ch.get('vol_num') is None:
-        return ('flat', ch['ch_num'], ch.get('ch_unit', ''))
+        base = ['flat', ch['ch_num'], ch.get('ch_unit', '')]
     else:
-        return (ch['vol_num'], ch['ch_num'], ch.get('ch_unit', ''))
+        base = [ch['vol_num'], ch['ch_num'], ch.get('ch_unit', '')]
+    
+    if title_dedup and ch['ch_num'] > 0:
+        base.append(_normalize_title(ch.get('title', '')))
+    
+    return tuple(base)
 
 
-def dedup_adjacent(chapters, volume_mode='auto'):
+def dedup_adjacent(chapters, volume_mode='auto', title_dedup=False):
     """策略1：相邻重复去重"""
     if not chapters:
         return []
     result = [chapters[0]]
     for ch in chapters[1:]:
-        key = _dedup_key(ch, volume_mode)
-        last_key = _dedup_key(result[-1], volume_mode)
+        key = _dedup_key(ch, volume_mode, title_dedup)
+        last_key = _dedup_key(result[-1], volume_mode, title_dedup)
         if ch['ch_num'] > 0 and key == last_key:
             if ch['body_lines'] > result[-1]['body_lines']:
                 result[-1] = ch
@@ -361,7 +402,7 @@ def dedup_adjacent(chapters, volume_mode='auto'):
     return result
 
 
-def dedup_first(chapters, volume_mode='auto'):
+def dedup_first(chapters, volume_mode='auto', title_dedup=False):
     """策略2：保留首次出现"""
     seen = set()
     result = []
@@ -370,14 +411,14 @@ def dedup_first(chapters, volume_mode='auto'):
             # 无号章节：按标题去重
             key = ('special', ch['title'])
         else:
-            key = _dedup_key(ch, volume_mode)
+            key = _dedup_key(ch, volume_mode, title_dedup)
         if key not in seen:
             seen.add(key)
             result.append(ch)
     return result
 
 
-def dedup_longest(chapters, volume_mode='auto'):
+def dedup_longest(chapters, volume_mode='auto', title_dedup=False):
     """策略3：保留内容最长的"""
     best = OrderedDict()
     order = []
@@ -386,7 +427,7 @@ def dedup_longest(chapters, volume_mode='auto'):
         if ch['ch_num'] <= 0 and ch['level'] == 'special':
             key = ('special', ch['title'])
         else:
-            key = _dedup_key(ch, volume_mode)
+            key = _dedup_key(ch, volume_mode, title_dedup)
 
         if key not in best:
             best[key] = ch
@@ -398,10 +439,25 @@ def dedup_longest(chapters, volume_mode='auto'):
     return [best[k] for k in order]
 
 
-def dedup_lis(chapters, volume_mode='auto'):
+def dedup_lis(chapters, volume_mode='auto', title_dedup=False):
     """策略4：最长递增子序列（LIS）
     支持卷级感知：同一卷内章号递增，跨卷时卷号也递增
+    注意：LIS排序基于章号，标题去重不影响排序逻辑
     """
+    # 先按去重键去重（保留首次出现），再做LIS
+    if title_dedup:
+        seen = {}
+        unique_chapters = []
+        for ch in chapters:
+            if ch['ch_num'] <= 0 and ch['level'] == 'special':
+                key = ('special', ch['title'])
+            else:
+                key = _dedup_key(ch, volume_mode, title_dedup)
+            if key not in seen:
+                seen[key] = True
+                unique_chapters.append(ch)
+        chapters = unique_chapters
+    
     # 构造排序键：(卷号, 章号)
     def sort_key(ch):
         vol = ch.get('vol_num') or 0
@@ -450,7 +506,7 @@ def dedup_lis(chapters, volume_mode='auto'):
     return [valid[i][1] for i in lis_indices]
 
 
-def dedup_sort(chapters, volume_mode='auto'):
+def dedup_sort(chapters, volume_mode='auto', title_dedup=False):
     """策略5：按（卷号,章号）重新排序"""
     best = OrderedDict()
 
@@ -458,7 +514,7 @@ def dedup_sort(chapters, volume_mode='auto'):
         if ch['ch_num'] <= 0 and ch['level'] == 'special':
             key = ('special', ch['title'])
         else:
-            key = _dedup_key(ch, volume_mode)
+            key = _dedup_key(ch, volume_mode, title_dedup)
 
         if key not in best:
             best[key] = ch
@@ -591,6 +647,33 @@ def deep_analyze(file_path):
         print(f"\n    重复次数分布：")
         for cnt in sorted(count_dist.keys()):
             print(f"      出现{cnt}次的章号: {count_dist[cnt]}个")
+
+    # 章号相同但标题不同的情况（标题级重复深度分析）
+    title_diff_count = 0
+    title_diff_examples = []
+    for num_val, occ_list in flat_map.items():
+        if len(occ_list) <= 1:
+            continue
+        # 规范化标题集合
+        norm_titles = set()
+        for ch in occ_list:
+            norm_titles.add(_normalize_title(ch.get('title', '')))
+        if len(norm_titles) > 1:
+            title_diff_count += 1
+            if len(title_diff_examples) < 5:
+                titles_sample = [ch['title'][:25] for ch in occ_list[:4]]
+                title_diff_examples.append((num_val, len(occ_list), titles_sample))
+
+    if title_diff_count > 0:
+        print(f"\n  ⚠ 章号相同但标题不同: {title_diff_count} 个章号")
+        print(f"    （说明同一章号下有不同标题，仅按章号去重可能误删）")
+        print(f"    建议开启 --title-dedup 启用标题级去重")
+        if title_diff_examples:
+            print(f"\n    示例：")
+            for num_val, cnt, titles in title_diff_examples:
+                print(f"      第{num_val}章 ({cnt}次):")
+                for t in titles:
+                    print(f"        · {t}")
 
     # 卷感知去重统计
     if volumes:
@@ -762,6 +845,10 @@ def deep_analyze(file_path):
     print()
     print("-" * 50)
     print("【七、常用组合效果预览（扁平模式）】")
+    
+    # 标题去重模式（默认关闭，分析报告统一用章号级去重做基准对比）
+    title_dedup = False
+    
     combos = [
         ("adjacent+none",  "adjacent", "none"),
         ("first+none",     "first",    "none"),
@@ -775,10 +862,10 @@ def deep_analyze(file_path):
             result = chapters
             if dedup_name != 'none':
                 dedup_func = DEDUP_STRATEGIES[dedup_name]
-                result = dedup_func(result, 'flat')
+                result = dedup_func(result, 'flat', title_dedup=title_dedup)
             if sort_name != 'none':
                 sort_func = SORT_STRATEGIES[sort_name]
-                result = sort_func(result, 'flat')
+                result = sort_func(result, 'flat', title_dedup=title_dedup)
             ooo_after = 0
             prev = 0
             for ch in result:
@@ -798,10 +885,10 @@ def deep_analyze(file_path):
                 result = chapters
                 if dedup_name != 'none':
                     dedup_func = DEDUP_STRATEGIES[dedup_name]
-                    result = dedup_func(result, 'auto')
+                    result = dedup_func(result, 'auto', title_dedup=title_dedup)
                 if sort_name != 'none':
                     sort_func = SORT_STRATEGIES[sort_name]
-                    result = sort_func(result, 'auto')
+                    result = sort_func(result, 'auto', title_dedup=title_dedup)
                 # 卷感知乱序：同卷内比较
                 ooo_after = 0
                 prev_vol = None
@@ -875,7 +962,8 @@ def format_range(ch_start, ch_end, unit):
 # ===========================================================================
 def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
                      dedup_strategy='longest', sort_strategy='sort', volume_mode='auto',
-                     generate_title_only=False, min_body_len=0, merge_flag=None):
+                     generate_title_only=False, min_body_len=0, merge_flag=None,
+                     title_dedup=False):
     """按章节一一拆分"""
     t_total0 = time.time()
 
@@ -927,8 +1015,8 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
         if dedup_func is None:
             print(f"[错误] 未知去重策略: {dedup_strategy}")
             sys.exit(1)
-        chapters = dedup_func(chapters, actual_vol_mode)
-        print(f"去重策略: {dedup_strategy}")
+        chapters = dedup_func(chapters, actual_vol_mode, title_dedup=title_dedup)
+        print(f"去重策略: {dedup_strategy}" + (" + 标题去重" if title_dedup else ""))
     else:
         print(f"去重策略: none（不处理）")
     t_dedup = time.time() - t0
@@ -941,7 +1029,7 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
         if sort_func is None:
             print(f"[错误] 未知排序策略: {sort_strategy}")
             sys.exit(1)
-        chapters = sort_func(chapters, actual_vol_mode)
+        chapters = sort_func(chapters, actual_vol_mode, title_dedup=title_dedup)
         print(f"排序策略: {sort_strategy}")
     else:
         print(f"排序策略: none（保持原文顺序）")
@@ -1124,7 +1212,7 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
 
 def split_by_groups(src, chunk_str="40,3", out_dir="", prefix="",
                     serial_width=3, encoding=None, dedup_strategy='longest',
-                    sort_strategy='sort', volume_mode='auto'):
+                    sort_strategy='sort', volume_mode='auto', title_dedup=False):
     """聚合拆分"""
     import math
 
@@ -1161,7 +1249,7 @@ def split_by_groups(src, chunk_str="40,3", out_dir="", prefix="",
         if dedup_func is None:
             print(f"[错误] 未知去重策略: {dedup_strategy}")
             sys.exit(1)
-        chapters = dedup_func(chapters, actual_vol_mode)
+        chapters = dedup_func(chapters, actual_vol_mode, title_dedup=title_dedup)
 
     # 排序
     if sort_strategy != 'none':
@@ -1169,7 +1257,7 @@ def split_by_groups(src, chunk_str="40,3", out_dir="", prefix="",
         if sort_func is None:
             print(f"[错误] 未知排序策略: {sort_strategy}")
             sys.exit(1)
-        chapters = sort_func(chapters, actual_vol_mode)
+        chapters = sort_func(chapters, actual_vol_mode, title_dedup=title_dedup)
 
     t_scan = time.time() - t0
 
@@ -1333,6 +1421,8 @@ def main():
                         help="最小正文字数(0=不检测)")
     parser.add_argument("--clean", default=None,
                         help="清洁模式: N[,flag]")
+    parser.add_argument("--title-dedup", action="store_true", default=False,
+                        help="标题级去重：去重键包含规范化标题，避免章号相同标题不同被误删")
     args = parser.parse_args()
 
     if args.analyze:
@@ -1361,12 +1451,13 @@ def main():
         if mode == "chapter":
             split_by_chapter(args.src, args.out, args.prefix, args.serial_width,
                              args.encoding, args.dedup, args.sort, args.volume_mode,
-                             args.keep_title_only, args.min_body_len, merge_flag)
+                             args.keep_title_only, args.min_body_len, merge_flag,
+                             title_dedup=args.title_dedup)
         else:
             chunk_str = args.chunk if args.chunk else "40,3"
             split_by_groups(args.src, chunk_str, args.out, args.prefix,
                             args.serial_width, args.encoding, args.dedup,
-                            args.sort, args.volume_mode)
+                            args.sort, args.volume_mode, title_dedup=args.title_dedup)
     except ValueError as e:
         print(f"[错误] {e}")
         sys.exit(1)

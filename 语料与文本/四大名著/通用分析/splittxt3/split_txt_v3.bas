@@ -85,6 +85,10 @@ Private g_tocChapterCount As Long  ' 目录区章节数
 Private g_cleanAds As Boolean      ' 是否启用广告清理
 Private g_adRemovedCount As Long   ' 已移除的广告行数
 
+' v3.3 新增：标题级去重开关
+Private g_titleDedup As Boolean    ' 是否启用标题级去重
+Private g_titleDiffCount As Long   ' 同章异题的章号数量（分析用）
+
 
 '==============================================================================
 ' 第零部分：初始化与入口
@@ -1044,10 +1048,12 @@ End Sub
 '==============================================================================
 
 '------------------------------------------------------------------------------
-' 获取去重键（卷感知）
+' 获取去重键（卷感知 + 可选标题级）
 '------------------------------------------------------------------------------
-Private Function DedupKey(ByVal idx As Long, ByVal volMode As String) As String
+Private Function DedupKey(ByVal idx As Long, ByVal volMode As String, _
+        Optional ByVal titleDedup As Boolean = False) As String
     Dim chNum As Long, volNum As Long, unitStr As String
+    Dim normTitle As String
     chNum = ch_nums(idx)
     volNum = ch_vols(idx)
     unitStr = ch_units(idx)
@@ -1057,13 +1063,20 @@ Private Function DedupKey(ByVal idx As Long, ByVal volMode As String) As String
     Else
         DedupKey = "V|" & volNum & "|" & chNum & "|" & unitStr
     End If
+    
+    ' 标题级去重：追加规范化标题到键中
+    If titleDedup And chNum > 0 Then
+        normTitle = NormalizeTitle(ch_titles(idx))
+        DedupKey = DedupKey & "|T|" & normTitle
+    End If
 End Function
 
 '------------------------------------------------------------------------------
 ' 策略1：相邻重复去重
 '------------------------------------------------------------------------------
 Private Sub DedupAdjacent(ByVal volMode As String, _
-        ByRef outIndices() As Long, ByRef outCount As Long)
+        ByRef outIndices() As Long, ByRef outCount As Long, _
+        Optional ByVal titleDedup As Boolean = False)
     Dim chapIdx() As Long, chapCnt As Long
     Dim i As Long, resultCnt As Long
     Dim lastKey As String, curKey As String
@@ -1074,10 +1087,10 @@ Private Sub DedupAdjacent(ByVal volMode As String, _
     ReDim outIndices(0 To chapCnt - 1)
     resultCnt = 1
     outIndices(0) = chapIdx(0)
-    lastKey = DedupKey(chapIdx(0), volMode)
+    lastKey = DedupKey(chapIdx(0), volMode, titleDedup)
 
     For i = 1 To chapCnt - 1
-        curKey = DedupKey(chapIdx(i), volMode)
+        curKey = DedupKey(chapIdx(i), volMode, titleDedup)
         If ch_nums(chapIdx(i)) > 0 And curKey = lastKey Then
             ' 相邻重复：保留正文更长的
             If ch_bodyLines(chapIdx(i)) > ch_bodyLines(outIndices(resultCnt - 1)) Then
@@ -1097,7 +1110,8 @@ End Sub
 ' 策略2：保留首次出现
 '------------------------------------------------------------------------------
 Private Sub DedupFirst(ByVal volMode As String, _
-        ByRef outIndices() As Long, ByRef outCount As Long)
+        ByRef outIndices() As Long, ByRef outCount As Long, _
+        Optional ByVal titleDedup As Boolean = False)
     Dim chapIdx() As Long, chapCnt As Long
     Dim i As Long, resultCnt As Long
     Dim seen As Object, key As String
@@ -1113,7 +1127,7 @@ Private Sub DedupFirst(ByVal volMode As String, _
         If ch_levels(chapIdx(i)) = "special" Then
             key = "S|" & ch_titles(chapIdx(i))
         Else
-            key = DedupKey(chapIdx(i), volMode)
+            key = DedupKey(chapIdx(i), volMode, titleDedup)
         End If
 
         If Not seen.Exists(key) Then
@@ -1131,7 +1145,8 @@ End Sub
 ' 策略3：保留内容最长的
 '------------------------------------------------------------------------------
 Private Sub DedupLongest(ByVal volMode As String, _
-        ByRef outIndices() As Long, ByRef outCount As Long)
+        ByRef outIndices() As Long, ByRef outCount As Long, _
+        Optional ByVal titleDedup As Boolean = False)
     Dim chapIdx() As Long, chapCnt As Long
     Dim i As Long, resultCnt As Long
     Dim best As Object, orderList As Object
@@ -1147,7 +1162,7 @@ Private Sub DedupLongest(ByVal volMode As String, _
         If ch_levels(chapIdx(i)) = "special" Then
             key = "S|" & ch_titles(chapIdx(i))
         Else
-            key = DedupKey(chapIdx(i), volMode)
+            key = DedupKey(chapIdx(i), volMode, titleDedup)
         End If
 
         If Not best.Exists(key) Then
@@ -1176,7 +1191,8 @@ End Sub
 '   排序键：(卷号, 章号)，严格递增
 '------------------------------------------------------------------------------
 Private Sub DedupLIS(ByVal volMode As String, _
-        ByRef outIndices() As Long, ByRef outCount As Long)
+        ByRef outIndices() As Long, ByRef outCount As Long, _
+        Optional ByVal titleDedup As Boolean = False)
     Dim chapIdx() As Long, chapCnt As Long
     Dim n As Long, i As Long
     Dim tails() As Long, tailVals_vol() As Long, tailVals_ch() As Long
@@ -1186,10 +1202,50 @@ Private Sub DedupLIS(ByVal volMode As String, _
     Dim tailLen As Long
     Dim vol_i As Long, ch_i As Long
     Dim mid As Long
-
-    GetChapterIndices chapIdx, chapCnt
-    If chapCnt = 0 Then outCount = 0: Exit Sub
-    n = chapCnt
+    
+    ' v3.3 标题级去重：先按标题键去重，再做LIS排序
+    If titleDedup Then
+        Dim tmpIdx() As Long, tmpCnt As Long
+        Dim seenDict As Object, tKey As String, tOrder As Object
+        Set seenDict = CreateObject("Scripting.Dictionary")
+        Set tOrder = CreateObject("Scripting.Dictionary")
+        
+        GetChapterIndices chapIdx, chapCnt
+        If chapCnt = 0 Then outCount = 0: Exit Sub
+        
+        For i = 0 To chapCnt - 1
+            If ch_levels(chapIdx(i)) = "special" Then
+                tKey = "S|" & ch_titles(chapIdx(i))
+            Else
+                tKey = DedupKey(chapIdx(i), volMode, True)
+            End If
+            If Not seenDict.Exists(tKey) Then
+                seenDict.Add tKey, chapIdx(i)
+                tOrder.Add tOrder.Count, tKey
+            End If
+        Next i
+        
+        tmpCnt = tOrder.Count
+        ReDim tmpIdx(0 To tmpCnt - 1)
+        For i = 0 To tmpCnt - 1
+            tmpIdx(i) = seenDict(tOrder(i))
+        Next i
+        
+        ' 用去重后的结果做LIS
+        Erase chapIdx
+        ReDim chapIdx(0 To tmpCnt - 1)
+        For i = 0 To tmpCnt - 1
+            chapIdx(i) = tmpIdx(i)
+        Next i
+        n = tmpCnt
+        
+        Set seenDict = Nothing
+        Set tOrder = Nothing
+    Else
+        GetChapterIndices chapIdx, chapCnt
+        If chapCnt = 0 Then outCount = 0: Exit Sub
+        n = chapCnt
+    End If
 
     ReDim tails(0 To n - 1)
     ReDim tailVals_vol(0 To n - 1)
@@ -1272,7 +1328,8 @@ End Sub
 ' 策略5：按（卷号,章号）重新排序
 '------------------------------------------------------------------------------
 Private Sub DedupSort(ByVal volMode As String, _
-        ByRef outIndices() As Long, ByRef outCount As Long)
+        ByRef outIndices() As Long, ByRef outCount As Long, _
+        Optional ByVal titleDedup As Boolean = False)
     Dim chapIdx() As Long, chapCnt As Long
     Dim i As Long, j As Long
     Dim best As Object, orderKeys As Object
@@ -1297,7 +1354,7 @@ Private Sub DedupSort(ByVal volMode As String, _
         If ch_levels(chapIdx(i)) = "special" Then
             key = "S|" & ch_titles(chapIdx(i))
         Else
-            key = DedupKey(chapIdx(i), volMode)
+            key = DedupKey(chapIdx(i), volMode, titleDedup)
         End If
 
         If Not best.Exists(key) Then
@@ -1373,15 +1430,16 @@ End Sub
 '   volMode:  flat/volume
 '   输出：dedup_indices, dedup_count（全局）
 '------------------------------------------------------------------------------
-Private Sub ApplyDedup(ByVal strategy As String, ByVal volMode As String)
+Private Sub ApplyDedup(ByVal strategy As String, ByVal volMode As String, _
+        Optional ByVal titleDedup As Boolean = False)
     If strategy = "none" Then
         ' 不去重：直接使用所有章节
         GetChapterIndices dedup_indices, dedup_count
     Else
         Select Case strategy
-            Case "adjacent": DedupAdjacent volMode, dedup_indices, dedup_count
-            Case "first":    DedupFirst volMode, dedup_indices, dedup_count
-            Case "longest":  DedupLongest volMode, dedup_indices, dedup_count
+            Case "adjacent": DedupAdjacent volMode, dedup_indices, dedup_count, titleDedup
+            Case "first":    DedupFirst volMode, dedup_indices, dedup_count, titleDedup
+            Case "longest":  DedupLongest volMode, dedup_indices, dedup_count, titleDedup
             Case Else
                 MsgBox "未知去重策略：" & strategy, vbExclamation, "错误"
                 dedup_count = 0
@@ -1882,6 +1940,64 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
             AddRptLine lines_arr, rptIdx, "      出现" & k & "次的章号: " & countDist(k) & "个"
         Next k
         Set countDist = Nothing
+        
+        ' v3.3 新增：同章异题统计（章号相同但标题不同）
+        Dim titleDiffCnt As Long, titleDiffArr() As Long
+        Dim titleDiffTitles() As String, tdIdx As Long
+        Dim normTitles As Object, chk As Long
+        ReDim titleDiffArr(0 To 9)
+        ReDim titleDiffTitles(0 To 9)
+        tdIdx = 0
+        titleDiffCnt = 0
+        
+        For Each numKey In flatMap.Keys
+            cc = CStr(flatMap(numKey))
+            If CLng(cc) <= 1 Then GoTo NextNumKey
+            
+            Set normTitles = CreateObject("Scripting.Dictionary")
+            For chk = 0 To ch_count - 1
+                If ch_levels(chk) = "chapter" And ch_nums(chk) = CLng(numKey) Then
+                    Dim nt As String
+                    nt = NormalizeTitle(ch_titles(chk))
+                    If Not normTitles.Exists(nt) Then normTitles.Add nt, 1
+                End If
+            Next chk
+            
+            If normTitles.Count > 1 Then
+                titleDiffCnt = titleDiffCnt + 1
+                If tdIdx < 5 Then
+                    titleDiffArr(tdIdx) = CLng(numKey)
+                    ' 收集前几个不同的标题
+                    Dim tdTitles As String, ttIdx As Long
+                    ttIdx = 0
+                    tdTitles = ""
+                    For Each nt In normTitles.Keys
+                        If ttIdx < 2 Then
+                            If ttIdx > 0 Then tdTitles = tdTitles & " / "
+                            tdTitles = tdTitles & Left(CStr(nt), 15)
+                            ttIdx = ttIdx + 1
+                        End If
+                    Next nt
+                    titleDiffTitles(tdIdx) = tdTitles
+                    tdIdx = tdIdx + 1
+                End If
+            End If
+            Set normTitles = Nothing
+NextNumKey:
+        Next numKey
+        
+        g_titleDiffCount = titleDiffCnt
+        If titleDiffCnt > 0 Then
+            AddRptLine lines_arr, rptIdx, ""
+            AddRptLine lines_arr, rptIdx, "  ⚠ 章号相同但标题不同: " & titleDiffCnt & " 个章号"
+            AddRptLine lines_arr, rptIdx, "    （仅按章号去重可能误删，建议启用标题级去重）"
+            If tdIdx > 0 Then
+                AddRptLine lines_arr, rptIdx, "    示例："
+                For ti = 0 To tdIdx - 1
+                    AddRptLine lines_arr, rptIdx, "      第" & titleDiffArr(ti) & "章: " & titleDiffTitles(ti)
+                Next ti
+            End If
+        End If
     End If
     Set flatMap = Nothing
     AddRptLine lines_arr, rptIdx, ""
@@ -2193,6 +2309,15 @@ Public Sub 拆分TXTv3()
     g_cleanAds = (adCleanMode = vbYes)
     g_adRemovedCount = 0
 
+    ' 步骤5c：标题级去重（v3.3 新增）
+    Dim titleDedupMode As VbMsgBoxResult
+    titleDedupMode = MsgBox("是否启用标题级去重？" & vbCrLf & vbCrLf & _
+                            "  [是]  启用（章号+标题双重判定）" & vbCrLf & _
+                            "       避免同章异题被误删" & vbCrLf & _
+                            "  [否]  仅按章号去重（默认）", _
+                            vbYesNo + vbQuestion + vbDefaultButton2, "标题级去重")
+    g_titleDedup = (titleDedupMode = vbYes)
+
     ' 步骤6：选择拆分模式
     mode = MsgBox("请选择拆分模式：" & vbCrLf & vbCrLf & _
                   "  [是]  按章节一一拆分（每章一个文件）" & vbCrLf & _
@@ -2202,32 +2327,20 @@ Public Sub 拆分TXTv3()
 
     If mode = vbCancel Then
         ' 清洁模式
-        cleanInput = InputBox("请输入清理参数（N,flag）：" & vbCrLf & vbCrLf & _
-                              "  N     最小正文字数（正文汉字<N的章节跳过）" & vbCrLf & _
-                              "  flag  0=合并跳过章节  1=合并保留章节(默认)  2=两者都合并" & vbCrLf & vbCrLf & _
-                              "示例：100,1  合并>=100字的保留章节", _
-                              "清洁模式", "100,1")
+        cleanInput = InputBox("请输入最小正文字数：" & vbCrLf & vbCrLf & _
+                              "  正文中文字数 < N 的章节将被跳过" & vbCrLf & _
+                              "  输出纯净正文（保留≥N字的章节）" & vbCrLf & vbCrLf & _
+                              "示例：100  →  只保留正文≥100字的章节", _
+                              "清洁模式", "100")
         If StrPtr(cleanInput) = 0 Then Exit Sub
         cleanInput = NormalizeSeparators(cleanInput)
         cleanParts = Split(Trim(cleanInput), ",")
-        If UBound(cleanParts) > 1 Then
-            MsgBox "格式错误，请输入 N 或 N,flag", vbExclamation, "提示"
-            Exit Sub
-        End If
         If Len(Trim(cleanParts(0))) = 0 Or Not IsDigits(Trim(cleanParts(0))) Then
-            MsgBox "N 必须为正整数。", vbExclamation, "提示"
+            MsgBox "请输入正整数（最小正文字数）。", vbExclamation, "提示"
             Exit Sub
         End If
         cleanN = CLng(Trim(cleanParts(0)))
-        cleanFlag = 1
-        If UBound(cleanParts) = 1 Then
-            flagStr = Trim(cleanParts(1))
-            If flagStr <> "0" And flagStr <> "1" And flagStr <> "2" Then
-                MsgBox "flag 必须为 0、1 或 2。", vbExclamation, "提示"
-                Exit Sub
-            End If
-            cleanFlag = CLng(flagStr)
-        End If
+        cleanFlag = 1   ' 固定为保留模式
         SplitByChapterV3 InputPath:=filePath, GenerateTitleOnly:=False, _
                          MinBodyLen:=cleanN, MergeFlag:=cleanFlag
     ElseIf mode = vbYes Then
@@ -2364,7 +2477,7 @@ Public Sub SplitByChapterV3(ByVal InputPath As String, _
 
     ' 4. 去重
     t0 = Timer
-    ApplyDedup g_dedupStrategy, actualVolMode
+    ApplyDedup g_dedupStrategy, actualVolMode, g_titleDedup
     tDedup = Timer - t0
 
     If dedup_count = 0 Then
@@ -2552,48 +2665,16 @@ NextChapterV3:
     Set regCn = Nothing
     tWrite = Timer - t0
 
-    ' 清洁模式合并文件
+    ' 清洁模式合并文件（仅输出保留≥N字的纯净正文，无报告头部）
     If MergeFlag >= 0 Then
-        Dim srcBaseName As String, hdr As String, mk As Long, topStr As String
+        Dim srcBaseName As String
         srcBaseName = fso.GetBaseName(InputPath)
 
-        hdr = String(50, "=") & vbLf & _
-              "清理说明：正文中文字数小于 " & MinBodyLen & " 的章节已跳过" & vbLf & _
-              "跳过章节：" & skippedCount & " 个" & vbLf
-        If skippedTitles.Count > 0 Then
-            hdr = hdr & "跳过明细：" & vbLf
-            For mk = 1 To skippedTitles.Count
-                hdr = hdr & "  " & skippedTitles(mk) & "（" & skippedBodyLens(mk) & "字）" & vbLf
-            Next mk
-            topStr = top1 & "字"
-            If skippedCount >= 2 Then topStr = topStr & "、" & top2 & "字"
-            If skippedCount >= 3 Then topStr = topStr & "、" & top3 & "字"
-            hdr = hdr & "前三正文：" & topStr & vbLf
-        End If
-        hdr = hdr & "保留章节：" & writtenCount & " 个" & vbLf
-
-        Dim doSkipMerge As Boolean, doKeepMerge As Boolean
-        doSkipMerge = (MergeFlag = 0 Or MergeFlag = 2) And skippedTexts.Count > 0
-        doKeepMerge = (MergeFlag = 1 Or MergeFlag = 2) And keptTexts.Count > 0
-
-        If doSkipMerge Then
-            Dim mergeName As String, mergeBody As String
-            mergeName = "清理小于" & MinBodyLen & "_" & srcBaseName & ".txt"
-            mergeBody = hdr & _
-                        "本文件内容：跳过章节（正文汉字 < " & MinBodyLen & "）" & vbLf & _
-                        String(50, "=") & vbLf & _
-                        JoinCollection(skippedTexts)
-            WriteTextUTF8NoBOM outDirFull & "\" & mergeName, mergeBody
-            Debug.Print "合并文件：" & mergeName & "（" & skippedTexts.Count & "章合并）"
-        End If
-
-        If doKeepMerge Then
+        ' 只输出保留章节的纯净正文（flag=1 或 2 时都输出保留文件）
+        If keptTexts.Count > 0 Then
             Dim mergeName2 As String, mergeBody2 As String
             mergeName2 = "保留大于等于" & MinBodyLen & "_" & srcBaseName & ".txt"
-            mergeBody2 = hdr & _
-                        "本文件内容：保留章节（正文汉字 >= " & MinBodyLen & "）" & vbLf & _
-                        String(50, "=") & vbLf & _
-                        JoinCollection(keptTexts)
+            mergeBody2 = JoinCollection(keptTexts)
             WriteTextUTF8NoBOM outDirFull & "\" & mergeName2, mergeBody2
             Debug.Print "合并文件：" & mergeName2 & "（" & keptTexts.Count & "章合并）"
         End If
@@ -2686,7 +2767,7 @@ Public Sub SplitByGroupsV3(ByVal InputPath As String, _
 
     ' 4. 去重
     t0 = Timer
-    ApplyDedup g_dedupStrategy, actualVolMode
+    ApplyDedup g_dedupStrategy, actualVolMode, g_titleDedup
     tDedup = Timer - t0
 
     If dedup_count = 0 Then
@@ -3103,6 +3184,92 @@ Private Function NormalizeLineForMatch(ByVal s As String) As String
     Next i
     
     NormalizeLineForMatch = result
+End Function
+
+'------------------------------------------------------------------------------
+' v3.3 新增：标题规范化（用于标题级去重的键生成）
+'   处理：全角半角统一、空白删除、标点清理、转小写
+'   目的：章号相同但标题仅差标点/空格/全角时，仍视为同一章
+'------------------------------------------------------------------------------
+Private Function NormalizeTitle(ByVal s As String) As String
+    Dim r As String
+    Dim i As Long, c As String
+    Dim result As String
+    Dim code As Long
+    
+    r = Trim(s)
+    
+    ' 1. 全角数字 → 半角
+    r = Replace(r, "０", "0"): r = Replace(r, "１", "1")
+    r = Replace(r, "２", "2"): r = Replace(r, "３", "3")
+    r = Replace(r, "４", "4"): r = Replace(r, "５", "5")
+    r = Replace(r, "６", "6"): r = Replace(r, "７", "7")
+    r = Replace(r, "８", "8"): r = Replace(r, "９", "9")
+    
+    ' 2. 全角字母 → 半角（小写+大写）
+    For i = 0 To 25
+        r = Replace(r, ChrW(&HFF41 + i), Chr(97 + i))   ' 全角小写
+        r = Replace(r, ChrW(&HFF21 + i), Chr(65 + i))   ' 全角大写
+    Next i
+    
+    ' 3. 全角空格 → 删除
+    r = Replace(r, ChrW(&H3000), "")
+    r = Replace(r, " ", "")
+    r = Replace(r, vbTab, "")
+    
+    ' 4. 全角冒号/分号/逗号/句号等 → 删除
+    r = Replace(r, "：", "")
+    r = Replace(r, "；", "")
+    r = Replace(r, "，", "")
+    r = Replace(r, "。", "")
+    r = Replace(r, "、", "")
+    
+    ' 5. 零宽字符
+    r = Replace(r, ChrW(&H200B), "")
+    r = Replace(r, ChrW(&H200C), "")
+    r = Replace(r, ChrW(&H200D), "")
+    r = Replace(r, ChrW(&HFEFF), "")
+    
+    ' 6. 半角标点清理
+    r = Replace(r, ",", "")
+    r = Replace(r, ".", "")
+    r = Replace(r, ":", "")
+    r = Replace(r, ";", "")
+    r = Replace(r, "!", "")
+    r = Replace(r, "?", "")
+    r = Replace(r, "'", "")
+    r = Replace(r, """", "")
+    r = Replace(r, "(", "")
+    r = Replace(r, ")", "")
+    r = Replace(r, "[", "")
+    r = Replace(r, "]", "")
+    r = Replace(r, "<", "")
+    r = Replace(r, ">", "")
+    r = Replace(r, "-", "")
+    r = Replace(r, "_", "")
+    
+    ' 7. 中文标点清理
+    r = Replace(r, "（", "")
+    r = Replace(r, "）", "")
+    r = Replace(r, "《", "")
+    r = Replace(r, "》", "")
+    r = Replace(r, "【", "")
+    r = Replace(r, "】", "")
+    r = Replace(r, "「", "")
+    r = Replace(r, "」", "")
+    r = Replace(r, "『", "")
+    r = Replace(r, "』", "")
+    r = Replace(r, "！", "")
+    r = Replace(r, "？", "")
+    r = Replace(r, "·", "")
+    r = Replace(r, "…", "")
+    r = Replace(r, "—", "")
+    r = Replace(r, "～", "")
+    
+    ' 8. 转小写（字母）
+    r = LCase(r)
+    
+    NormalizeTitle = r
 End Function
 
 '------------------------------------------------------------------------------
