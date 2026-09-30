@@ -1893,10 +1893,12 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
     AddRptLine lines_arr, rptIdx, "    存在重复的章号数: " & dupCnt
 
     If dupCnt > 0 Then
-        ' 找重复最严重的10个
+        ' 找重复最严重的10个（带标题和行号，避免只看章号混淆）
         topCount = 0
         ReDim topNums(0 To 9)
         ReDim topCounts(0 To 9)
+        ReDim topTitles(0 To 9)       ' 首次出现的完整标题
+        ReDim topLineInfo(0 To 9)     ' 前几次出现的行号
 
         For Each k In flatMap.Keys
             If flatMap(k) > 1 Then
@@ -1915,9 +1917,27 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
                     For mv = IIf(topCount < 9, topCount, 9) To insPos + 1 Step -1
                         topNums(mv) = topNums(mv - 1)
                         topCounts(mv) = topCounts(mv - 1)
+                        topTitles(mv) = topTitles(mv - 1)
+                        topLineInfo(mv) = topLineInfo(mv - 1)
                     Next mv
                     topNums(insPos) = k
                     topCounts(insPos) = vv
+                    ' 收集该章号的首次标题和前5次行号
+                    Dim occLines As String, occCnt As Long, fi As Long
+                    occLines = "": occCnt = 0
+                    For fi = 0 To ch_count - 1
+                        If ch_levels(fi) = "chapter" And ch_nums(fi) = CLng(k) Then
+                            If occCnt = 0 Then
+                                topTitles(insPos) = ch_titles(fi)
+                            End If
+                            If occCnt < 5 Then
+                                If occCnt > 0 Then occLines = occLines & "、"
+                                occLines = occLines & (ch_starts(fi) + 1)
+                            End If
+                            occCnt = occCnt + 1
+                        End If
+                    Next fi
+                    topLineInfo(insPos) = occLines
                     If topCount < 10 Then topCount = topCount + 1
                 End If
             End If
@@ -1926,7 +1946,8 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
         AddRptLine lines_arr, rptIdx, ""
         AddRptLine lines_arr, rptIdx, "    重复最严重的前10个章号："
         For i = 0 To topCount - 1
-            AddRptLine lines_arr, rptIdx, "      第" & topNums(i) & "章: " & topCounts(i) & "次"
+            AddRptLine lines_arr, rptIdx, "      第" & topNums(i) & "章 (" & topCounts(i) & "次): " & topTitles(i)
+            AddRptLine lines_arr, rptIdx, "        出现行号: " & topLineInfo(i)
         Next i
 
         ' 重复次数分布
@@ -1945,11 +1966,12 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
         
         ' v3.3 新增：同章异题统计（章号相同但标题不同）
         Dim titleDiffCnt As Long, titleDiffArr() As Long
-        Dim titleDiffTitles() As String, tdIdx As Long
+        Dim titleDiffTitles() As String, titleDiffTCnts() As Long, tdIdx As Long
         Dim normTitles As Object, chk As Long
         Dim ntStr As String, tdTitles As String, ttIdx As Long
         ReDim titleDiffArr(0 To 9)
         ReDim titleDiffTitles(0 To 9)
+        ReDim titleDiffTCnts(0 To 9)
         tdIdx = 0
         titleDiffCnt = 0
         
@@ -1969,15 +1991,14 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
                 titleDiffCnt = titleDiffCnt + 1
                 If tdIdx < 5 Then
                     titleDiffArr(tdIdx) = CLng(numKey)
-                    ' 收集前几个不同的标题
+                    titleDiffTCnts(tdIdx) = normTitles.Count
+                    ' 收集所有不同的标题（完整显示，不截断，避免混淆）
                     ttIdx = 0
                     tdTitles = ""
                     For Each ntKey In normTitles.Keys
-                        If ttIdx < 2 Then
-                            If ttIdx > 0 Then tdTitles = tdTitles & " / "
-                            tdTitles = tdTitles & Left(CStr(ntKey), 15)
-                            ttIdx = ttIdx + 1
-                        End If
+                        If ttIdx > 0 Then tdTitles = tdTitles & vbCrLf
+                        tdTitles = tdTitles & "        · " & CStr(ntKey)
+                        ttIdx = ttIdx + 1
                     Next ntKey
                     titleDiffTitles(tdIdx) = tdTitles
                     tdIdx = tdIdx + 1
@@ -1995,7 +2016,8 @@ NextNumKey:
             If tdIdx > 0 Then
                 AddRptLine lines_arr, rptIdx, "    示例："
                 For ti = 0 To tdIdx - 1
-                    AddRptLine lines_arr, rptIdx, "      第" & titleDiffArr(ti) & "章: " & titleDiffTitles(ti)
+                    AddRptLine lines_arr, rptIdx, "      第" & titleDiffArr(ti) & "章（" & titleDiffTCnts(ti) & "个不同标题）:"
+                    AddRptLine lines_arr, rptIdx, titleDiffTitles(ti)
                 Next ti
             End If
         End If
@@ -2043,7 +2065,7 @@ NextNumKey:
         AddRptLine lines_arr, rptIdx, "    目录章节数: " & g_tocChapterCount & " 章"
         AddRptLine lines_arr, rptIdx, "    目录位置: 第 " & (g_tocStartIdx + 1) & " - " & (g_tocEndIdx + 1) & " 个识别项"
         If g_tocStartIdx >= 0 And g_tocStartIdx < ch_count Then
-            AddRptLine lines_arr, rptIdx, "    起始标题: " & Left(ch_titles(g_tocStartIdx), 40)
+            AddRptLine lines_arr, rptIdx, "    起始标题: " & ch_titles(g_tocStartIdx)
         End If
     Else
         AddRptLine lines_arr, rptIdx, "  未检测到独立目录区"
@@ -2533,7 +2555,7 @@ Public Sub SplitByChapterV3(ByVal InputPath As String, _
     ' 8. 写文件
     Dim titleOnlyCount As Long, writtenCount As Long, skippedCount As Long
     Dim shortBodyCount As Long, bodyLen As Long, isInsufficient As Boolean
-    Dim top1 As Long, top2 As Long, top3 As Long
+    Dim top1 As Long, top2 As Long, top3 As Long, topStr As String
     Dim regCn As Object
     Dim keptTexts As Collection, skippedTexts As Collection
     Dim skippedTitles As Collection, skippedBodyLens As Collection
