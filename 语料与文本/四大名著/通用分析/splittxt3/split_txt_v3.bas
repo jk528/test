@@ -81,6 +81,10 @@ Private g_tocStartIdx As Long      ' 目录区起始索引
 Private g_tocEndIdx As Long        ' 目录区结束索引
 Private g_tocChapterCount As Long  ' 目录区章节数
 
+' v3.2 新增：广告/垃圾行清理开关
+Private g_cleanAds As Boolean      ' 是否启用广告清理
+Private g_adRemovedCount As Long   ' 已移除的广告行数
+
 
 '==============================================================================
 ' 第零部分：初始化与入口
@@ -785,6 +789,7 @@ Private Sub ScanChaptersV3(lines() As String, ByVal lineCount As Long)
                 ReDim Preserve ch_levels(0 To ch_count + 127)
                 ReDim Preserve ch_patterns(0 To ch_count + 127)
                 ReDim Preserve ch_bodyLines(0 To ch_count + 127)
+                ReDim Preserve ch_isTOC(0 To ch_count + 127)
             End If
             GoTo NextLine5
         End If
@@ -869,6 +874,7 @@ Private Sub ScanChaptersV3(lines() As String, ByVal lineCount As Long)
                 ReDim Preserve ch_levels(0 To ch_count + 127)
                 ReDim Preserve ch_patterns(0 To ch_count + 127)
                 ReDim Preserve ch_bodyLines(0 To ch_count + 127)
+                ReDim Preserve ch_isTOC(0 To ch_count + 127)
             End If
         End If
 NextLine5:
@@ -893,7 +899,114 @@ NextLine5:
 End Sub
 
 '------------------------------------------------------------------------------
-' 获取仅章节（排除volume）的数量和索引映射
+' v3.2 新增：目录区自动检测
+'   原理：文件开头连续 N 个章节正文都极短（<=2行）且章号递增 → 判定为目录区
+'   参数：minTOCchapters - 最少目录章节数（默认10）
+'         maxBodyLines   - 目录章最大正文行数（默认2）
+'   效果：将目录区章节标记为 ch_isTOC=True，并设置全局变量
+'------------------------------------------------------------------------------
+Private Sub DetectTOC(Optional ByVal minTOCchapters As Long = 10, _
+                      Optional ByVal maxBodyLines As Long = 2)
+    Dim i As Long, chapStart As Long, chapEnd As Long
+    Dim inTOC As Boolean
+    Dim prevNum As Long, consecCount As Long
+    Dim bodyLn As Long
+    
+    g_tocStartIdx = -1
+    g_tocEndIdx = -1
+    g_tocChapterCount = 0
+    
+    If ch_count < minTOCchapters Then Exit Sub
+    
+    ' 先计算每个章节的正文行数（ch_ends - ch_starts）
+    For i = 0 To ch_count - 1
+        If ch_levels(i) = "chapter" Or ch_levels(i) = "special" Then
+            bodyLn = ch_ends(i) - ch_starts(i)
+            If bodyLn < 0 Then bodyLn = 0
+            ch_bodyLines(i) = bodyLn
+        End If
+    Next i
+    
+    ' 从头扫描，找第一段连续的短正文章节
+    inTOC = False
+    consecCount = 0
+    prevNum = 0
+    chapStart = -1
+    
+    For i = 0 To ch_count - 1
+        ' 只看章节级（跳过volume）
+        If ch_levels(i) <> "chapter" Then GoTo NextTOCScan
+        
+        bodyLn = ch_bodyLines(i)
+        
+        If bodyLn <= maxBodyLines Then
+            ' 正文很短，可能是目录项
+            If Not inTOC Then
+                ' 检查是否在文件开头位置（前30%的章节内）
+                If i > ch_count * 0.3 Then Exit For  ' 不在开头，不用找了
+                chapStart = i
+                consecCount = 1
+                prevNum = ch_nums(i)
+                inTOC = True
+            Else
+                ' 检查章号是否递增（目录通常是顺序的）
+                If ch_nums(i) > prevNum Or ch_nums(i) = 0 Then
+                    consecCount = consecCount + 1
+                    prevNum = ch_nums(i)
+                Else
+                    ' 章号回退，可能目录结束了
+                    If consecCount >= minTOCchapters Then
+                        ' 确认是目录区
+                        g_tocStartIdx = chapStart
+                        g_tocEndIdx = i - 1
+                        g_tocChapterCount = consecCount
+                        Exit For
+                    Else
+                        ' 不够长，重置
+                        inTOC = False
+                        consecCount = 0
+                        chapStart = -1
+                    End If
+                End If
+            End If
+        Else
+            ' 正文足够长
+            If inTOC Then
+                If consecCount >= minTOCchapters Then
+                    ' 确认是目录区，到前一个为止
+                    g_tocStartIdx = chapStart
+                    g_tocEndIdx = i - 1
+                    g_tocChapterCount = consecCount
+                    Exit For
+                Else
+                    ' 连续短章不够多，不是目录
+                    inTOC = False
+                    consecCount = 0
+                    chapStart = -1
+                End If
+            End If
+        End If
+NextTOCScan:
+    Next i
+    
+    ' 处理循环结束时还在 TOC 中的情况
+    If inTOC And consecCount >= minTOCchapters Then
+        g_tocStartIdx = chapStart
+        g_tocEndIdx = ch_count - 1
+        g_tocChapterCount = consecCount
+    End If
+    
+    ' 标记 TOC 章节
+    If g_tocChapterCount > 0 Then
+        For i = g_tocStartIdx To g_tocEndIdx
+            ch_isTOC(i) = True
+        Next i
+    End If
+End Sub
+
+'------------------------------------------------------------------------------
+' 获取仅章节（排除volume，排除目录区）的数量和索引映射
+'   v3.2 更新：默认跳过目录区章节
 '   输出：chapIndices — 仅章节级别的原索引数组
 '         chapCount   — 章节数量
 '------------------------------------------------------------------------------
@@ -902,7 +1015,8 @@ Private Sub GetChapterIndices(ByRef chapIndices() As Long, ByRef chapCount As Lo
     ReDim chapIndices(0 To ch_count - 1)
     cnt = 0
     For i = 0 To ch_count - 1
-        If ch_levels(i) = "chapter" Or ch_levels(i) = "special" Then
+        If (ch_levels(i) = "chapter" Or ch_levels(i) = "special") _
+           And Not ch_isTOC(i) Then
             chapIndices(cnt) = i
             cnt = cnt + 1
         End If
@@ -1557,6 +1671,7 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
     ' 扫描
     t0 = Timer
     ScanChaptersV3 lines, lineCount
+    DetectTOC                       ' v3.2 新增：目录区自动检测
     tScan = Timer - t0
 
     ' 构建报告
@@ -1577,6 +1692,8 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
         If ch_levels(i) = "chapter" Or ch_levels(i) = "special" Then chapCnt = chapCnt + 1
     Next i
     AddRptLine lines_arr, rptIdx, "识别结构: 卷级 " & volCnt & " 个, 章节级 " & chapCnt & " 个"
+    If g_tocChapterCount > 0 Then
+        AddRptLine lines_arr, rptIdx, "              其中目录区 " & g_tocChapterCount & " 章（已跳过）"
     AddRptLine lines_arr, rptIdx, "使用正则: " & g_regexName
     AddRptLine lines_arr, rptIdx, ""
 
@@ -1788,6 +1905,19 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
     ' 四、多轨目录检测
     AddRptLine lines_arr, rptIdx, String(50, "-")
     AddRptLine lines_arr, rptIdx, "【四、多轨目录检测】"
+    
+    ' v3.2 新增：目录区自动检测结果
+    If g_tocChapterCount > 0 Then
+        AddRptLine lines_arr, rptIdx, "  ⚠ 检测到目录区（已自动跳过，不参与去重/排序）"
+        AddRptLine lines_arr, rptIdx, "    目录章节数: " & g_tocChapterCount & " 章"
+        AddRptLine lines_arr, rptIdx, "    目录位置: 第 " & (g_tocStartIdx + 1) & " - " & (g_tocEndIdx + 1) & " 个识别项"
+        If g_tocStartIdx >= 0 And g_tocStartIdx < ch_count Then
+            AddRptLine lines_arr, rptIdx, "    起始标题: " & Left(ch_titles(g_tocStartIdx), 40)
+        End If
+    Else
+        AddRptLine lines_arr, rptIdx, "  未检测到独立目录区"
+    End If
+    AddRptLine lines_arr, rptIdx, ""
 
     ' 相邻双标题比例
     adjDup = 0: prevChIdx = -1
@@ -2029,6 +2159,15 @@ Public Sub 拆分TXTv3()
     ' 步骤5：选择卷模式
     If Not SelectVolumeMode() Then Exit Sub
 
+    ' 步骤5b：广告清理（v3.2 新增）
+    Dim adCleanMode As VbMsgBoxResult
+    adCleanMode = MsgBox("是否启用广告/垃圾行清理？" & vbCrLf & vbCrLf & _
+                         "  [是]  启用（移除网址/推广语/分隔线等）" & vbCrLf & _
+                         "  [否]  不清理，保留原文", _
+                         vbYesNo + vbQuestion + vbDefaultButton2, "广告清理")
+    g_cleanAds = (adCleanMode = vbYes)
+    g_adRemovedCount = 0
+
     ' 步骤6：选择拆分模式
     mode = MsgBox("请选择拆分模式：" & vbCrLf & vbCrLf & _
                   "  [是]  按章节一一拆分（每章一个文件）" & vbCrLf & _
@@ -2186,6 +2325,7 @@ Public Sub SplitByChapterV3(ByVal InputPath As String, _
     ' 2. 扫描（v3增强版）
     t0 = Timer
     ScanChaptersV3 lines, lineCount
+    DetectTOC                       ' v3.2 新增：目录区自动检测
     tScan = Timer - t0
     If ch_count = 0 Then
         MsgBox "未识别到任何章节标题。" & vbCrLf & _
@@ -2350,8 +2490,16 @@ Public Sub SplitByChapterV3(ByVal InputPath As String, _
         End If
 
         outPath = fileDir & "\" & fileName
-        WriteTextUTF8NoBOM outPath, body
-        If MergeFlag = 1 Or MergeFlag = 2 Then keptTexts.Add body
+        
+        ' v3.2 新增：广告/垃圾行清理
+        Dim finalBody As String
+        finalBody = body
+        If g_cleanAds Then
+            finalBody = CleanAdLines(body)
+        End If
+        
+        WriteTextUTF8NoBOM outPath, finalBody
+        If MergeFlag = 1 Or MergeFlag = 2 Then keptTexts.Add finalBody
 
         If writtenCount < 3 Or i >= dedup_count - 2 Then
             Dim tag As String, volTag As String
@@ -2501,6 +2649,7 @@ Public Sub SplitByGroupsV3(ByVal InputPath As String, _
     ' 2. 扫描
     t0 = Timer
     ScanChaptersV3 lines, lineCount
+    DetectTOC                       ' v3.2 新增：目录区自动检测
     tScan = Timer - t0
     If ch_count = 0 Then
         MsgBox "未识别到任何章节标题。", vbExclamation, "提示"
@@ -2616,7 +2765,14 @@ Public Sub SplitByGroupsV3(ByVal InputPath As String, _
         fname = serial & "_" & safe & ".txt"
         If Len(FileNamePrefix) > 0 Then fname = FileNamePrefix & "_" & fname
 
-        WriteTextUTF8NoBOM outDirFull & "\" & fname, body
+        ' v3.2 新增：广告/垃圾行清理
+        Dim groupFinalBody As String
+        groupFinalBody = body
+        If g_cleanAds Then
+            groupFinalBody = CleanAdLines(body)
+        End If
+        
+        WriteTextUTF8NoBOM outDirFull & "\" & fname, groupFinalBody
     Next f
     On Error GoTo 0
     tWrite = Timer - t0
@@ -2745,6 +2901,13 @@ Private Sub ShowCompleteReportV3(ByVal title As String, ByVal fileCount As Long,
     If Len(extraInfo) > 0 Then
         msg = msg & vbCrLf & vbCrLf & extraInfo
     End If
+    
+    ' v3.2 新增：广告清理统计
+    If g_cleanAds Then
+        msg = msg & vbCrLf & vbCrLf & "【广告清理】" & vbCrLf & _
+              "  已移除广告行：" & g_adRemovedCount & " 行"
+    End If
+    
     MsgBox msg, vbInformation, "完成"
 End Sub
 
@@ -2915,6 +3078,117 @@ Private Function NormalizeLineForMatch(ByVal s As String) As String
     Next i
     
     NormalizeLineForMatch = result
+End Function
+
+'------------------------------------------------------------------------------
+' v3.2 新增：广告/垃圾行清理
+'   清理常见的盗版TXT广告、水印、推广语等垃圾行
+'   参数：text - 原始文本（vbLf分隔）
+'   返回：清理后的文本
+'   注意：全局变量 g_adRemovedCount 累计移除行数
+'------------------------------------------------------------------------------
+Private Function CleanAdLines(ByVal text As String) As String
+    Dim linesArr() As String
+    Dim resultArr() As String
+    Dim i As Long, cnt As Long
+    Dim line As String, tline As String
+    Dim isAd As Boolean
+    
+    linesArr = Split(text, vbLf)
+    ReDim resultArr(0 To UBound(linesArr))
+    cnt = 0
+    
+    For i = 0 To UBound(linesArr)
+        line = linesArr(i)
+        tline = Trim(line)
+        isAd = False
+        
+        ' 1. 空行保留（不视为广告）
+        If Len(tline) = 0 Then
+            isAd = False
+            
+        ' 2. 网址行（http/https/www.xxx.com等）
+        ElseIf InStr(1, tline, "http://", vbTextCompare) > 0 _
+            Or InStr(1, tline, "https://", vbTextCompare) > 0 _
+            Or InStr(1, tline, "www.", vbTextCompare) > 0 Then
+            isAd = True
+            
+        ' 3. 常见域名后缀（xx.com / xx.net / xx.cc 等）
+        ElseIf Len(tline) < 60 And _
+            (InStr(1, tline, ".com", vbTextCompare) > 0 _
+             Or InStr(1, tline, ".net", vbTextCompare) > 0 _
+             Or InStr(1, tline, ".cc", vbTextCompare) > 0 _
+             Or InStr(1, tline, ".cn", vbTextCompare) > 0 _
+             Or InStr(1, tline, ".org", vbTextCompare) > 0 _
+             Or InStr(1, tline, ".info", vbTextCompare) > 0) Then
+            ' 进一步确认：短行且包含疑似域名
+            If Len(tline) < 40 Then isAd = True
+            
+        ' 4. 站点推广语
+        ElseIf InStr(1, tline, "记住本站", vbTextCompare) > 0 _
+            Or InStr(1, tline, "收藏本站", vbTextCompare) > 0 _
+            Or InStr(1, tline, "推荐收藏", vbTextCompare) > 0 _
+            Or InStr(1, tline, "手机用户", vbTextCompare) > 0 _
+            Or InStr(1, tline, "请访问", vbTextCompare) > 0 _
+            Or InStr(1, tline, "永久域名", vbTextCompare) > 0 _
+            Or InStr(1, tline, "最新地址", vbTextCompare) > 0 _
+            Or InStr(1, tline, "笔趣阁", vbTextCompare) > 0 _
+            Or InStr(1, tline, "顶点小说", vbTextCompare) > 0 Then
+            isAd = True
+            
+        ' 5. 分页提示语
+        ElseIf InStr(1, tline, "本章未完", vbTextCompare) > 0 _
+            Or InStr(1, tline, "下一页继续", vbTextCompare) > 0 _
+            Or InStr(1, tline, "点击下一页", vbTextCompare) > 0 _
+            Or InStr(1, tline, "上一页", vbTextCompare) > 0 _
+            Or InStr(1, tline, "返回目录", vbTextCompare) > 0 _
+            Or InStr(1, tline, "加入书架", vbTextCompare) > 0 Then
+            isAd = True
+            
+        ' 6. 求票/求收藏类作者推广
+        ElseIf (InStr(1, tline, "求月票", vbTextCompare) > 0 _
+                Or InStr(1, tline, "求推荐", vbTextCompare) > 0 _
+                Or InStr(1, tline, "求收藏", vbTextCompare) > 0 _
+                Or InStr(1, tline, "求打赏", vbTextCompare) > 0 _
+                Or InStr(1, tline, "感谢打赏", vbTextCompare) > 0 _
+                Or InStr(1, tline, "感谢订阅", vbTextCompare) > 0) _
+            And Len(tline) < 40 Then
+            isAd = True
+            
+        ' 7. 纯符号分隔线（*、-、=、~ 等重复 >=5 个）
+        ElseIf Len(tline) >= 5 Then
+            Dim firstCh As String
+            firstCh = Left(tline, 1)
+            If firstCh = "*" Or firstCh = "-" Or firstCh = "=" Or _
+               firstCh = "~" Or firstCh = "·" Or firstCh = "—" Or _
+               firstCh = "＋" Or firstCh = "+" Then
+                Dim allSame As Boolean
+                allSame = True
+                Dim j As Long
+                For j = 2 To Len(tline)
+                    If Mid(tline, j, 1) <> firstCh Then
+                        allSame = False
+                        Exit For
+                    End If
+                Next j
+                If allSame Then isAd = True
+            End If
+        End If
+        
+        If Not isAd Then
+            resultArr(cnt) = line
+            cnt = cnt + 1
+        Else
+            g_adRemovedCount = g_adRemovedCount + 1
+        End If
+    Next i
+    
+    If cnt > 0 Then
+        ReDim Preserve resultArr(0 To cnt - 1)
+        CleanAdLines = Join(resultArr, vbLf)
+    Else
+        CleanAdLines = ""
+    End If
 End Function
 
 Private Function IsDigits(ByVal s As String) As Boolean
