@@ -634,12 +634,13 @@ def deep_analyze(file_path):
 
     if dup_flat:
         sorted_dups = sorted(dup_flat.items(), key=lambda x: -len(x[1]))
-        print(f"\n    重复最严重的15个章号：")
-        for num_val, occ_list in sorted_dups[:15]:
+        print(f"\n    重复最严重的前10个章号：")
+        for num_val, occ_list in sorted_dups[:10]:
             count = len(occ_list)
-            lines_str = ', '.join(str(c['line_idx'] + 1) for c in occ_list[:5])
-            title_preview = occ_list[0]['title'][:30]
-            print(f"      第{num_val}章 ({count}次): {title_preview}... (行: {lines_str}...)")
+            lines_str = '、'.join(str(c['line_idx'] + 1) for c in occ_list[:5])
+            full_title = occ_list[0]['title']
+            print(f"      第{num_val}章 ({count}次): {full_title}")
+            print(f"        出现行号: {lines_str}")
 
         count_dist = defaultdict(int)
         for occ_list in dup_flat.values():
@@ -648,9 +649,9 @@ def deep_analyze(file_path):
         for cnt in sorted(count_dist.keys()):
             print(f"      出现{cnt}次的章号: {count_dist[cnt]}个")
 
-    # 章号相同但标题不同的情况（标题级重复深度分析）
+    # 章号相同但标题不同的情况（标题级重复深度分析，全部列出）
     title_diff_count = 0
-    title_diff_examples = []
+    title_diff_list = []  # [(num_val, occ_count, norm_titles_list), ...]
     for num_val, occ_list in flat_map.items():
         if len(occ_list) <= 1:
             continue
@@ -660,20 +661,18 @@ def deep_analyze(file_path):
             norm_titles.add(_normalize_title(ch.get('title', '')))
         if len(norm_titles) > 1:
             title_diff_count += 1
-            if len(title_diff_examples) < 5:
-                titles_sample = [ch['title'][:25] for ch in occ_list[:4]]
-                title_diff_examples.append((num_val, len(occ_list), titles_sample))
+            # 收集所有不同的规范化标题（完整显示，不截断）
+            title_diff_list.append((num_val, len(occ_list), sorted(norm_titles)))
 
     if title_diff_count > 0:
         print(f"\n  ⚠ 章号相同但标题不同: {title_diff_count} 个章号")
         print(f"    （说明同一章号下有不同标题，仅按章号去重可能误删）")
         print(f"    建议开启 --title-dedup 启用标题级去重")
-        if title_diff_examples:
-            print(f"\n    示例：")
-            for num_val, cnt, titles in title_diff_examples:
-                print(f"      第{num_val}章 ({cnt}次):")
-                for t in titles:
-                    print(f"        · {t}")
+        print(f"\n    完整列表：")
+        for num_val, cnt, titles in title_diff_list:
+            print(f"      第{num_val}章（{len(titles)}个不同标题）:")
+            for t in titles:
+                print(f"        · {t}")
 
     # 卷感知去重统计
     if volumes:

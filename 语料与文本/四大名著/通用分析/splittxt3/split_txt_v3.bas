@@ -1697,7 +1697,6 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
     Dim vv As Long, insPos As Long, mv As Long
     Dim countDist As Object
     Dim cc As String
-    Dim ti As Long              ' 示例循环变量
     Dim ntKey As Variant        ' For Each 遍历标题字典键（必须 Variant）
     
     ' 乱序分析
@@ -1964,15 +1963,13 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
         Next k
         Set countDist = Nothing
         
-        ' v3.3 新增：同章异题统计（章号相同但标题不同）
-        Dim titleDiffCnt As Long, titleDiffArr() As Long
-        Dim titleDiffTitles() As String, titleDiffTCnts() As Long, tdIdx As Long
+        ' v3.3 新增：同章异题统计（章号相同但标题不同，全部列出）
+        Dim titleDiffCnt As Long
+        Dim titleDiffDict As Object, titleDiffCntDict As Object
         Dim normTitles As Object, chk As Long
         Dim ntStr As String, tdTitles As String, ttIdx As Long
-        ReDim titleDiffArr(0 To 9)
-        ReDim titleDiffTitles(0 To 9)
-        ReDim titleDiffTCnts(0 To 9)
-        tdIdx = 0
+        Set titleDiffDict = CreateObject("Scripting.Dictionary")    ' 章号 → 所有不同标题（换行分隔）
+        Set titleDiffCntDict = CreateObject("Scripting.Dictionary") ' 章号 → 不同标题数
         titleDiffCnt = 0
         
         For Each numKey In flatMap.Keys
@@ -1989,20 +1986,16 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String)
             
             If normTitles.Count > 1 Then
                 titleDiffCnt = titleDiffCnt + 1
-                If tdIdx < 5 Then
-                    titleDiffArr(tdIdx) = CLng(numKey)
-                    titleDiffTCnts(tdIdx) = normTitles.Count
-                    ' 收集所有不同的标题（完整显示，不截断，避免混淆）
-                    ttIdx = 0
-                    tdTitles = ""
-                    For Each ntKey In normTitles.Keys
-                        If ttIdx > 0 Then tdTitles = tdTitles & vbCrLf
-                        tdTitles = tdTitles & "        · " & CStr(ntKey)
-                        ttIdx = ttIdx + 1
-                    Next ntKey
-                    titleDiffTitles(tdIdx) = tdTitles
-                    tdIdx = tdIdx + 1
-                End If
+                ' 收集所有不同的标题（完整显示，不截断，避免混淆）
+                ttIdx = 0
+                tdTitles = ""
+                For Each ntKey In normTitles.Keys
+                    If ttIdx > 0 Then tdTitles = tdTitles & vbCrLf
+                    tdTitles = tdTitles & "        · " & CStr(ntKey)
+                    ttIdx = ttIdx + 1
+                Next ntKey
+                titleDiffDict.Add CStr(numKey), tdTitles
+                titleDiffCntDict.Add CStr(numKey), normTitles.Count
             End If
             Set normTitles = Nothing
 NextNumKey:
@@ -2013,14 +2006,15 @@ NextNumKey:
             AddRptLine lines_arr, rptIdx, ""
             AddRptLine lines_arr, rptIdx, "  ⚠ 章号相同但标题不同: " & titleDiffCnt & " 个章号"
             AddRptLine lines_arr, rptIdx, "    （仅按章号去重可能误删，建议启用标题级去重）"
-            If tdIdx > 0 Then
-                AddRptLine lines_arr, rptIdx, "    示例："
-                For ti = 0 To tdIdx - 1
-                    AddRptLine lines_arr, rptIdx, "      第" & titleDiffArr(ti) & "章（" & titleDiffTCnts(ti) & "个不同标题）:"
-                    AddRptLine lines_arr, rptIdx, titleDiffTitles(ti)
-                Next ti
-            End If
+            AddRptLine lines_arr, rptIdx, "    完整列表："
+            Dim tdKey As Variant
+            For Each tdKey In titleDiffDict.Keys
+                AddRptLine lines_arr, rptIdx, "      第" & tdKey & "章（" & titleDiffCntDict(tdKey) & "个不同标题）:"
+                AddRptLine lines_arr, rptIdx, titleDiffDict(tdKey)
+            Next tdKey
         End If
+        Set titleDiffDict = Nothing
+        Set titleDiffCntDict = Nothing
     End If
     Set flatMap = Nothing
     AddRptLine lines_arr, rptIdx, ""
