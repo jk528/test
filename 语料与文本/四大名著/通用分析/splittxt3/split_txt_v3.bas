@@ -1,7 +1,7 @@
 Option Explicit
 
 '==============================================================================
-' TXT章节拆分工具 v3（去重+乱序修复+卷级感知增强版）
+' TXT章节拆分工具 v3.4（去重+乱序修复+卷级感知增强版）
 '   以 splittxt2 多正则版为底本，增加：
 '     - 中文数字转阿拉伯数字（支持万/亿/大写/繁体/俗写）
 '     - 卷/部/册/篇 级别识别与卷感知去重
@@ -14,8 +14,19 @@ Option Explicit
 '
 '   复制粘贴到 VBA 编辑器（WPS/Excel/Word）即可运行，无需导入其他模块
 '
-' 入口：运行 拆分TXTv3（选择文件 → 选择正则 → 选择模式 → 选择去重 → 生成）
-'       运行 分析TXTv3（仅分析不拆分，输出详细报告）
+' v3.4 变更摘要：
+'   - 主流程弹窗由 9~10 个压缩为 4 个（文件→正则→去重排序组合→输出模式）
+'   - 去重与排序合并为一次六选一（SelectDedupSortCombo）
+'   - 新增独立设置入口 设置TXTv3（广告清理/标题去重/卷模式，SaveSetting持久化）
+'   - 清洁模式同时生成 保留≥N 与 清理<N 两个合并文件（MergeFlag=2）
+'   - 完成报告与分析报告改为 总-分 结构
+'   - 新增自动化入口 自动TXTv3（自动判定组合与清洁N，一次确认即执行）
+'   - 删除旧的"按章节一一拆分"模式（清洁模式本身即输出每章单文件）
+'
+' 入口：运行 拆分TXTv3（选择文件 → 选择正则 → 选择组合 → 输出模式 → 生成）
+'       运行 分析TXTv3（仅分析不拆分，输出总-分结构详细报告）
+'       运行 自动TXTv3（全自动决策，一次确认即完成拆分）
+'       运行 设置TXTv3（查看/修改默认设置）
 '
 ' 去重策略：
 '   1. adjacent   — 相邻重复去重（仅合并连续相同章号，适合双标题）
@@ -88,6 +99,13 @@ Private g_adRemovedCount As Long   ' 已移除的广告行数
 ' v3.3 新增：标题级去重开关
 Private g_titleDedup As Boolean    ' 是否启用标题级去重
 Private g_titleDiffCount As Long   ' 同章异题的章号数量（分析用）
+
+' v3.4 新增：统计信息（总-分报告用）
+Private g_dedupRemoved As Long     ' 去重减少的章数
+Private g_oooFixed As Long         ' 排序修复的乱序处数（排序前后章号回退计数差）
+Private g_actualVolMode As String  ' 实际使用的卷模式（flat/volume）
+Private g_skipTitleOnly As Long    ' 跳过章节中仅标题的数量
+Private g_skipShortBody As Long    ' 跳过章节中正文不足的数量
 
 
 '==============================================================================
@@ -183,7 +201,7 @@ Private Function SelectRegexPattern() As Boolean
              "  示例:  1,4      同时使用 标准中文 + 序章/楔子" & vbCrLf & vbCrLf & _
              "请输入序号："
 
-    inputVal = InputBox(prompt, "选择正则表达式（可多选）", "1")
+    inputVal = InputBox(prompt, "选择正则表达式（可多选）", "1,4")
     If StrPtr(inputVal) = 0 Then
         SelectRegexPattern = False
         Exit Function
@@ -286,146 +304,239 @@ Private Function SelectRegexPattern() As Boolean
 End Function
 
 '------------------------------------------------------------------------------
-' 去重策略选择对话框
+' v3.4 新增：去重+排序组合选择对话框（一次六选一，替代原来的两个弹窗）
 '------------------------------------------------------------------------------
-Private Function SelectDedupStrategy() As Boolean
+Private Function SelectDedupSortCombo() As Boolean
     Dim prompt As String, inputVal As String
-    Dim strategies As Variant, names As Variant, i As Long
+    Dim dedupArr As Variant, sortArr As Variant, i As Long
 
-    strategies = Array("none", "adjacent", "first", "longest")
-    names = Array("不去重", _
-                  "相邻重复去重（仅合并连续相同章号）", _
-                  "保留首次出现（每章只留第一次）", _
-                  "保留内容最长的（每章留正文最多的）★推荐")
+    dedupArr = Array("none", "none", "first", "first", "longest", "longest")
+    sortArr = Array("none", "sort", "none", "sort", "none", "sort")
 
-    prompt = "【步骤3/4】请选择去重策略：" & vbCrLf & vbCrLf
-    For i = 0 To UBound(strategies)
-        prompt = prompt & "  " & (i + 1) & ". " & names(i) & vbCrLf
-    Next i
-    prompt = prompt & vbCrLf & _
-             "说明：" & vbCrLf & _
-             "  • 只有双标题 → 2 (adjacent)" & vbCrLf & _
-             "  • 有重复想保留最多内容 → 4 (longest) ★" & vbCrLf & _
-             "  • 只想排序不去重 → 1 (none)" & vbCrLf & vbCrLf & _
+    prompt = "【步骤3/4】请选择去重+排序组合：" & vbCrLf & vbCrLf & _
+             "  1. 不去重 + 不排序（原样保留）" & vbCrLf & _
+             "  2. 不去重 + 排序（仅按章号重排）" & vbCrLf & _
+             "  3. 保留首次 + 不排序" & vbCrLf & _
+             "  4. 保留首次 + 排序" & vbCrLf & _
+             "  5. 保留最长 + 不排序" & vbCrLf & _
+             "  6. 保留最长 + 排序 ★推荐" & vbCrLf & vbCrLf & _
+             "说明：乱序严重选排序；想保留最全内容选保留最长。" & vbCrLf & vbCrLf & _
              "请输入序号："
 
-    inputVal = InputBox(prompt, "选择去重策略", "4")
+    inputVal = InputBox(prompt, "选择去重+排序组合", "6")
     If StrPtr(inputVal) = 0 Then
-        SelectDedupStrategy = False
+        SelectDedupSortCombo = False
         Exit Function
     End If
 
     inputVal = Trim(inputVal)
     If Not IsDigits(inputVal) Then
         MsgBox "请输入数字序号。", vbExclamation, "提示"
-        SelectDedupStrategy = False
+        SelectDedupSortCombo = False
         Exit Function
     End If
 
     i = CLng(inputVal) - 1
-    If i < 0 Or i > UBound(strategies) Then
-        MsgBox "序号超出范围（1-" & (UBound(strategies) + 1) & "）。", vbExclamation, "提示"
-        SelectDedupStrategy = False
+    If i < 0 Or i > 5 Then
+        MsgBox "序号超出范围（1-6）。", vbExclamation, "提示"
+        SelectDedupSortCombo = False
         Exit Function
     End If
 
-    g_dedupStrategy = strategies(i)
-    Debug.Print "[去重策略] " & g_dedupStrategy & " - " & names(i)
-    SelectDedupStrategy = True
+    g_dedupStrategy = dedupArr(i)
+    g_sortStrategy = sortArr(i)
+    Debug.Print "[去重+排序组合] 去重=" & g_dedupStrategy & " 排序=" & g_sortStrategy
+    SelectDedupSortCombo = True
 End Function
 
 '------------------------------------------------------------------------------
-' 排序策略选择对话框
+' v3.4 新增：从注册表读取默认设置（缺省 "1","0","1"）
 '------------------------------------------------------------------------------
-Private Function SelectSortStrategy() As Boolean
-    Dim prompt As String, inputVal As String
-    Dim strategies As Variant, names As Variant, i As Long
+Private Sub LoadSettings()
+    Dim sAd As String, sTitle As String, sVol As String
+    sAd = GetSetting("SplitTxtV3", "Defaults", "AdClean", "1")
+    sTitle = GetSetting("SplitTxtV3", "Defaults", "TitleDedup", "0")
+    sVol = GetSetting("SplitTxtV3", "Defaults", "VolMode", "1")
 
-    strategies = Array("none", "lis", "sort")
-    names = Array("不排序，保持原文顺序", _
-                  "最长递增子序列修序（智能找主线）", _
-                  "按章号完全重排（最彻底，章号齐全有序）★推荐")
+    g_cleanAds = (sAd = "1")
+    g_titleDedup = (sTitle = "1")
+    Select Case sVol
+        Case "2": g_volumeMode = "flat"
+        Case "3": g_volumeMode = "by_volume"
+        Case Else: g_volumeMode = "auto"
+    End Select
+End Sub
 
-    prompt = "【步骤4/4】请选择排序策略：" & vbCrLf & vbCrLf
-    For i = 0 To UBound(strategies)
-        prompt = prompt & "  " & (i + 1) & ". " & names(i) & vbCrLf
+'------------------------------------------------------------------------------
+' v3.4 新增：独立设置入口（直接回车=保持不变）
+'------------------------------------------------------------------------------
+Public Sub 设置TXTv3()
+    Dim sAd As String, sTitle As String, sVol As String
+    Dim prompt As String, inputVal As String, parts() As String
+    Dim newAd As String, newTitle As String, newVol As String
+
+    sAd = GetSetting("SplitTxtV3", "Defaults", "AdClean", "1")
+    sTitle = GetSetting("SplitTxtV3", "Defaults", "TitleDedup", "0")
+    sVol = GetSetting("SplitTxtV3", "Defaults", "VolMode", "1")
+
+    prompt = "默认设置（当前值 " & sAd & "," & sTitle & "," & sVol & "）：" & vbCrLf & vbCrLf & _
+             "  第1位 广告/垃圾行清理：1=清理(默认) 0=不清理" & vbCrLf & _
+             "  第2位 标题级去重：0=仅章号(默认) 1=双重判定(章号+标题)" & vbCrLf & _
+             "  第3位 卷级别处理：1=自动判定(默认) 2=强制扁平 3=按卷分目录" & vbCrLf & vbCrLf & _
+             "输入格式 1,0,1（直接回车=保持不变）："
+
+    inputVal = InputBox(prompt, "设置TXTv3 - 默认设置", sAd & "," & sTitle & "," & sVol)
+    If StrPtr(inputVal) = 0 Then Exit Sub
+
+    inputVal = NormalizeSeparators(inputVal)
+    inputVal = Replace(Trim(inputVal), " ", ",")
+    If Len(inputVal) = 0 Then Exit Sub
+
+    parts = Split(inputVal, ",")
+    newAd = sAd: newTitle = sTitle: newVol = sVol
+    If UBound(parts) >= 0 Then
+        If Trim(parts(0)) = "0" Or Trim(parts(0)) = "1" Then newAd = Trim(parts(0))
+    End If
+    If UBound(parts) >= 1 Then
+        If Trim(parts(1)) = "0" Or Trim(parts(1)) = "1" Then newTitle = Trim(parts(1))
+    End If
+    If UBound(parts) >= 2 Then
+        If Trim(parts(2)) = "1" Or Trim(parts(2)) = "2" Or Trim(parts(2)) = "3" Then newVol = Trim(parts(2))
+    End If
+
+    SaveSetting "SplitTxtV3", "Defaults", "AdClean", newAd
+    SaveSetting "SplitTxtV3", "Defaults", "TitleDedup", newTitle
+    SaveSetting "SplitTxtV3", "Defaults", "VolMode", newVol
+
+    MsgBox "设置已保存：" & vbCrLf & vbCrLf & _
+           "  广告/垃圾行清理：" & newAd & vbCrLf & _
+           "  标题级去重：" & newTitle & vbCrLf & _
+           "  卷级别处理：" & newVol, vbInformation, "设置完成"
+End Sub
+
+'------------------------------------------------------------------------------
+' v3.4 新增：统计章号回退次数（乱序处数，仅用 ch_num>0 且非目录区章节）
+'------------------------------------------------------------------------------
+Private Function CountOOO() As Long
+    Dim i As Long, prevNum As Long, cnt As Long
+    cnt = 0: prevNum = 0
+    For i = 0 To ch_count - 1
+        If ch_levels(i) = "chapter" And ch_nums(i) > 0 And Not ch_isTOC(i) Then
+            If prevNum > 0 And ch_nums(i) < prevNum Then cnt = cnt + 1
+            prevNum = ch_nums(i)
+        End If
     Next i
-    prompt = prompt & vbCrLf & _
-             "说明：" & vbCrLf & _
-             "  • 只想去重不改顺序 → 1 (none)" & vbCrLf & _
-             "  • 乱序但想保留原文脉络 → 2 (lis)" & vbCrLf & _
-             "  • 乱序严重，要完全整齐 → 3 (sort) ★" & vbCrLf & vbCrLf & _
-             "请输入序号："
-
-    inputVal = InputBox(prompt, "选择排序策略", "3")
-    If StrPtr(inputVal) = 0 Then
-        SelectSortStrategy = False
-        Exit Function
-    End If
-
-    inputVal = Trim(inputVal)
-    If Not IsDigits(inputVal) Then
-        MsgBox "请输入数字序号。", vbExclamation, "提示"
-        SelectSortStrategy = False
-        Exit Function
-    End If
-
-    i = CLng(inputVal) - 1
-    If i < 0 Or i > UBound(strategies) Then
-        MsgBox "序号超出范围（1-" & (UBound(strategies) + 1) & "）。", vbExclamation, "提示"
-        SelectSortStrategy = False
-        Exit Function
-    End If
-
-    g_sortStrategy = strategies(i)
-    Debug.Print "[排序策略] " & g_sortStrategy & " - " & names(i)
-    SelectSortStrategy = True
+    CountOOO = cnt
 End Function
 
 '------------------------------------------------------------------------------
-' 卷模式选择对话框
+' v3.4 新增：统计 dedup_indices 当前顺序中的章号回退次数（排序前后对比用）
 '------------------------------------------------------------------------------
-Private Function SelectVolumeMode() As Boolean
-    Dim prompt As String, inputVal As String
-    Dim modes As Variant, names As Variant, i As Long
-
-    modes = Array("auto", "flat", "by_volume")
-    names = Array("自动检测（有多卷则卷感知，无则扁平）", _
-                  "强制扁平（忽略卷结构，所有章节按章号去重）", _
-                  "按卷分目录（每卷独立子文件夹输出）")
-
-    prompt = "请选择卷级处理模式：" & vbCrLf & vbCrLf
-    For i = 0 To UBound(modes)
-        prompt = prompt & "  " & (i + 1) & ". " & names(i) & vbCrLf
+Private Function CountOOOInDedup() As Long
+    Dim i As Long, prevNum As Long, cnt As Long
+    Dim oIdx As Long
+    cnt = 0: prevNum = 0
+    For i = 0 To dedup_count - 1
+        oIdx = dedup_indices(i)
+        If ch_nums(oIdx) > 0 Then
+            If prevNum > 0 And ch_nums(oIdx) < prevNum Then cnt = cnt + 1
+            prevNum = ch_nums(oIdx)
+        End If
     Next i
-    prompt = prompt & vbCrLf & _
-             "提示：如果小说有第一卷、第二卷...且每卷章号从1开始，" & vbCrLf & _
-             "请选择 1 或 3，避免把不同卷的同名章节当重复去掉。" & vbCrLf & vbCrLf & _
-             "请输入序号："
+    CountOOOInDedup = cnt
+End Function
 
-    inputVal = InputBox(prompt, "选择卷级处理模式", "1")
-    If StrPtr(inputVal) = 0 Then
-        SelectVolumeMode = False
+'------------------------------------------------------------------------------
+' v3.4 新增：自动判定清洁模式的最小正文字数 N
+'   规则：收集所有章节正文汉字数，升序排序，在下半区（≤中位数）找最大相邻间隔 gap，
+'         N=间隔中点取整到10，clamp[50,2000]；
+'         章节<20 或 gap<50 或 最大gap<次大gap×2 → N=100
+'------------------------------------------------------------------------------
+Private Function AutoNFromBodies(ByVal lines() As String) As Long
+    Dim regCn As Object
+    Dim cnts() As Long, cnt As Long
+    Dim i As Long, j As Long, n As Long
+    Dim bodyText As String, tmp As Long
+    Dim lowerCnt As Long, k As Long
+    Dim gap As Long, maxGap As Long, maxGapAt As Long, secondGap As Long
+    Dim nResult As Long
+
+    AutoNFromBodies = 100
+    If ch_count = 0 Then Exit Function
+
+    Set regCn = CreateObject("VBScript.RegExp")
+    regCn.Global = True
+    regCn.Pattern = "[" & ChrW(&H4E00) & "-" & ChrW(&H9FFF) & "]"
+
+    ReDim cnts(0 To ch_count - 1)
+    cnt = 0
+    For i = 0 To ch_count - 1
+        If (ch_levels(i) = "chapter" Or ch_levels(i) = "special") _
+           And Not ch_isTOC(i) Then
+            n = ch_ends(i) - ch_starts(i)
+            If n > 0 Then
+                bodyText = ""
+                For j = ch_starts(i) + 1 To ch_ends(i)
+                    bodyText = bodyText & lines(j)
+                Next j
+                cnts(cnt) = regCn.Execute(bodyText).Count
+                cnt = cnt + 1
+            End If
+        End If
+    Next i
+
+    If cnt < 20 Then
+        Set regCn = Nothing
         Exit Function
     End If
+    ReDim Preserve cnts(0 To cnt - 1)
 
-    inputVal = Trim(inputVal)
-    If Not IsDigits(inputVal) Then
-        MsgBox "请输入数字序号。", vbExclamation, "提示"
-        SelectVolumeMode = False
+    ' 升序排序（冒泡）
+    For i = 0 To cnt - 2
+        For j = i + 1 To cnt - 1
+            If cnts(j) < cnts(i) Then
+                tmp = cnts(i): cnts(i) = cnts(j): cnts(j) = tmp
+            End If
+        Next j
+    Next i
+
+    ' 在下半区（≤中位数）找最大相邻间隔
+    lowerCnt = cnt \ 2 + 1
+    If lowerCnt < 2 Then
+        Set regCn = Nothing
         Exit Function
     End If
+    maxGap = 0: secondGap = 0: maxGapAt = -1
+    For k = 0 To lowerCnt - 2
+        gap = cnts(k + 1) - cnts(k)
+        If gap > maxGap Then
+            secondGap = maxGap
+            maxGap = gap
+            maxGapAt = k
+        ElseIf gap > secondGap Then
+            secondGap = gap
+        End If
+    Next k
 
-    i = CLng(inputVal) - 1
-    If i < 0 Or i > UBound(modes) Then
-        MsgBox "序号超出范围（1-" & (UBound(modes) + 1) & "）。", vbExclamation, "提示"
-        SelectVolumeMode = False
+    If maxGap < 50 Then
+        Set regCn = Nothing
         Exit Function
     End If
+    If secondGap > 0 Then
+        If maxGap < secondGap * 2 Then
+            Set regCn = Nothing
+            Exit Function
+        End If
+    End If
 
-    g_volumeMode = modes(i)
-    Debug.Print "[卷模式] " & g_volumeMode & " - " & names(i)
-    SelectVolumeMode = True
+    ' N=间隔中点取整到10
+    nResult = (cnts(maxGapAt) + cnts(maxGapAt + 1)) \ 2
+    nResult = ((nResult + 5) \ 10) * 10
+    If nResult < 50 Then nResult = 50
+    If nResult > 2000 Then nResult = 2000
+    AutoNFromBodies = nResult
+
+    Set regCn = Nothing
 End Function
 
 
@@ -1647,12 +1758,16 @@ Public Sub 分析TXTv3()
     g_tSelect = 0
     g_regexName = ""
     g_selCount = 0
+    g_adRemovedCount = 0
 
     ' 选择文件
     tSel0 = Timer
     filePath = SelectTxtFile("选择要分析的TXT文件")
     g_tSelect = Timer - tSel0
     If Len(filePath) = 0 Then Exit Sub
+
+    ' v3.4：读取默认设置（卷模式/广告清理/标题级去重）
+    LoadSettings
 
     ' 选择正则
     InitRegexPatterns
@@ -1665,7 +1780,7 @@ End Sub
 '------------------------------------------------------------------------------
 ' 深度分析核心
 '------------------------------------------------------------------------------
-Private Sub DeepAnalyzeFile(ByVal filePath As String)
+Private Sub DeepAnalyzeFile(ByVal filePath As String, Optional ByVal outputDir As String = "")
     ' ===== 所有变量集中声明（Option Explicit 要求必须声明）=====
     Dim fso As Object
     Dim content As String
@@ -2232,17 +2347,70 @@ NextNumKey:
 
     AddRptLine lines_arr, rptIdx, String(70, "=")
 
-    ' 输出报告
-    report = JoinArr(lines_arr, rptIdx)
+    ' v3.4：构建【总】结论与建议（置于报告开头，明细保留在【分】之后）
+    Dim summary As String
+    Dim recCombo As String
+    Dim autoN As Long
+    Dim volStructDesc As String, tocDesc As String
+
+    ' 推荐组合（与自动TXTv3相同的自动决策规则）
+    If dupCnt = 0 And oooCnt = 0 Then
+        recCombo = "none+none（干净型：不去重不排序）"
+    ElseIf adjRatio >= 0.3 And oooCnt < 10 Then
+        recCombo = "first+none（双标题型：保留首次不排序）"
+    ElseIf oooCnt >= 10 Then
+        recCombo = "longest+sort（乱序严重：保留最长并排序）"
+    ElseIf dupCnt > 0 Then
+        recCombo = "longest+none（仅重复：保留最长不排序）"
+    Else
+        recCombo = "longest+sort（稳妥默认）"
+    End If
+
+    ' 建议清洁N值
+    autoN = AutoNFromBodies(lines)
+
+    If volCnt > 0 Then
+        volStructDesc = "有卷（卷级标题 " & volCnt & " 个）"
+    Else
+        volStructDesc = "无卷"
+    End If
+    If g_tocChapterCount > 0 Then
+        tocDesc = "有（" & g_tocChapterCount & " 章，已跳过）"
+    Else
+        tocDesc = "无"
+    End If
+
+    summary = "【总】结论与建议" & vbCrLf & _
+              "  问题计数：" & vbCrLf & _
+              "    重复章号数：" & dupCnt & vbCrLf & _
+              "    乱序处数：" & oooCnt & vbCrLf & _
+              "    卷结构：" & volStructDesc & vbCrLf & _
+              "    同章异题数：" & g_titleDiffCount & vbCrLf & _
+              "    目录区：" & tocDesc & vbCrLf & _
+              "  推荐组合：" & recCombo & vbCrLf & _
+              "  建议清洁N值：" & autoN & vbCrLf & _
+              String(50, "-") & vbCrLf & _
+              "【分】各维度明细" & vbCrLf
+
+    ' 输出报告（总-分结构）
+    report = summary & JoinArr(lines_arr, rptIdx)
     Debug.Print report
 
     ' 写报告文件
-    outPath = fso.GetParentFolderName(filePath) & "\" & fso.GetBaseName(filePath) & "_分析报告.txt"
+    If Len(outputDir) > 0 Then
+        outPath = outputDir & "\分析报告.txt"
+    Else
+        outPath = fso.GetParentFolderName(filePath) & "\" & fso.GetBaseName(filePath) & "_分析报告.txt"
+    End If
     WriteTextUTF8NoBOM outPath, report
-    MsgBox "分析完成！" & vbCrLf & _
-           "报告已保存：" & vbCrLf & outPath & vbCrLf & vbCrLf & _
-           "（详细内容见输出文件，也可在VBA立即窗口查看）", _
-           vbInformation, "分析完成"
+    If Len(outputDir) = 0 Then
+        MsgBox "【总】分析完成" & vbCrLf & _
+               "  重复章号 " & dupCnt & "｜乱序 " & oooCnt & " 处｜同章异题 " & g_titleDiffCount & vbCrLf & _
+               "  推荐组合：" & recCombo & vbCrLf & _
+               "  建议清洁N值：" & autoN & vbCrLf & vbCrLf & _
+               "报告已保存：" & vbCrLf & outPath, _
+               vbInformation, "分析完成"
+    End If
 
     Set fso = Nothing
 End Sub
@@ -2284,10 +2452,13 @@ End Function
 Public Sub 拆分TXTv3()
     Dim filePath As String
     Dim tSel0 As Double
-    Dim mode As VbMsgBoxResult
-    Dim chunkStr As String, prompt As String
-    Dim cleanInput As String, cleanParts() As String
-    Dim cleanN As Long, cleanFlag As Long
+    Dim prompt As String
+    Dim outInput As String, modeStr As String, paramStr As String
+    Dim spPos As Long
+    Dim cleanN As Long
+    Dim chunkStr As String
+    Dim selIdx As Long
+    Dim unitInput As String
 
     ' 初始化
     g_tTotal0 = Timer
@@ -2296,103 +2467,80 @@ Public Sub 拆分TXTv3()
     g_selCount = 0
     g_dedupStrategy = "longest"
     g_sortStrategy = "sort"
-    g_volumeMode = "auto"
+    g_adRemovedCount = 0
+    g_dedupRemoved = 0
+    g_oooFixed = 0
+    g_skipTitleOnly = 0
+    g_skipShortBody = 0
 
-    ' 步骤1：选择文件
+    ' 弹窗1：选择文件
     tSel0 = Timer
     filePath = SelectTxtFile("选择要拆分的TXT文件")
     g_tSelect = Timer - tSel0
     If Len(filePath) = 0 Then Exit Sub
 
-    ' 步骤2：选择正则
+    ' 弹窗2：选择正则（多选）
     InitRegexPatterns
     If Not SelectRegexPattern() Then Exit Sub
 
-    ' 步骤3：选择去重策略
-    If Not SelectDedupStrategy() Then Exit Sub
+    ' 弹窗3：去重+排序组合（六选一）
+    If Not SelectDedupSortCombo() Then Exit Sub
 
-    ' 步骤4：选择排序策略
-    If Not SelectSortStrategy() Then Exit Sub
+    ' 卷模式/广告清理/标题级去重：改由设置读取（见 设置TXTv3）
+    LoadSettings
 
-    ' 步骤5：选择卷模式
-    If Not SelectVolumeMode() Then Exit Sub
+    ' 弹窗4：输出模式+参数一体输入
+    prompt = "【步骤4/4】请选择输出模式（可带参数）：" & vbCrLf & vbCrLf & _
+             "  1. 清洁模式（默认）" & vbCrLf & _
+             "       每章一个文件 + 生成 保留≥N / 清理<N 两个合并文件" & vbCrLf & _
+             "       输入 1 → N=100；输入 1 200 → N=200" & vbCrLf & _
+             "  2. 聚合模式（多章合并为一份）" & vbCrLf & _
+             "       输入 2 → 40,3；输入 2 20,1|20,1|80,1 → 自定义" & vbCrLf & vbCrLf & _
+             "请输入："
+    outInput = InputBox(prompt, "输出模式+参数", "1")
+    If StrPtr(outInput) = 0 Then Exit Sub
 
-    ' 步骤5b：广告清理（v3.2 新增）
-    Dim adCleanMode As VbMsgBoxResult
-    adCleanMode = MsgBox("是否启用广告/垃圾行清理？" & vbCrLf & vbCrLf & _
-                         "  [是]  启用（移除网址/推广语/分隔线等）" & vbCrLf & _
-                         "  [否]  不清理，保留原文", _
-                         vbYesNo + vbQuestion + vbDefaultButton2, "广告清理")
-    g_cleanAds = (adCleanMode = vbYes)
-    g_adRemovedCount = 0
+    outInput = NormalizeSeparators(outInput)
+    outInput = Trim(outInput)
+    If Len(outInput) = 0 Then
+        MsgBox "未输入模式。", vbExclamation, "提示"
+        Exit Sub
+    End If
 
-    ' 步骤5c：标题级去重（v3.3 新增）
-    Dim titleDedupMode As VbMsgBoxResult
-    titleDedupMode = MsgBox("是否启用标题级去重？" & vbCrLf & vbCrLf & _
-                            "  [是]  启用（章号+标题双重判定）" & vbCrLf & _
-                            "       避免同章异题被误删" & vbCrLf & _
-                            "  [否]  仅按章号去重（默认）", _
-                            vbYesNo + vbQuestion + vbDefaultButton2, "标题级去重")
-    g_titleDedup = (titleDedupMode = vbYes)
-
-    ' 步骤6：选择拆分模式
-    mode = MsgBox("请选择拆分模式：" & vbCrLf & vbCrLf & _
-                  "  [是]  按章节一一拆分（每章一个文件）" & vbCrLf & _
-                  "  [否]  聚合拆分（多章合并为一份）" & vbCrLf & _
-                  "  [取消] 清洁模式（按正文字数过滤并合并）", _
-                  vbYesNoCancel + vbQuestion, "选择拆分模式")
-
-    If mode = vbCancel Then
-        ' 清洁模式
-        cleanInput = InputBox("请输入最小正文字数：" & vbCrLf & vbCrLf & _
-                              "  正文中文字数 < N 的章节将被跳过" & vbCrLf & _
-                              "  输出纯净正文（保留≥N字的章节）" & vbCrLf & vbCrLf & _
-                              "示例：100  →  只保留正文≥100字的章节", _
-                              "清洁模式", "100")
-        If StrPtr(cleanInput) = 0 Then Exit Sub
-        cleanInput = NormalizeSeparators(cleanInput)
-        cleanParts = Split(Trim(cleanInput), ",")
-        If Len(Trim(cleanParts(0))) = 0 Or Not IsDigits(Trim(cleanParts(0))) Then
-            MsgBox "请输入正整数（最小正文字数）。", vbExclamation, "提示"
-            Exit Sub
-        End If
-        cleanN = CLng(Trim(cleanParts(0)))
-        cleanFlag = 1   ' 固定为保留模式
-        SplitByChapterV3 InputPath:=filePath, GenerateTitleOnly:=False, _
-                         MinBodyLen:=cleanN, MergeFlag:=cleanFlag
-    ElseIf mode = vbYes Then
-        ' 按章节一一拆分
-        Dim contentMode As VbMsgBoxResult
-        contentMode = MsgBox("选择章节内容处理方式：" & vbCrLf & vbCrLf & _
-                            "  [是] 生成所有章节（含仅有标题/正文不足）" & vbCrLf & _
-                            "  [否] 跳过仅有标题的章节（默认）", _
-                            vbYesNo + vbQuestion + vbDefaultButton2, "章节内容处理")
-        If contentMode = vbYes Then
-            SplitByChapterV3 InputPath:=filePath, GenerateTitleOnly:=True
-        Else
-            SplitByChapterV3 InputPath:=filePath, GenerateTitleOnly:=False
-        End If
+    ' 解析：按第一个空格切开，前段=模式，后段=参数（参数内可含逗号和竖线）
+    spPos = InStr(outInput, " ")
+    If spPos > 0 Then
+        modeStr = Trim(Left(outInput, spPos - 1))
+        paramStr = Trim(Mid(outInput, spPos + 1))
     Else
-        ' 聚合拆分
-        prompt = "请输入聚合格式（每份章数,份数，以 | 分割多段）：" & vbCrLf & vbCrLf & _
-                 "示例：" & vbCrLf & _
-                 "  40,3              每份40章，共3份" & vbCrLf & _
-                 "  40                每40章一份（便捷模式）" & vbCrLf & _
-                 "  20,1|20,1|80,1    多段：1-20、21-40、41-120" & vbCrLf & vbCrLf & _
-                 "（余数自动补齐）"
-        chunkStr = InputBox(prompt, "聚合拆分 - 输入格式", "40,3")
-        If StrPtr(chunkStr) = 0 Then Exit Sub
-        chunkStr = NormalizeSeparators(chunkStr)
-        If Len(Trim(chunkStr)) = 0 Then
-            MsgBox "未输入格式。", vbExclamation, "提示"
-            Exit Sub
+        modeStr = outInput
+        paramStr = ""
+    End If
+
+    If modeStr = "1" Then
+        ' 清洁模式（每章一个文件 + 两个合并文件）
+        If Len(paramStr) = 0 Then
+            cleanN = 100
+        Else
+            If Not IsDigits(paramStr) Then
+                MsgBox "清洁模式参数应为正整数（最小正文字数）。", vbExclamation, "提示"
+                Exit Sub
+            End If
+            cleanN = CLng(paramStr)
+        End If
+        SplitByChapterV3 InputPath:=filePath, GenerateTitleOnly:=False, _
+                         MinBodyLen:=cleanN, MergeFlag:=2
+    ElseIf modeStr = "2" Then
+        ' 聚合模式
+        If Len(paramStr) = 0 Then
+            chunkStr = "40,3"
+        Else
+            chunkStr = paramStr
         End If
 
-        ' 自定义正则的单位词询问
-        Dim selIdx As Long
+        ' 自定义正则的单位词询问（聚合时保留）
         For selIdx = 0 To g_selCount - 1
             If g_selOrigIndices(selIdx) = g_regexCount Then
-                Dim unitInput As String
                 unitInput = InputBox("检测到自定义正则，请输入聚合拆分用的单位词：", _
                                       "聚合拆分单位词", "章")
                 If StrPtr(unitInput) = 0 Or Len(Trim(unitInput)) = 0 Then
@@ -2404,7 +2552,191 @@ Public Sub 拆分TXTv3()
         Next selIdx
 
         SplitByGroupsV3 InputPath:=filePath, ChunkStr:=chunkStr
+    Else
+        MsgBox "无效模式：" & modeStr & "（应为 1 或 2）。", vbExclamation, "提示"
+        Exit Sub
     End If
+End Sub
+
+'------------------------------------------------------------------------------
+' v3.4 新增：自动化入口
+'   弹窗1选文件 → LoadSettings → 读取+扫描+DetectTOC → 自动决策 → 确认 → 执行 → 总-分报告
+'------------------------------------------------------------------------------
+Public Sub 自动TXTv3()
+    Dim filePath As String
+    Dim tSel0 As Double
+    Dim content As String, lines() As String, lineCount As Long
+    Dim tRead As Double, tScan As Double, t0 As Double
+    Dim fso As Object
+    Dim autoDir As String, autoSubDir As String
+    Dim dupCnt As Long, oooCnt As Long, adjRatio As Double
+    Dim recDedup As String, recSort As String, recComboStr As String
+    Dim autoN As Long
+    Dim confirmMsg As String
+    Dim volCnt As Long, i As Long
+
+    ' 初始化
+    g_tTotal0 = Timer
+    g_tSelect = 0
+    g_regexName = ""
+    g_selCount = 0
+    g_adRemovedCount = 0
+    g_dedupRemoved = 0
+    g_oooFixed = 0
+    g_skipTitleOnly = 0
+    g_skipShortBody = 0
+
+    ' 弹窗1：选择文件
+    tSel0 = Timer
+    filePath = SelectTxtFile("选择要自动拆分的TXT文件")
+    g_tSelect = Timer - tSel0
+    If Len(filePath) = 0 Then Exit Sub
+
+    ' 读取设置（卷模式/广告/标题）
+    LoadSettings
+
+    Set fso = CreateObject("Scripting.FileSystemObject")
+
+    ' 读取并扫描
+    t0 = Timer
+    g_detectedEnc = DetectEncodingFile(filePath)
+    content = ReadTextAuto(filePath)
+    content = Replace(Replace(content, vbCrLf, vbLf), vbCr, vbLf)
+    lines = Split(content, vbLf)
+    lineCount = UBound(lines) + 1
+    tRead = Timer - t0
+
+    ' 自动正则：固定 "1,4"（标准中文+无号）
+    InitRegexPatterns
+    Dim autoPatterns As String
+    autoPatterns = "1,4"
+    autoPatterns = Replace(Trim(autoPatterns), " ", ",")
+    ' 直接填充正则数组（不弹InputBox）
+    Dim parts() As String, p As Long, idx As Long
+    parts = Split(autoPatterns, ",")
+    ReDim g_selPatterns(0 To UBound(parts))
+    ReDim g_selUnitGroups(0 To UBound(parts))
+    ReDim g_selDefaultUnits(0 To UBound(parts))
+    ReDim g_selOrigIndices(0 To UBound(parts))
+    g_selCount = 0
+    For p = 0 To UBound(parts)
+        idx = CLng(Trim(parts(p)))
+        g_selPatterns(g_selCount) = g_regexPatterns(idx)
+        g_selUnitGroups(g_selCount) = g_regexUnitGroups(idx)
+        g_selDefaultUnits(g_selCount) = g_regexDefaultUnits(idx)
+        g_selOrigIndices(g_selCount) = idx
+        g_selCount = g_selCount + 1
+    Next p
+    g_regexName = "标准中文 + 序章/楔子"
+
+    t0 = Timer
+    ScanChaptersV3 lines, lineCount
+    DetectTOC
+    tScan = Timer - t0
+    If ch_count = 0 Then
+        MsgBox "未识别到任何章节标题。", vbExclamation, "提示"
+        Exit Sub
+    End If
+
+    ' 自动决策：统计（仅用 ch_num>0 且非目录区章节）
+    Dim flatMap As Object
+    Dim numKey As Variant, adjDup As Long, prevChIdx As Long
+    Dim seqLen As Long, maxSeq As Long, prevNum As Long
+    Dim chapCnt As Long
+    chapCnt = 0: dupCnt = 0: oooCnt = 0: adjDup = 0: prevChIdx = -1
+
+    Set flatMap = CreateObject("Scripting.Dictionary")
+    For i = 0 To ch_count - 1
+        If ch_levels(i) = "chapter" And ch_nums(i) > 0 And Not ch_isTOC(i) Then
+            chapCnt = chapCnt + 1
+            numKey = CStr(ch_nums(i))
+            If Not flatMap.Exists(numKey) Then flatMap.Add numKey, 0
+            flatMap(numKey) = flatMap(numKey) + 1
+
+            ' 乱序
+            If prevNum > 0 And ch_nums(i) < prevNum Then oooCnt = oooCnt + 1
+            prevNum = ch_nums(i)
+
+            ' 相邻双标题
+            If prevChIdx >= 0 Then
+                If ch_nums(i) = ch_nums(prevChIdx) And _
+                   ch_starts(i) - ch_starts(prevChIdx) <= 2 Then
+                    adjDup = adjDup + 1
+                End If
+            End If
+            prevChIdx = i
+        End If
+    Next i
+    For Each numKey In flatMap.Keys
+        If flatMap(numKey) > 1 Then dupCnt = dupCnt + 1
+    Next numKey
+    Set flatMap = Nothing
+    If chapCnt > 0 Then adjRatio = adjDup / chapCnt
+
+    ' 自动决策规则
+    If dupCnt = 0 And oooCnt = 0 Then
+        recDedup = "none": recSort = "none"
+        recComboStr = "none+none（干净型）"
+    ElseIf adjRatio >= 0.3 And oooCnt < 10 Then
+        recDedup = "first": recSort = "none"
+        recComboStr = "first+none（双标题型）"
+    ElseIf oooCnt >= 10 Then
+        recDedup = "longest": recSort = "sort"
+        recComboStr = "longest+sort（乱序严重）"
+    ElseIf dupCnt > 0 Then
+        recDedup = "longest": recSort = "none"
+        recComboStr = "longest+none（仅重复）"
+    Else
+        recDedup = "longest": recSort = "sort"
+        recComboStr = "longest+sort（稳妥默认）"
+    End If
+
+    ' 自动判定N
+    autoN = AutoNFromBodies(lines)
+
+    ' 卷结构统计
+    volCnt = 0
+    For i = 0 To ch_count - 1
+        If ch_levels(i) = "volume" Then volCnt = volCnt + 1
+    Next i
+
+    ' 确认弹窗
+    confirmMsg = "【自动方案】" & vbCrLf & _
+                 "  正则：标准中文 + 无号章节" & vbCrLf & _
+                 "  去重+排序：" & recComboStr & vbCrLf & _
+                 "  理由：重复章号=" & dupCnt & "，乱序=" & oooCnt & "，相邻双标题占比=" & Format(adjRatio, "0.0%") & vbCrLf & _
+                 "  清洁N值：" & autoN & vbCrLf & _
+                 "  卷模式：" & g_volumeMode & "（" & IIf(volCnt > 1, "检测多卷", "扁平") & "）" & vbCrLf & _
+                 "  广告清理：" & IIf(g_cleanAds, "是", "否") & vbCrLf & _
+                 "  标题级去重：" & IIf(g_titleDedup, "是", "否") & vbCrLf & vbCrLf & _
+                 "[确定]执行   [取消]退出"
+    If MsgBox(confirmMsg, vbOKCancel + vbQuestion, "自动TXTv3 - 确认方案") <> vbOK Then Exit Sub
+
+    ' 执行
+    g_dedupStrategy = recDedup
+    g_sortStrategy = recSort
+
+    autoDir = fso.GetParentFolderName(filePath) & "\" & fso.GetBaseName(filePath) & "_自动"
+    autoSubDir = autoDir & "\拆分文档"
+    If Dir(autoDir, vbDirectory) = "" Then MkDir autoDir
+    If Dir(autoSubDir, vbDirectory) = "" Then MkDir autoSubDir
+
+    ' 生成分析报告
+    DeepAnalyzeFile filePath, autoDir
+
+    ' 拆分（清洁模式，MergeFlag=2）
+    SplitByChapterV3 InputPath:=filePath, OutputDir:=autoSubDir, _
+                     GenerateTitleOnly:=False, MinBodyLen:=autoN, MergeFlag:=2
+
+    ' 把合并文件从 autoSubDir 移到 autoDir
+    On Error Resume Next
+    Dim mvFile As Object
+    For Each mvFile In fso.GetFolder(autoSubDir).Files
+        If InStr(mvFile.Name, "保留大于等于") > 0 Or InStr(mvFile.Name, "清理小于") > 0 Then
+            fso.MoveFile mvFile.Path, autoDir & "\"
+        End If
+    Next mvFile
+    On Error GoTo 0
 End Sub
 
 
@@ -2460,6 +2792,8 @@ Public Sub SplitByChapterV3(ByVal InputPath As String, _
     Dim t0 As Double
     Dim outDirFull As String
     Dim actualVolMode As String, byVolFlag As Boolean
+    Dim chapIdxTmp() As Long
+    Dim chapBefore As Long, tSort As Double, oooBefore As Long
 
     If g_tTotal0 = 0 Then g_tTotal0 = Timer
 
@@ -2491,22 +2825,26 @@ Public Sub SplitByChapterV3(ByVal InputPath As String, _
     ' 3. 确定卷模式
     actualVolMode = ResolveVolMode(g_volumeMode)
     byVolFlag = (g_volumeMode = "by_volume" And actualVolMode = "volume")
+    g_actualVolMode = actualVolMode
 
-    ' 4. 去重
+    ' 4. 去重（统计减少章数）
+    GetChapterIndices chapIdxTmp, chapBefore
     t0 = Timer
     ApplyDedup g_dedupStrategy, actualVolMode, g_titleDedup
     tDedup = Timer - t0
+    g_dedupRemoved = chapBefore - dedup_count
 
     If dedup_count = 0 Then
         MsgBox "去重后无有效章节！", vbExclamation, "错误"
         Exit Sub
     End If
 
-    ' 4b. 排序
-    Dim tSort As Double
+    ' 4b. 排序（统计乱序修复处数）
     t0 = Timer
+    oooBefore = CountOOOInDedup()
     ApplySort g_sortStrategy, actualVolMode
     tSort = Timer - t0
+    g_oooFixed = oooBefore - CountOOOInDedup()
 
     If dedup_count = 0 Then
         MsgBox "排序后无有效章节！", vbExclamation, "错误"
@@ -2602,6 +2940,12 @@ Public Sub SplitByChapterV3(ByVal InputPath As String, _
 
         If isInsufficient And Not GenerateTitleOnly Then
             skippedCount = skippedCount + 1
+            ' v3.4 新增：跳过原因统计（总-分报告用）
+            If n = 1 Then
+                g_skipTitleOnly = g_skipTitleOnly + 1
+            ElseIf MinBodyLen > 0 And bodyLen < MinBodyLen Then
+                g_skipShortBody = g_skipShortBody + 1
+            End If
             If bodyLen >= top1 Then
                 top3 = top2: top2 = top1: top1 = bodyLen
             ElseIf bodyLen >= top2 Then
@@ -2612,8 +2956,6 @@ Public Sub SplitByChapterV3(ByVal InputPath As String, _
             If MergeFlag >= 0 Then
                 skippedTitles.Add ch_titles(origIdx)
                 skippedBodyLens.Add bodyLen
-            End If
-            If MergeFlag = 0 Or MergeFlag = 2 Then
                 skippedTexts.Add body
             End If
             GoTo NextChapterV3
@@ -2682,18 +3024,23 @@ NextChapterV3:
     Set regCn = Nothing
     tWrite = Timer - t0
 
-    ' 清洁模式合并文件（仅输出保留≥N字的纯净正文，无报告头部）
+    ' 清洁模式合并文件（MergeFlag=2 同时输出保留和清理两个合并文件）
     If MergeFlag >= 0 Then
         Dim srcBaseName As String
+        Dim mergeName2 As String, mergeBody2 As String
         srcBaseName = fso.GetBaseName(InputPath)
 
-        ' 只输出保留章节的纯净正文（flag=1 或 2 时都输出保留文件）
         If keptTexts.Count > 0 Then
-            Dim mergeName2 As String, mergeBody2 As String
             mergeName2 = "保留大于等于" & MinBodyLen & "_" & srcBaseName & ".txt"
             mergeBody2 = JoinCollection(keptTexts)
             WriteTextUTF8NoBOM outDirFull & "\" & mergeName2, mergeBody2
             Debug.Print "合并文件：" & mergeName2 & "（" & keptTexts.Count & "章合并）"
+        End If
+        If MergeFlag = 2 And skippedTexts.Count > 0 Then
+            mergeName2 = "清理小于" & MinBodyLen & "_" & srcBaseName & ".txt"
+            mergeBody2 = JoinCollection(skippedTexts)
+            WriteTextUTF8NoBOM outDirFull & "\" & mergeName2, mergeBody2
+            Debug.Print "合并文件：" & mergeName2 & "（" & skippedTexts.Count & "章合并）"
         End If
     End If
 
@@ -2707,25 +3054,26 @@ NextChapterV3:
         skipDetail = skipDetail & shortBodyCount & "个正文不足"
     End If
 
-    extraInfo = "【去重+排序信息】" & vbCrLf & _
-               "  去重策略：" & g_dedupStrategy & vbCrLf & _
-               "  排序策略：" & g_sortStrategy & vbCrLf & _
-               "  卷模式：" & actualVolMode & vbCrLf & _
-               "  原始章节：" & ch_count & " → 处理后：" & dedup_count & vbCrLf
-
+    ' v3.4：统计信息改由模块级变量传递（g_dedupRemoved/g_oooFixed/g_skip*），
+    ' extraInfo 仅保留补充说明
     If skippedCount > 0 Then
         topStr = top1 & "字"
         If skippedCount >= 2 Then topStr = topStr & "、" & top2 & "字"
         If skippedCount >= 3 Then topStr = topStr & "、" & top3 & "字"
-        extraInfo = extraInfo & _
-                   "【跳过统计】" & vbCrLf & _
-                   "  跳过章节：" & skippedCount & " 个（" & skipDetail & "）" & vbCrLf & _
-                   "  前三正文：" & topStr
+        extraInfo = "  跳过章节前三正文：" & topStr
     ElseIf Len(skipDetail) > 0 Then
-        extraInfo = extraInfo & "  " & skipDetail & "（已生成）"
+        extraInfo = "  " & skipDetail & "（已生成）"
     End If
 
-    ShowCompleteReportV3 "按章节拆分完成", writtenCount, outDirFull, _
+    ' v3.4：清洁模式（MergeFlag>=0）报告标题
+    Dim rptTitle As String
+    If MergeFlag >= 0 Then
+        rptTitle = "清洁模式"
+    Else
+        rptTitle = "按章节拆分"
+    End If
+
+    ShowCompleteReportV3 rptTitle, writtenCount, outDirFull, _
                          tRead, tScan, tDedup, tWrite, extraInfo
     Exit Sub
 
@@ -2752,6 +3100,7 @@ Public Sub SplitByGroupsV3(ByVal InputPath As String, _
     Dim outDirFull As String
     Dim actualVolMode As String
     Dim unitStr As String
+    Dim chapIdxTmp2() As Long, chapBefore2 As Long, oooBefore2 As Long
 
     If g_tTotal0 = 0 Then g_tTotal0 = Timer
 
@@ -2781,22 +3130,27 @@ Public Sub SplitByGroupsV3(ByVal InputPath As String, _
 
     ' 3. 卷模式
     actualVolMode = ResolveVolMode(g_volumeMode)
+    g_actualVolMode = actualVolMode
 
-    ' 4. 去重
+    ' 4. 去重（统计减少章数）
+    GetChapterIndices chapIdxTmp2, chapBefore2
     t0 = Timer
     ApplyDedup g_dedupStrategy, actualVolMode, g_titleDedup
     tDedup = Timer - t0
+    g_dedupRemoved = chapBefore2 - dedup_count
 
     If dedup_count = 0 Then
         MsgBox "去重后无有效章节！", vbExclamation, "错误"
         Exit Sub
     End If
 
-    ' 4b. 排序
+    ' 4b. 排序（统计乱序修复处数）
     Dim tSort2 As Double
     t0 = Timer
+    oooBefore2 = CountOOOInDedup()
     ApplySort g_sortStrategy, actualVolMode
     tSort2 = Timer - t0
+    g_oooFixed = oooBefore2 - CountOOOInDedup()
 
     If dedup_count = 0 Then
         MsgBox "排序后无有效章节！", vbExclamation, "错误"
@@ -2829,32 +3183,16 @@ Public Sub SplitByGroupsV3(ByVal InputPath As String, _
     If Dir(outDirFull, vbDirectory) = "" Then MkDir outDirFull
     CleanOutputDir outDirFull
 
-    ' 9. 预览
-    Dim preview As String, showN As Long, rangeStr As String, f As Long
-    preview = "【聚合拆分预览】" & vbCrLf & _
-              "源文件：" & InputPath & vbCrLf & _
-              "总行数：" & lineCount & vbCrLf
-    If Len(g_regexName) > 0 Then preview = preview & "正则：" & g_regexName & vbCrLf
-    preview = preview & _
-              "去重策略：" & g_dedupStrategy & vbCrLf & _
-              "排序策略：" & g_sortStrategy & vbCrLf & _
-              "卷模式：" & actualVolMode & vbCrLf & _
-              "原始章节：" & ch_count & " → 处理后：" & dedup_count & vbCrLf & _
-              "单位：" & unitStr & vbCrLf & _
-              "聚合格式：" & ChunkStr & vbCrLf & _
-              "将生成 " & fileCount & " 个文件：" & vbCrLf
-    showN = fileCount
-    If showN > 12 Then showN = 12
-    For f = 0 To showN - 1
+    ' 9. 预览信息（v3.4：不再弹确认框，仅输出到立即窗口）
+    Dim rangeStr As String, f As Long
+    Debug.Print "【聚合拆分】源文件：" & InputPath & "，总行数：" & lineCount & _
+                "，聚合格式：" & ChunkStr & "，将生成 " & fileCount & " 个文件"
+    For f = 0 To fileCount - 1
+        If f >= 12 Then Exit For
         rangeStr = FormatRange(fileChStart(f), fileChEnd(f), unitStr)
-        preview = preview & "  " & Format(f + 1, serialFmt) & "  " & rangeStr & vbCrLf
+        Debug.Print "  " & Format(f + 1, serialFmt) & "  " & rangeStr
     Next f
-    If fileCount > 12 Then
-        preview = preview & "  ...（其余 " & (fileCount - 12) & " 份省略）" & vbCrLf
-    End If
-    preview = preview & vbCrLf & "输出目录：" & outDirFull & vbCrLf & vbCrLf & _
-              "确认开始拆分？"
-    If MsgBox(preview, vbOKCancel + vbQuestion, "聚合拆分预览") <> vbOK Then Exit Sub
+    If fileCount > 12 Then Debug.Print "  ...（其余 " & (fileCount - 12) & " 份省略）"
 
     ' 10. 写文件
     t0 = Timer
@@ -2900,14 +3238,11 @@ Public Sub SplitByGroupsV3(ByVal InputPath As String, _
     On Error GoTo 0
     tWrite = Timer - t0
 
-    ' 完成报告
+    ' 完成报告（v3.4：统计信息由模块级变量传递）
     Dim extraInfo As String
-    extraInfo = "【去重信息】" & vbCrLf & _
-               "  去重策略：" & g_dedupStrategy & vbCrLf & _
-               "  卷模式：" & actualVolMode & vbCrLf & _
-               "  原始章节：" & ch_count & " → 去重后：" & dedup_count
+    extraInfo = "  聚合格式：" & ChunkStr & "（单位：" & unitStr & "）"
 
-    ShowCompleteReportV3 "聚合拆分完成", fileCount, outDirFull, _
+    ShowCompleteReportV3 "聚合模式", fileCount, outDirFull, _
                          tRead, tScan, tDedup, tWrite, extraInfo
     Exit Sub
 
@@ -3002,35 +3337,64 @@ Private Sub ShowCompleteReportV3(ByVal title As String, ByVal fileCount As Long,
         ByVal outDir As String, ByVal tRead As Double, _
         ByVal tScan As Double, ByVal tDedup As Double, _
         ByVal tWrite As Double, Optional ByVal extraInfo As String = "")
+    ' v3.4：重构为 总-分 结构
     Dim tTotal As Double, msg As String
+    Dim skippedTotal As Long
     tTotal = Timer - g_tTotal0
+    skippedTotal = g_skipTitleOnly + g_skipShortBody
 
-    msg = title & "！" & vbCrLf & _
-          "生成文件：" & fileCount & " 个" & vbCrLf
-    If Len(g_regexName) > 0 Then msg = msg & "正则：" & g_regexName & vbCrLf
-    msg = msg & _
-          "源文件编码：" & g_detectedEnc & " → UTF-8" & vbCrLf & _
-          "输出目录：" & outDir & vbCrLf & vbCrLf & _
-          "【计时统计】" & vbCrLf & _
-          "  文件选择：" & Format(g_tSelect, "0.00") & " 秒" & vbCrLf & _
-          "  读取文件：" & Format(tRead, "0.00") & " 秒" & vbCrLf & _
-          "  识别章节：" & Format(tScan, "0.00") & " 秒" & vbCrLf & _
-          "  去重处理：" & Format(tDedup, "0.00") & " 秒" & vbCrLf & _
-          "  写入文件：" & Format(tWrite, "0.00") & " 秒" & vbCrLf & _
-          "  总计耗时：" & Format(tTotal, "0.00") & " 秒"
-    If tWrite > 0 Then
-        msg = msg & vbCrLf & "  写入速率：" & Format(fileCount / tWrite, "0.0") & " 文件/秒"
+    ' 【总】
+    msg = "【总】" & title & "完成：生成 " & fileCount & " 个文件（耗时 " & _
+          Format(tTotal, "0.0") & " 秒）" & vbCrLf & _
+          "输出：" & outDir & vbCrLf & _
+          String(30, "-") & vbCrLf
+
+    ' 【分】
+    msg = msg & "【分】" & vbCrLf
+    msg = msg & "  来源：编码 " & g_detectedEnc & "→UTF-8｜正则 " & g_regexName & _
+          "｜识别章节 " & ch_count & vbCrLf
+
+    ' 质量行：去重(-N章)｜排序(修N处)｜卷模式（无数据的部分省略）
+    Dim qualityLine As String
+    qualityLine = "  质量："
+    If g_dedupStrategy <> "none" Then
+        qualityLine = qualityLine & "去重 " & g_dedupStrategy & "(-" & g_dedupRemoved & "章)｜"
+    Else
+        qualityLine = qualityLine & "去重 none｜"
     End If
+    If g_sortStrategy <> "none" Then
+        qualityLine = qualityLine & "排序 " & g_sortStrategy & "(修" & g_oooFixed & "处)｜"
+    Else
+        qualityLine = qualityLine & "排序 none｜"
+    End If
+    qualityLine = qualityLine & "卷模式 " & g_actualVolMode
+    msg = msg & qualityLine & vbCrLf
+
+    ' 清理行：广告行 -N｜跳过 N 章（无数据的行省略）
+    If g_cleanAds Or skippedTotal > 0 Then
+        Dim cleanLine As String
+        cleanLine = "  清理："
+        If g_cleanAds Then
+            cleanLine = cleanLine & "广告行 -" & g_adRemovedCount
+            If skippedTotal > 0 Then cleanLine = cleanLine & "｜"
+        End If
+        If skippedTotal > 0 Then
+            cleanLine = cleanLine & "跳过 " & skippedTotal & " 章"
+            If g_skipTitleOnly > 0 Or g_skipShortBody > 0 Then
+                cleanLine = cleanLine & "（仅标题" & g_skipTitleOnly & "/正文不足" & g_skipShortBody & "）"
+            End If
+        End If
+        msg = msg & cleanLine & vbCrLf
+    End If
+
+    msg = msg & "  计时：读取 " & Format(tRead, "0.00") & "s｜识别 " & _
+          Format(tScan, "0.00") & "s｜去重 " & Format(tDedup, "0.00") & "s｜写入 " & _
+          Format(tWrite, "0.00") & "s｜总计 " & Format(tTotal, "0.00") & "s"
+
     If Len(extraInfo) > 0 Then
-        msg = msg & vbCrLf & vbCrLf & extraInfo
+        msg = msg & vbCrLf & extraInfo
     End If
-    
-    ' v3.2 新增：广告清理统计
-    If g_cleanAds Then
-        msg = msg & vbCrLf & vbCrLf & "【广告清理】" & vbCrLf & _
-              "  已移除广告行：" & g_adRemovedCount & " 行"
-    End If
-    
+
     MsgBox msg, vbInformation, "完成"
 End Sub
 

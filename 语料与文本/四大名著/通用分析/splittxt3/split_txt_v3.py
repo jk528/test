@@ -1,11 +1,21 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-TXT章节拆分工具 v3.1（去重+乱序修复+卷级感知增强版）
+TXT章节拆分工具 v3.4（去重+乱序修复+卷级感知+目录区检测+广告清理+全自动模式）
   - 双版本：Python版（命令行，本文件） + VBA版（split_txt_v3.bas，WPS/Excel/Word）
   - 以 splittxt2 多正则版为底本，增加去重与乱序修复能力
   - 全面覆盖 13 类问题场景（重复4类 + 乱序3类 + 结构6类）
   - 定位：TXT质量修复工具（上游：splittxt2 拆分；下游：彩读阅读/静读天下等阅读器）
+
+【v3.4 新增（与VBA版对齐）】
+  - 章号归一化：全角数字/空格/冒号→半角、压缩空格、清零宽字符、Tab→空格（仅用于匹配）
+  - 目录区检测：文件前30%内连续≥10个短正文(≤2行)且章号递增 → 自动跳过去重/排序/拆分
+  - 广告/垃圾行清理：7类规则（网址/站点推广/分页提示/求票求收藏/符号分隔线/手机提示/加入书架）
+    默认启用，--no-ad-clean 关闭
+  - CLI 6组合：去重 none/first/longest × 排序 none/sort（adjacent、lis 仅兼容保留）
+  - --clean N 双合并文件：同时生成 保留大于等于N_*.txt 和 清理小于N_*.txt
+  - --auto 全自动：分析→自动决策去重/排序组合→自动判定清洁N值→一键输出
+  - 报告总-分结构：【总】结论建议 + 【分】七维度明细
 
 【已覆盖的问题场景】
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -28,12 +38,14 @@ TXT章节拆分工具 v3.1（去重+乱序修复+卷级感知增强版）
   12. 章号缺失      —— 中间缺章，章号不连续
   13. 格式混合      —— 阿拉伯数字+中文数字混合，不同单位词混合
 
-【5种去重策略】
-  adjacent   — 相邻重复去重（仅合并连续相同章号，适合双标题）
-  first      — 保留首次出现（每个章号只留第一次）
-  longest    — 保留内容最长的（每个章号只留正文最多的）
-  lis        — 最长递增子序列（智能找主线，去重+修序二合一）★推荐
-  sort       — 按章号重新排序（最彻底，章号齐全，完全有序）★推荐
+【6种去重×排序组合】（去重 none/first/longest × 排序 none/sort）
+  none    + none   — 文件干净无重复无乱序，仅拆分
+  none    + sort   — 无重复但整体乱序，按章号重排
+  first   + none   — 相邻双标题/简单重复，保留首次出现
+  first   + sort   — 简单重复且乱序
+  longest + none   — 整块重复，保留内容最长且不改顺序
+  longest + sort   — 重复+乱序严重，最彻底（默认）★推荐
+  （adjacent 已合并入 first、lis 已合并入 first+sort，仅兼容保留）
 
 【3种卷级处理模式】
   auto       — 自动检测：有卷结构则启用卷-章二级去重（默认）
@@ -45,20 +57,26 @@ TXT章节拆分工具 v3.1（去重+乱序修复+卷级感知增强版）
   VBA版（split_txt_v3.bas）  — WPS/Excel/Word 中运行，图形化交互，与 splittxt2 用法一致
 
 用法（Python版）:
-  # 深度分析（推荐第一步，全面诊断所有问题）
+  # 全自动模式（推荐：分析→自动决策→清洁输出一步到位）
+  python split_txt_v3.py --src 小说.txt --auto
+
+  # 深度分析（全面诊断所有问题，总-分结构报告）
   python split_txt_v3.py --src 小说.txt --analyze
 
-  # 按章节拆分（LIS去重 + 自动卷检测）
-  python split_txt_v3.py --src 小说.txt --dedup lis
+  # 按章节拆分（默认 longest+sort）
+  python split_txt_v3.py --src 小说.txt
 
-  # 乱序严重用sort（最彻底，章号齐全）
-  python split_txt_v3.py --src 小说.txt --dedup sort
+  # 指定6组合之一
+  python split_txt_v3.py --src 小说.txt --dedup first --sort none
+
+  # 清洁模式：同时生成 保留大于等于N / 清理小于N 双合并文件
+  python split_txt_v3.py --src 小说.txt --clean 100
 
   # 按卷分目录输出
-  python split_txt_v3.py --src 小说.txt --dedup lis --volume-mode by_volume
+  python split_txt_v3.py --src 小说.txt --volume-mode by_volume
 
   # 聚合拆分
-  python split_txt_v3.py --src 小说.txt --dedup lis --chunk 40,3
+  python split_txt_v3.py --src 小说.txt --chunk 40,3
 """
 
 import re
@@ -192,6 +210,235 @@ CHAPTER_PATTERNS = [
 ]
 
 
+# ===========================================================================
+# v3.4 新增：章号归一化（移植自VBA版 NormalizeLineForMatch）
+#   仅用于匹配，不影响输出原文
+# ===========================================================================
+def normalize_line_for_match(s):
+    """全角数字/空格/冒号→半角、压缩连续空格、清零宽字符、Tab→空格"""
+    r = s
+    # 1. 全角数字 → 半角
+    for i in range(10):
+        r = r.replace(chr(0xFF10 + i), str(i))
+    # 2. 全角空格 → 半角空格
+    r = r.replace('\u3000', ' ')
+    # 3. 全角冒号 → 半角冒号
+    r = r.replace('：', ':')
+    # 4. 清理零宽字符（U+200B-200D / FEFF）
+    for z in ('\u200b', '\u200c', '\u200d', '\ufeff'):
+        r = r.replace(z, '')
+    # 5. Tab → 空格
+    r = r.replace('\t', ' ')
+    # 6. 压缩多个连续空格为一个
+    r = re.sub(r' +', ' ', r)
+    return r
+
+
+# ===========================================================================
+# v3.4 新增：广告/垃圾行清理（移植自VBA版 CleanAdLines，7类规则）
+# ===========================================================================
+_AD_PROMO_WORDS = ('记住本站', '收藏本站', '推荐收藏', '手机用户', '手机版',
+                   '请访问', '永久域名', '最新地址', '笔趣阁', '顶点小说')
+_AD_PAGE_WORDS = ('本章未完', '下一页继续', '点击下一页', '上一页', '下一页',
+                  '返回目录', '加入书架', '加入书签')
+_AD_BEG_WORDS = ('求月票', '求推荐', '求收藏', '求打赏', '感谢打赏', '感谢订阅')
+_AD_DOMAIN_RE = re.compile(r'\.(com|net|cc|cn|org|info)([^0-9a-zA-Z]|$)', re.IGNORECASE)
+_AD_SEP_CHARS = '*-=~·—＋+'
+
+
+def clean_ad_lines(lines):
+    """清理广告/垃圾行。返回 (清理后的行列表, 移除行数)"""
+    result = []
+    removed = 0
+    for line in lines:
+        t = line.strip()
+        is_ad = False
+        if not t:
+            is_ad = False  # 空行保留
+        elif ('http://' in t.lower() or 'https://' in t.lower()
+              or 'www.' in t.lower()):
+            is_ad = True  # 网址行
+        elif len(t) < 40 and _AD_DOMAIN_RE.search(t):
+            is_ad = True  # 含域名后缀的短行
+        elif any(k in t for k in _AD_PROMO_WORDS):
+            is_ad = True  # 站点推广语 / 手机端提示
+        elif any(k in t for k in _AD_PAGE_WORDS):
+            is_ad = True  # 分页提示 / 加入书架书签
+        elif any(k in t for k in _AD_BEG_WORDS) and len(t) < 40:
+            is_ad = True  # 求票求收藏短行
+        elif len(t) >= 5 and t[0] in _AD_SEP_CHARS and all(c == t[0] for c in t):
+            is_ad = True  # 纯符号分隔线
+        if is_ad:
+            removed += 1
+        else:
+            result.append(line)
+    return result, removed
+
+
+# ===========================================================================
+# v3.4 新增：目录区检测（移植自VBA版 DetectTOC）
+#   文件前30%内、连续≥min_toc_chapters个章节正文≤max_body_lines行且章号递增
+#   → 判定为目录区，标记 is_toc=True（不参与去重/排序/拆分输出）
+# ===========================================================================
+def detect_toc(chapters, min_toc_chapters=10, max_body_lines=2):
+    """检测并标记目录区章节，返回目录区章节数"""
+    n = len(chapters)
+    if n < min_toc_chapters:
+        return 0
+
+    toc_start = -1
+    toc_count = 0
+    in_toc = False
+    consec = 0
+    prev_num = 0
+    chap_start = -1
+
+    for i, ch in enumerate(chapters):
+        if ch['level'] != 'chapter':
+            continue
+        body_ln = ch.get('body_lines', 0)
+
+        if body_ln <= max_body_lines:
+            # 正文很短，可能是目录项
+            if not in_toc:
+                # 检查是否在文件开头位置（前30%的章节内）
+                if i > n * 0.3:
+                    break
+                chap_start = i
+                consec = 1
+                prev_num = ch['ch_num'] or 0
+                in_toc = True
+            else:
+                cn = ch['ch_num'] or 0
+                # 章号递增（目录通常是顺序的）
+                if cn > prev_num or cn == 0:
+                    consec += 1
+                    prev_num = cn
+                else:
+                    # 章号回退，可能目录结束了
+                    if consec >= min_toc_chapters:
+                        toc_start = chap_start
+                        toc_count = consec
+                    in_toc = False
+                    consec = 0
+                    chap_start = -1
+                    if toc_count > 0:
+                        break
+        else:
+            # 正文足够长
+            if in_toc:
+                if consec >= min_toc_chapters:
+                    toc_start = chap_start
+                    toc_count = consec
+                in_toc = False
+                consec = 0
+                chap_start = -1
+                if toc_count > 0:
+                    break
+
+    # 循环结束时还在目录区中的情况
+    if toc_count == 0 and in_toc and consec >= min_toc_chapters:
+        toc_start = chap_start
+        toc_count = consec
+
+    # 标记目录区章节
+    if toc_count > 0:
+        for i in range(toc_start, toc_start + toc_count):
+            chapters[i]['is_toc'] = True
+    return toc_count
+
+
+def get_body_hanzi_count(ch, lines):
+    """章节正文汉字数"""
+    s_line = ch['line_idx']
+    e_line = max(ch['end_line'], s_line)
+    if e_line <= s_line:
+        return 0
+    body_text = ''.join(lines[s_line + 1:e_line + 1])
+    return len(re.sub(r'[^一-鿿]', '', body_text))
+
+
+def count_ooo(chapters):
+    """统计章号回退（乱序）次数，仅统计 ch_num>0 的章节"""
+    ooo = 0
+    prev = 0
+    for ch in chapters:
+        if ch['ch_num'] <= 0:
+            continue
+        if prev > 0 and ch['ch_num'] < prev:
+            ooo += 1
+        prev = ch['ch_num']
+    return ooo
+
+
+def count_adj_dup(chapters):
+    """统计相邻双标题数（同章号且行距≤2）"""
+    adj = 0
+    for i in range(1, len(chapters)):
+        if (chapters[i]['ch_num'] == chapters[i - 1]['ch_num']
+                and chapters[i]['ch_num'] > 0
+                and chapters[i]['line_idx'] - chapters[i - 1]['line_idx'] <= 2):
+            adj += 1
+    return adj
+
+
+def auto_decide(chapters):
+    """v3.4 自动决策去重+排序组合（仅用 ch_num>0 且非目录区章节）
+    返回 (dedup策略, sort策略, 判定理由)"""
+    valid = [c for c in chapters if c['ch_num'] > 0 and not c.get('is_toc')]
+
+    num_counts = defaultdict(int)
+    for c in valid:
+        num_counts[c['ch_num']] += 1
+    dup_num_count = sum(1 for v in num_counts.values() if v > 1)  # 有重复的章号数
+    ooo_count = count_ooo(valid)                                   # 章号回退次数
+    adj_dup = count_adj_dup(valid)
+    adj_ratio = adj_dup / len(valid) if valid else 0               # 相邻双标题占比
+
+    # 决策表（按优先级）
+    if dup_num_count == 0 and ooo_count == 0:
+        return 'none', 'none', '无重复章号且无乱序，文件质量良好'
+    if adj_ratio >= 0.3 and ooo_count < 10:
+        return 'first', 'none', f'相邻双标题占比{adj_ratio:.1%}≥30%且乱序{ooo_count}处<10'
+    if ooo_count >= 10:
+        return 'longest', 'sort', f'乱序{ooo_count}处≥10，需最彻底修复'
+    if dup_num_count > 0:
+        return 'longest', 'none', f'有{dup_num_count}个重复章号，保留最长内容且不改顺序'
+    return 'longest', 'sort', '其余情况默认最彻底组合'
+
+
+def auto_decide_n(chapters, lines):
+    """v3.4 自动判定清洁N值
+    所有章节正文汉字数升序排序，下半区(≤中位数)找最大相邻间隔gap，
+    N=间隔中点取整到10，clamp[50,2000]；
+    章节<20 或 gap<50 或 最大gap<次大gap×2 → N=100
+    返回 (N, 判定理由)"""
+    valid = [c for c in chapters if not c.get('is_toc')]
+    counts = sorted(get_body_hanzi_count(c, lines) for c in valid)
+
+    if len(counts) < 20:
+        return 100, f'章节数{len(counts)}<20，使用默认值'
+
+    median = counts[len(counts) // 2]
+    lower = [c for c in counts if c <= median]
+    if len(lower) < 2:
+        return 100, '下半区数据不足，使用默认值'
+
+    gaps = [(lower[i + 1] - lower[i], lower[i], lower[i + 1])
+            for i in range(len(lower) - 1)]
+    gaps.sort(key=lambda g: -g[0])
+    max_gap, gap_lo, gap_hi = gaps[0]
+
+    if max_gap < 50:
+        return 100, f'下半区最大间隔{max_gap}<50，使用默认值'
+    if len(gaps) > 1 and max_gap < gaps[1][0] * 2:
+        return 100, f'最大间隔{max_gap}不显著(次大{gaps[1][0]}×2)，使用默认值'
+
+    n = int(round((gap_lo + gap_hi) / 2 / 10.0)) * 10
+    n = max(50, min(2000, n))
+    return n, f'下半区最大间隔{gap_lo}~{gap_hi}字，取中点得N={n}'
+
+
 def scan_structures(lines):
     """扫描所有层级结构（卷+章），返回结构化数据
 
@@ -214,9 +461,11 @@ def scan_structures(lines):
     current_vol_title = None
 
     for i, line in enumerate(lines):
-        line_stripped = line.rstrip()
+        # v3.4：先归一化再匹配（仅影响匹配，title 仍取原始行）
+        line_stripped = normalize_line_for_match(line).rstrip()
         if not line_stripped.strip():
             continue
+        orig_title = line.strip()
 
         matched = False
 
@@ -231,7 +480,7 @@ def scan_structures(lines):
             sub = m.group(5) or ''
             structures.append({
                 'line_idx': i,
-                'title': m.group(0).strip(),
+                'title': orig_title,
                 'level': 'chapter',
                 'vol_num': vol_num,
                 'vol_unit': vol_unit,
@@ -258,7 +507,7 @@ def scan_structures(lines):
             current_vol_title = m.group(0).strip()
             structures.append({
                 'line_idx': i,
-                'title': m.group(0).strip(),
+                'title': orig_title,
                 'level': 'volume',
                 'vol_num': vol_num,
                 'vol_unit': vol_unit,
@@ -300,7 +549,7 @@ def scan_structures(lines):
                 level = 'special' if ptype == 'no_num' else 'chapter'
                 structures.append({
                     'line_idx': i,
-                    'title': m.group(0).strip(),
+                    'title': orig_title,
                     'level': level,
                     'vol_num': current_vol,
                     'vol_unit': current_vol_unit,
@@ -364,7 +613,7 @@ def _normalize_title(title):
     # 压缩空白
     t = re.sub(r'\s+', '', t)
     # 移除常见标点符号
-    t = re.sub(r'[，。、；：""''（）《》【】「」『』！？·…—\-—_,\.;:""\'\'\(\)\[\]<>!]', '', t)
+    t = re.sub('[' + re.escape('，。、；：""''（）《》【】「」『』！？·…—_,.;:""\'\'()[]<>!-') + ']', '', t)
     # 转小写
     t = t.lower()
     return t
@@ -550,148 +799,64 @@ SORT_STRATEGIES = {
 
 
 # ===========================================================================
-# 深度分析报告
+# 深度分析报告（v3.4：总-分结构，返回报告文本，print 由调用方做）
 # ===========================================================================
-def deep_analyze(file_path):
-    """深度分析：全面诊断所有问题"""
-    print("=" * 70)
-    print(f"  深度分析报告: {os.path.basename(file_path)}")
-    print("=" * 70)
-
-    content = read_text_auto(file_path)
+def load_and_scan(file_path, encoding=None, ad_clean=True):
+    """读取→(可选)广告清理→扫描→目录区检测
+    返回 (lines, structures, chapters, volumes, toc_count, ad_removed, enc)"""
+    if encoding:
+        enc = encoding.upper()
+        content = read_text_auto(file_path, encoding)
+    else:
+        enc = detect_encoding(file_path)
+        content = read_text_auto(file_path)
     content = content.replace('\r\n', '\n').replace('\r', '\n')
     lines = content.split('\n')
-    print(f"总行数: {len(lines):,}")
-    print(f"总字符: {len(content):,}")
+
+    ad_removed = 0
+    if ad_clean:
+        lines, ad_removed = clean_ad_lines(lines)
 
     structures = scan_structures(lines)
     chapters = get_chapters_only(structures)
     volumes = get_volumes(structures)
+    toc_count = detect_toc(chapters)
+    return lines, structures, chapters, volumes, toc_count, ad_removed, enc
 
-    print(f"识别结构: 卷级 {len(volumes)} 个, 章节级 {len(chapters)} 个")
-    print()
 
-    # ---------- 1. 卷结构分析 ----------
-    print("-" * 50)
-    print("【一、卷/部结构分析】")
-    if volumes:
-        print(f"  卷级标题数: {len(volumes)}")
-        vol_nums = set(v['vol_num'] for v in volumes if v['vol_num'])
-        vol_units = set(v['vol_unit'] for v in volumes if v['vol_unit'])
-        print(f"  卷号范围: {min(vol_nums)} - {max(vol_nums)}") if vol_nums else None
-        print(f"  卷单位词: {', '.join(sorted(vol_units))}")
+def deep_analyze(file_path, encoding=None, ad_clean=True):
+    """深度分析：全面诊断所有问题。返回报告文本（总-分结构）"""
+    out = []
+    p = out.append
 
-        # 每卷的章数
-        vol_chapter_counts = defaultdict(int)
-        current_vol = None
-        for s in structures:
-            if s['level'] == 'volume':
-                current_vol = s['vol_num']
-            elif s['level'] in ('chapter', 'special'):
-                vol_chapter_counts[current_vol] += 1
+    lines, structures, chapters_all, volumes, toc_count, ad_removed, enc = \
+        load_and_scan(file_path, encoding, ad_clean)
+    content_len = sum(len(l) for l in lines) + len(lines)
 
-        print(f"  各卷章节数:")
-        for vol_num in sorted(vol_chapter_counts.keys(), key=lambda x: (x is None, x or 0)):
-            vol_label = f"第{vol_num}卷" if vol_num else "无卷"
-            print(f"    {vol_label}: {vol_chapter_counts[vol_num]} 章")
+    # 目录区章节不参与分析
+    chapters = [c for c in chapters_all if not c.get('is_toc')]
 
-        # 卷间章号重复检测
-        if len(vol_nums) > 1:
-            vol_chs = defaultdict(set)
-            current_vol = None
-            for s in structures:
-                if s['level'] == 'volume':
-                    current_vol = s['vol_num']
-                elif s['level'] == 'chapter' and s['ch_num'] > 0:
-                    vol_chs[current_vol].add(s['ch_num'])
+    # ---------- 预计算汇总指标（供【总】使用） ----------
+    vol_nums = set(v['vol_num'] for v in volumes if v['vol_num'])
 
-            vol_list = sorted(vol_chs.keys(), key=lambda x: (x is None, x or 0))
-            if len(vol_list) >= 2:
-                common = vol_chs[vol_list[0]] & vol_chs[vol_list[1]]
-                if common:
-                    print(f"\n  ⚠ 卷间章号重复: 第{vol_list[0]}卷 和 第{vol_list[1]}卷 共享 {len(common)} 个章号")
-                    print(f"    示例重复章号: {sorted(list(common))[:10]}...")
-    else:
-        print("  未检测到卷/部/册级结构")
-
-    # ---------- 2. 重复分析 ----------
-    print()
-    print("-" * 50)
-    print("【二、重复章节分析】")
-
-    # 扁平去重统计（忽略卷）
     flat_map = defaultdict(list)
     for ch in chapters:
         if ch['ch_num'] > 0:
             flat_map[ch['ch_num']].append(ch)
-
-    unique_flat = len(flat_map)
     dup_flat = {k: v for k, v in flat_map.items() if len(v) > 1}
+    dup_num_count = len(dup_flat)                          # 重复章号数
+    dup_copies = sum(len(v) - 1 for v in dup_flat.values())  # 重复份数
 
-    print(f"  扁平视角（忽略卷）:")
-    print(f"    不重复章号数: {unique_flat}")
-    print(f"    存在重复的章号数: {len(dup_flat)}")
-
-    if dup_flat:
-        sorted_dups = sorted(dup_flat.items(), key=lambda x: -len(x[1]))
-        print(f"\n    重复最严重的前10个章号：")
-        for num_val, occ_list in sorted_dups[:10]:
-            count = len(occ_list)
-            lines_str = '、'.join(str(c['line_idx'] + 1) for c in occ_list[:5])
-            full_title = occ_list[0]['title']
-            print(f"      第{num_val}章 ({count}次): {full_title}")
-            print(f"        出现行号: {lines_str}")
-
-        count_dist = defaultdict(int)
-        for occ_list in dup_flat.values():
-            count_dist[len(occ_list)] += 1
-        print(f"\n    重复次数分布：")
-        for cnt in sorted(count_dist.keys()):
-            print(f"      出现{cnt}次的章号: {count_dist[cnt]}个")
-
-    # 章号相同但标题不同的情况（标题级重复深度分析，全部列出）
     title_diff_count = 0
-    title_diff_list = []  # [(num_val, occ_count, norm_titles_list), ...]
+    title_diff_list = []
     for num_val, occ_list in flat_map.items():
         if len(occ_list) <= 1:
             continue
-        # 规范化标题集合
-        norm_titles = set()
-        for ch in occ_list:
-            norm_titles.add(_normalize_title(ch.get('title', '')))
+        norm_titles = set(_normalize_title(c.get('title', '')) for c in occ_list)
         if len(norm_titles) > 1:
             title_diff_count += 1
-            # 收集所有不同的规范化标题（完整显示，不截断）
             title_diff_list.append((num_val, len(occ_list), sorted(norm_titles)))
 
-    if title_diff_count > 0:
-        print(f"\n  ⚠ 章号相同但标题不同: {title_diff_count} 个章号")
-        print(f"    （说明同一章号下有不同标题，仅按章号去重可能误删）")
-        print(f"    建议开启 --title-dedup 启用标题级去重")
-        print(f"\n    完整列表：")
-        for num_val, cnt, titles in title_diff_list:
-            print(f"      第{num_val}章（{len(titles)}个不同标题）:")
-            for t in titles:
-                print(f"        · {t}")
-
-    # 卷感知去重统计
-    if volumes:
-        vol_aware_map = defaultdict(list)
-        for ch in chapters:
-            if ch['ch_num'] > 0:
-                key = (ch.get('vol_num'), ch['ch_num'])
-                vol_aware_map[key].append(ch)
-        dup_vol_aware = {k: v for k, v in vol_aware_map.items() if len(v) > 1}
-        print(f"\n  卷感知视角（同卷内才算重复）:")
-        print(f"    卷-章组合数: {len(vol_aware_map)}")
-        print(f"    同卷内重复数: {len(dup_vol_aware)}")
-
-    # ---------- 3. 乱序分析 ----------
-    print()
-    print("-" * 50)
-    print("【三、乱序分析】")
-
-    # 扁平乱序
     valid_chs = [ch for ch in chapters if ch['ch_num'] > 0]
     ooo_count = 0
     max_drop = 0
@@ -706,14 +871,138 @@ def deep_analyze(file_path):
                 max_drop_info = (prev_num, ch['ch_num'], ch['line_idx'] + 1)
         prev_num = ch['ch_num']
 
-    print(f"  扁平视角（忽略卷）:")
-    print(f"    乱序次数: {ooo_count}")
-    if max_drop_info:
-        print(f"    最大跌幅: 第{max_drop_info[0]}章 → 第{max_drop_info[1]}章 (跌{max_drop}, 行{max_drop_info[2]})")
+    adj_dup = count_adj_dup(chapters)
+    adj_ratio = adj_dup / len(chapters) if chapters else 0
 
-    # 卷内乱序
+    # 推荐组合 + 建议清洁N值
+    rec_dedup, rec_sort, rec_reason = auto_decide(chapters)
+    rec_n, rec_n_reason = auto_decide_n(chapters, lines)
+
+    # ========== 【总】结论与建议 ==========
+    p("=" * 70)
+    p(f"  深度分析报告: {os.path.basename(file_path)}")
+    p("=" * 70)
+    p("【总】结论与建议")
+    p(f"  问题计数: 卷结构{len(vol_nums)}个 / 重复章号{dup_num_count}个(共{dup_copies}份) / "
+      f"乱序{ooo_count}处(最大跌{max_drop}) / 同章异题{title_diff_count}个 / "
+      f"目录区{toc_count}章 / 相邻双标题占比{adj_ratio:.1%}")
+    p(f"  推荐组合: --dedup {rec_dedup} --sort {rec_sort}  （{rec_reason}）")
+    p(f"  建议清洁N值: {rec_n}  （{rec_n_reason}）")
+    if ad_removed > 0:
+        p(f"  广告清理: 已移除垃圾行 {ad_removed} 行（--no-ad-clean 可关闭）")
+    p("")
+
+    # ========== 【分】详细分析 ==========
+    p("【分】详细分析")
+    p(f"总行数: {len(lines):,}   总字符: {content_len:,}   编码: {enc}")
+    p(f"识别结构: 卷级 {len(volumes)} 个, 章节级 {len(chapters_all)} 个"
+      + (f"（其中目录区 {toc_count} 章，已跳过）" if toc_count > 0 else ""))
+    p("")
+
+    # ---------- 1. 卷结构分析 ----------
+    p("-" * 50)
+    p("【一、卷/部结构分析】")
     if volumes:
-        print(f"\n  卷内视角（每卷单独统计）:")
+        p(f"  卷级标题数: {len(volumes)}")
+        vol_units = set(v['vol_unit'] for v in volumes if v['vol_unit'])
+        if vol_nums:
+            p(f"  卷号范围: {min(vol_nums)} - {max(vol_nums)}")
+        p(f"  卷单位词: {', '.join(sorted(vol_units))}")
+
+        vol_chapter_counts = defaultdict(int)
+        current_vol = None
+        for s in structures:
+            if s['level'] == 'volume':
+                current_vol = s['vol_num']
+            elif s['level'] in ('chapter', 'special'):
+                vol_chapter_counts[current_vol] += 1
+
+        p(f"  各卷章节数:")
+        for vol_num in sorted(vol_chapter_counts.keys(), key=lambda x: (x is None, x or 0)):
+            vol_label = f"第{vol_num}卷" if vol_num else "无卷"
+            p(f"    {vol_label}: {vol_chapter_counts[vol_num]} 章")
+
+        # 卷间章号重复检测
+        common = set()
+        if len(vol_nums) > 1:
+            vol_chs = defaultdict(set)
+            current_vol = None
+            for s in structures:
+                if s['level'] == 'volume':
+                    current_vol = s['vol_num']
+                elif s['level'] == 'chapter' and s['ch_num'] > 0:
+                    vol_chs[current_vol].add(s['ch_num'])
+
+            vol_list = sorted(vol_chs.keys(), key=lambda x: (x is None, x or 0))
+            if len(vol_list) >= 2:
+                common = vol_chs[vol_list[0]] & vol_chs[vol_list[1]]
+                if common:
+                    p(f"\n  ⚠ 卷间章号重复: 第{vol_list[0]}卷 和 第{vol_list[1]}卷 共享 {len(common)} 个章号")
+                    p(f"    示例重复章号: {sorted(list(common))[:10]}...")
+    else:
+        p("  未检测到卷/部/册级结构")
+
+    # ---------- 2. 重复分析 ----------
+    p("")
+    p("-" * 50)
+    p("【二、重复章节分析】")
+
+    unique_flat = len(flat_map)
+    p(f"  扁平视角（忽略卷）:")
+    p(f"    不重复章号数: {unique_flat}")
+    p(f"    存在重复的章号数: {dup_num_count}")
+
+    if dup_flat:
+        sorted_dups = sorted(dup_flat.items(), key=lambda x: -len(x[1]))
+        p(f"\n    重复最严重的前10个章号：")
+        for num_val, occ_list in sorted_dups[:10]:
+            count = len(occ_list)
+            lines_str = '、'.join(str(c['line_idx'] + 1) for c in occ_list[:5])
+            full_title = occ_list[0]['title']
+            p(f"      第{num_val}章 ({count}次): {full_title}")
+            p(f"        出现行号: {lines_str}")
+
+        count_dist = defaultdict(int)
+        for occ_list in dup_flat.values():
+            count_dist[len(occ_list)] += 1
+        p(f"\n    重复次数分布：")
+        for cnt in sorted(count_dist.keys()):
+            p(f"      出现{cnt}次的章号: {count_dist[cnt]}个")
+
+    if title_diff_count > 0:
+        p(f"\n  ⚠ 章号相同但标题不同: {title_diff_count} 个章号")
+        p(f"    （说明同一章号下有不同标题，仅按章号去重可能误删）")
+        p(f"    建议开启 --title-dedup 启用标题级去重")
+        p(f"\n    完整列表：")
+        for num_val, cnt, titles in title_diff_list:
+            p(f"      第{num_val}章（{len(titles)}个不同标题）:")
+            for t in titles:
+                p(f"        · {t}")
+
+    # 卷感知去重统计
+    if volumes:
+        vol_aware_map = defaultdict(list)
+        for ch in chapters:
+            if ch['ch_num'] > 0:
+                key = (ch.get('vol_num'), ch['ch_num'])
+                vol_aware_map[key].append(ch)
+        dup_vol_aware = {k: v for k, v in vol_aware_map.items() if len(v) > 1}
+        p(f"\n  卷感知视角（同卷内才算重复）:")
+        p(f"    卷-章组合数: {len(vol_aware_map)}")
+        p(f"    同卷内重复数: {len(dup_vol_aware)}")
+
+    # ---------- 3. 乱序分析 ----------
+    p("")
+    p("-" * 50)
+    p("【三、乱序分析】")
+
+    p(f"  扁平视角（忽略卷）:")
+    p(f"    乱序次数: {ooo_count}")
+    if max_drop_info:
+        p(f"    最大跌幅: 第{max_drop_info[0]}章 → 第{max_drop_info[1]}章 (跌{max_drop}, 行{max_drop_info[2]})")
+
+    if volumes:
+        p(f"\n  卷内视角（每卷单独统计）:")
         vol_ooo = defaultdict(int)
         vol_max_drop = defaultdict(lambda: (0, 0, 0))
         current_vol = None
@@ -722,7 +1011,7 @@ def deep_analyze(file_path):
             if s['level'] == 'volume':
                 current_vol = s['vol_num']
                 prev_ch = 0
-            elif s['level'] == 'chapter' and s['ch_num'] > 0:
+            elif s['level'] == 'chapter' and s['ch_num'] > 0 and not s.get('is_toc'):
                 if s['ch_num'] < prev_ch:
                     vol_ooo[current_vol] += 1
                     drop = prev_ch - s['ch_num']
@@ -733,46 +1022,40 @@ def deep_analyze(file_path):
         for vol_num in sorted(vol_ooo.keys(), key=lambda x: (x is None, x or 0)):
             vol_label = f"第{vol_num}卷" if vol_num else "无卷"
             drop_info = vol_max_drop[vol_num]
-            print(f"    {vol_label}: 乱序{vol_ooo[vol_num]}处, 最大跌{drop_info[0]} (第{drop_info[1]}→第{drop_info[2]}章)")
+            p(f"    {vol_label}: 乱序{vol_ooo[vol_num]}处, 最大跌{drop_info[0]} (第{drop_info[1]}→第{drop_info[2]}章)")
 
     # ---------- 4. 多轨目录检测 ----------
-    print()
-    print("-" * 50)
-    print("【四、多轨目录检测】")
+    p("")
+    p("-" * 50)
+    p("【四、多轨目录检测】")
 
-    # 检测方法1：相邻双标题比例
-    adj_dup = 0
-    for i in range(1, len(chapters)):
-        if (chapters[i]['ch_num'] == chapters[i-1]['ch_num']
-                and chapters[i]['ch_num'] > 0
-                and chapters[i]['line_idx'] - chapters[i-1]['line_idx'] <= 2):
-            adj_dup += 1
+    if toc_count > 0:
+        toc_chs = [c for c in chapters_all if c.get('is_toc')]
+        p(f"  ⚠ 检测到目录区（已自动跳过，不参与去重/排序/拆分）")
+        p(f"    目录章节数: {toc_count} 章")
+        p(f"    起始标题: {toc_chs[0]['title']}")
+    else:
+        p(f"  未检测到独立目录区")
 
-    adj_ratio = adj_dup / len(chapters) if chapters else 0
-    print(f"  相邻双标题数: {adj_dup} (占比 {adj_ratio:.1%})")
+    p(f"  相邻双标题数: {adj_dup} (占比 {adj_ratio:.1%})")
     if adj_ratio > 0.3:
-        print(f"  → 疑似每章双标题结构（目录式+正文式各一次）")
+        p(f"  → 疑似每章双标题结构（目录式+正文式各一次）")
 
-    # 检测方法2：完整的章号序列出现多次
-    # 找最长的连续递增序列出现的次数
     if len(valid_chs) > 10:
-        print(f"  章号序列模式检测中...")
-        # 简单检测：统计1到N的完整序列出现了几次
-        # 找第一个连续递增块的长度
         seq_len = 1
         max_seq = 1
         for i in range(1, len(valid_chs)):
-            if valid_chs[i]['ch_num'] == valid_chs[i-1]['ch_num'] + 1:
+            if valid_chs[i]['ch_num'] == valid_chs[i - 1]['ch_num'] + 1:
                 seq_len += 1
                 max_seq = max(max_seq, seq_len)
             else:
                 seq_len = 1
-        print(f"  最长连续递增章号段长度: {max_seq}")
+        p(f"  最长连续递增章号段长度: {max_seq}")
 
     # ---------- 5. 格式多样性分析 ----------
-    print()
-    print("-" * 50)
-    print("【五、格式多样性分析】")
+    p("")
+    p("-" * 50)
+    p("【五、格式多样性分析】")
 
     pattern_counts = defaultdict(int)
     unit_counts = defaultdict(int)
@@ -781,35 +1064,34 @@ def deep_analyze(file_path):
         if ch.get('ch_unit'):
             unit_counts[ch['ch_unit']] += 1
 
-    print(f"  正则类型分布:")
+    p(f"  正则类型分布:")
     for ptype, cnt in sorted(pattern_counts.items(), key=lambda x: -x[1]):
-        print(f"    {ptype:15s}: {cnt:4d} 章 ({cnt/len(chapters)*100:.1f}%)")
+        p(f"    {ptype:15s}: {cnt:4d} 章 ({cnt / len(chapters) * 100:.1f}%)")
 
-    print(f"  单位词分布:")
+    p(f"  单位词分布:")
     for unit, cnt in sorted(unit_counts.items(), key=lambda x: -x[1]):
-        print(f"    {unit:6s}: {cnt:4d} 章")
+        p(f"    {unit:6s}: {cnt:4d} 章")
 
     special_chs = [ch for ch in chapters if ch['level'] == 'special']
     if special_chs:
-        print(f"  无号章节（序章/楔子/番外等）: {len(special_chs)} 个")
+        p(f"  无号章节（序章/楔子/番外等）: {len(special_chs)} 个")
         for ch in special_chs[:10]:
-            print(f"    行{ch['line_idx']+1}: {ch['title'][:40]}")
+            p(f"    行{ch['line_idx'] + 1}: {ch['title'][:40]}")
         if len(special_chs) > 10:
-            print(f"    ... 共 {len(special_chs)} 个")
+            p(f"    ... 共 {len(special_chs)} 个")
 
     # ---------- 6. 连续性分析 ----------
-    print()
-    print("-" * 50)
-    print("【六、章号连续性分析】")
+    p("")
+    p("-" * 50)
+    p("【六、章号连续性分析】")
 
     if volumes:
-        # 分卷统计
         vol_chs = defaultdict(list)
         current_vol = None
         for s in structures:
             if s['level'] == 'volume':
                 current_vol = s['vol_num']
-            elif s['level'] == 'chapter' and s['ch_num'] > 0:
+            elif s['level'] == 'chapter' and s['ch_num'] > 0 and not s.get('is_toc'):
                 vol_chs[current_vol].append(s['ch_num'])
 
         for vol_num in sorted(vol_chs.keys(), key=lambda x: (x is None, x or 0)):
@@ -821,74 +1103,61 @@ def deep_analyze(file_path):
             expected = max_n - min_n + 1
             actual = len(nums)
             missing = expected - actual
-            print(f"  {vol_label}: {min_n}-{max_n}章, 应有{expected}章, 实有{actual}章, 缺{missing}章")
+            p(f"  {vol_label}: {min_n}-{max_n}章, 应有{expected}章, 实有{actual}章, 缺{missing}章")
     else:
         nums = sorted(set(ch['ch_num'] for ch in chapters if ch['ch_num'] > 0))
         if nums:
             min_n, max_n = min(nums), max(nums)
             expected = max_n - min_n + 1
             missing = expected - len(nums)
-            print(f"  章号范围: {min_n} - {max_n}")
-            print(f"  应有章节数: {expected}")
-            print(f"  实际章号数: {len(nums)}")
-            print(f"  缺失章号数: {missing}")
+            p(f"  章号范围: {min_n} - {max_n}")
+            p(f"  应有章节数: {expected}")
+            p(f"  实际章号数: {len(nums)}")
+            p(f"  缺失章号数: {missing}")
 
             if missing > 0 and missing < 100:
                 full_set = set(nums)
                 missing_list = [n for n in range(min_n, max_n + 1) if n not in full_set]
-                print(f"  缺失章号: {missing_list[:30]}")
+                p(f"  缺失章号: {missing_list[:30]}")
                 if len(missing_list) > 30:
-                    print(f"    ... 共{len(missing_list)}个")
+                    p(f"    ... 共{len(missing_list)}个")
 
     # ---------- 7. 各组合效果预览 ----------
-    print()
-    print("-" * 50)
-    print("【七、常用组合效果预览（扁平模式）】")
-    
-    # 标题去重模式（默认关闭，分析报告统一用章号级去重做基准对比）
+    p("")
+    p("-" * 50)
+    p("【七、6组合效果预览（扁平模式）】")
+
     title_dedup = False
-    
     combos = [
-        ("adjacent+none",  "adjacent", "none"),
-        ("first+none",     "first",    "none"),
-        ("longest+none",   "longest",  "none"),
-        ("none+lis",       "none",     "lis"),
-        ("longest+lis",    "longest",  "lis"),
-        ("longest+sort",   "longest",  "sort"),
+        ("none+none",    "none",    "none"),
+        ("none+sort",    "none",    "sort"),
+        ("first+none",   "first",   "none"),
+        ("first+sort",   "first",   "sort"),
+        ("longest+none", "longest", "none"),
+        ("longest+sort", "longest", "sort"),
     ]
+
+    def _run_combo(chs, dedup_name, sort_name, vol_mode):
+        result = chs
+        if dedup_name != 'none':
+            result = DEDUP_STRATEGIES[dedup_name](result, vol_mode, title_dedup=title_dedup)
+        if sort_name != 'none':
+            result = SORT_STRATEGIES[sort_name](result, vol_mode, title_dedup=title_dedup)
+        return result
+
     for label, dedup_name, sort_name in combos:
         try:
-            result = chapters
-            if dedup_name != 'none':
-                dedup_func = DEDUP_STRATEGIES[dedup_name]
-                result = dedup_func(result, 'flat', title_dedup=title_dedup)
-            if sort_name != 'none':
-                sort_func = SORT_STRATEGIES[sort_name]
-                result = sort_func(result, 'flat', title_dedup=title_dedup)
-            ooo_after = 0
-            prev = 0
-            for ch in result:
-                if ch['ch_num'] <= 0:
-                    continue
-                if ch['ch_num'] < prev:
-                    ooo_after += 1
-                prev = ch['ch_num']
-            print(f"  {label:14s}: 剩{len(result):4d}章, 乱序{ooo_after:4d}处")
+            result = _run_combo(chapters, dedup_name, sort_name, 'flat')
+            ooo_after = count_ooo(result)
+            p(f"  {label:14s}: 剩{len(result):4d}章, 乱序{ooo_after:4d}处")
         except Exception as e:
-            print(f"  {label:14s}: 错误 - {e}")
+            p(f"  {label:14s}: 错误 - {e}")
 
     if volumes:
-        print(f"\n  【卷感知模式】")
+        p(f"\n  【卷感知模式】")
         for label, dedup_name, sort_name in combos:
             try:
-                result = chapters
-                if dedup_name != 'none':
-                    dedup_func = DEDUP_STRATEGIES[dedup_name]
-                    result = dedup_func(result, 'auto', title_dedup=title_dedup)
-                if sort_name != 'none':
-                    sort_func = SORT_STRATEGIES[sort_name]
-                    result = sort_func(result, 'auto', title_dedup=title_dedup)
-                # 卷感知乱序：同卷内比较
+                result = _run_combo(chapters, dedup_name, sort_name, 'auto')
                 ooo_after = 0
                 prev_vol = None
                 prev_ch = 0
@@ -896,19 +1165,18 @@ def deep_analyze(file_path):
                     if ch['ch_num'] <= 0:
                         continue
                     v = ch.get('vol_num')
-                    if v == prev_vol:
-                        if ch['ch_num'] < prev_ch:
-                            ooo_after += 1
+                    if v == prev_vol and ch['ch_num'] < prev_ch:
+                        ooo_after += 1
                     prev_vol = v
                     prev_ch = ch['ch_num']
-                print(f"  {label:14s}: 剩{len(result):4d}章, 卷内乱序{ooo_after:3d}处")
+                p(f"  {label:14s}: 剩{len(result):4d}章, 卷内乱序{ooo_after:3d}处")
             except Exception as e:
-                print(f"  {label:14s}: 错误 - {e}")
+                p(f"  {label:14s}: 错误 - {e}")
 
     # ---------- 8. 建议 ----------
-    print()
-    print("=" * 70)
-    print("  处理建议：")
+    p("")
+    p("=" * 70)
+    p("  处理建议：")
 
     suggestions = []
     if volumes and len(vol_nums) > 1 and common:
@@ -917,22 +1185,24 @@ def deep_analyze(file_path):
 
     if ooo_count > 10 and dup_flat:
         suggestions.append("• 重复+乱序都严重，推荐 --dedup longest --sort sort（最彻底）")
-        suggestions.append("  或 --dedup none --sort lis（智能找主线，保留原文脉络）")
     elif ooo_count > 10:
-        suggestions.append("• 乱序严重，推荐 --sort sort（最彻底）或 --sort lis（智能）")
+        suggestions.append("• 乱序严重，推荐 --dedup none --sort sort（按章号重排）")
     elif dup_flat:
-        suggestions.append("• 有重复但乱序轻微，推荐 --dedup longest --sort none（保留内容最长的且不改顺序）")
+        suggestions.append("• 有重复但乱序轻微，推荐 --dedup longest --sort none（保留最长且不改顺序）")
 
     if adj_ratio > 0.3:
-        suggestions.append("• 每章双标题明显，--dedup adjacent 即可解决大部分问题")
+        suggestions.append("• 每章双标题明显，推荐 --dedup first --sort none")
 
     if not suggestions:
         suggestions.append("• 文件质量较好，可根据需要选择组合")
 
-    for s in suggestions:
-        print(f"  {s}")
+    suggestions.append(f"• 一键处理：--auto 自动完成分析+决策+清洁输出")
 
-    print("=" * 70)
+    for s in suggestions:
+        p(f"  {s}")
+
+    p("=" * 70)
+    return '\n'.join(out)
 
 
 # ===========================================================================
@@ -962,32 +1232,26 @@ def format_range(ch_start, ch_end, unit):
 def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
                      dedup_strategy='longest', sort_strategy='sort', volume_mode='auto',
                      generate_title_only=False, min_body_len=0, merge_flag=None,
-                     title_dedup=False):
+                     title_dedup=False, ad_clean=True, merge_dir=None):
     """按章节一一拆分"""
     t_total0 = time.time()
 
-    # 1. 读取
+    # 1. 读取 + 广告清理 + 扫描 + 目录区检测
     t0 = time.time()
-    if encoding:
-        enc = encoding.upper()
-        content = read_text_auto(src, encoding)
-    else:
-        enc = detect_encoding(src)
-        content = read_text_auto(src)
-    content = content.replace('\r\n', '\n').replace('\r', '\n')
-    lines = content.split('\n')
+    lines, structures, all_chapters_raw, volumes, toc_count, ad_removed, enc = \
+        load_and_scan(src, encoding, ad_clean)
     t_read = time.time() - t0
     print(f"编码: {enc}")
     print(f"源文件: {src}")
-    print(f"总行数: {len(lines):,}  总字符: {len(content):,}")
+    print(f"总行数: {len(lines):,}")
+    if ad_clean:
+        print(f"广告清理: 移除垃圾行 {ad_removed} 行")
 
-    # 2. 扫描结构
-    t0 = time.time()
-    structures = scan_structures(lines)
-    all_chapters = get_chapters_only(structures)
-    volumes = get_volumes(structures)
+    # 2. 目录区章节不参与去重/排序/拆分输出
     t_scan = time.time() - t0
-    print(f"识别结构: 卷级 {len(volumes)} 个, 章节级 {len(all_chapters)} 个")
+    all_chapters = [c for c in all_chapters_raw if not c.get('is_toc')]
+    print(f"识别结构: 卷级 {len(volumes)} 个, 章节级 {len(all_chapters_raw)} 个"
+          + (f"（其中目录区 {toc_count} 章，已跳过）" if toc_count > 0 else ""))
 
     # 3. 确定卷模式
     if volume_mode == 'auto':
@@ -1008,6 +1272,7 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
 
     # 4. 去重
     chapters = all_chapters
+    chapters_before_dedup = len(chapters)
     t0 = time.time()
     if dedup_strategy != 'none':
         dedup_func = DEDUP_STRATEGIES.get(dedup_strategy)
@@ -1019,9 +1284,11 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
     else:
         print(f"去重策略: none（不处理）")
     t_dedup = time.time() - t0
+    dedup_removed = chapters_before_dedup - len(chapters)
     print(f"去重后章节: {len(chapters)}")
 
     # 4b. 排序
+    ooo_before_sort = count_ooo(chapters)
     t0 = time.time()
     if sort_strategy != 'none':
         sort_func = SORT_STRATEGIES.get(sort_strategy)
@@ -1033,6 +1300,8 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
     else:
         print(f"排序策略: none（保持原文顺序）")
     t_sort = time.time() - t0
+    ooo_after_sort = count_ooo(chapters)
+    ooo_fixed = ooo_before_sort - ooo_after_sort
     print(f"排序后章节: {len(chapters)}")
 
     if not chapters:
@@ -1087,7 +1356,7 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
         # 正文汉字数
         if n_lines > 1:
             body_text = ''.join(lines[start_line + 1:end_line + 1])
-            body_len = len(re.sub(r'[^\u4e00-\u9fff]', '', body_text))
+            body_len = len(re.sub(r'[^一-鿿]', '', body_text))
         else:
             body_len = 0
 
@@ -1104,7 +1373,6 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
             skipped_body_lens.append(body_len)
             if merge_flag is not None:
                 skipped_chapters_list.append((ch['title'], body_len))
-            if merge_flag == 0:
                 skipped_texts.append(body)
             continue
 
@@ -1127,7 +1395,7 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
             fname = f"{serial}_{char_cnt}_{safe_title}.txt"
 
         write_text_utf8_nobom(os.path.join(file_dir, fname), body)
-        if merge_flag == 1:
+        if merge_flag is not None:
             kept_texts.append(body)
 
         if written_count < 3 or idx >= len(chapters) - 2:
@@ -1147,68 +1415,70 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
     t_write = time.time() - t0
     t_total = time.time() - t_total0
 
-    # 清洁模式合并（仅输出保留≥N字的纯净正文，无报告头部）
-    if merge_flag is not None and kept_texts:
+    # 清洁模式双合并（v3.4：同时输出 保留≥N 和 清理<N 两个纯净正文文件，无报告头部）
+    if merge_flag is not None:
         src_name = os.path.splitext(os.path.basename(src))[0]
-        merge_name = f"保留大于等于{min_body_len}_{src_name}.txt"
-        merge_path = os.path.join(out_dir, merge_name)
-        with open(merge_path, 'w', encoding='utf-8') as f:
+        mdir = merge_dir if merge_dir else out_dir
+        os.makedirs(mdir, exist_ok=True)
+        kept_name = f"保留大于等于{min_body_len}_{src_name}.txt"
+        with open(os.path.join(mdir, kept_name), 'w', encoding='utf-8') as f:
             f.write('\n'.join(kept_texts))
-        print(f"合并文件：{merge_name}（{len(kept_texts)}章合并）")
+        print(f"合并文件：{kept_name}（{len(kept_texts)}章合并）")
+        skipped_name = f"清理小于{min_body_len}_{src_name}.txt"
+        with open(os.path.join(mdir, skipped_name), 'w', encoding='utf-8') as f:
+            f.write('\n'.join(skipped_texts))
+        print(f"合并文件：{skipped_name}（{len(skipped_texts)}章合并）")
 
-    # 报告
+    # ===== 报告（v3.4：总-分结构） =====
+    mode_label = f"清洁模式(N={min_body_len})" if merge_flag is not None else "拆分"
     print()
     print("=" * 60)
-    print(f"拆分完成！共生成 {written_count} 个文件")
-    print(f"输出目录: {out_dir}")
-    print(f"去重策略: {dedup_strategy}")
-    print(f"卷模式: {actual_vol_mode}")
-    print()
-    print("【计时统计】")
-    print(f"  读取文件: {t_read:.2f} 秒")
-    print(f"  识别结构: {t_scan:.2f} 秒")
-    print(f"  去重处理: {t_dedup:.2f} 秒")
-    print(f"  写入文件: {t_write:.2f} 秒")
-    print(f"  总计耗时: {t_total:.2f} 秒")
-
+    print(f"【总】{mode_label}完成：共生成 {written_count} 个文件")
+    print(f"  输出目录: {out_dir}")
+    print(f"  总耗时: {t_total:.2f} 秒")
+    print("-" * 60)
+    print("【分】详细统计")
+    print(f"  来源: 编码{enc} / 总行数{len(lines):,} / 识别章节{len(all_chapters_raw)}"
+          + (f"（目录区跳过{toc_count}）" if toc_count > 0 else ""))
+    print(f"  质量: 去重{dedup_strategy}(减少{dedup_removed}章) / "
+          f"排序{sort_strategy}(修序{ooo_fixed}处) / 卷模式{actual_vol_mode}")
     parts = []
     if title_only_count > 0:
         parts.append(f"{title_only_count}个仅有标题")
     if short_body_count > 0:
         parts.append(f"{short_body_count}个正文不足")
-    if skipped_count > 0:
-        top3 = sorted(skipped_body_lens, reverse=True)[:3]
-        print(f"\n[提示] 跳过 {skipped_count} 个章节（{'、'.join(parts)}），前三：{'、'.join(f'{x}字' for x in top3)}")
-    elif parts:
-        print(f"\n[提示] {'、'.join(parts)}（已生成）")
+    skip_desc = '、'.join(parts) if parts else '无'
+    top3 = sorted(skipped_body_lens, reverse=True)[:3]
+    top3_str = '、'.join(f'{x}字' for x in top3) if top3 else '无'
+    print(f"  清理: 广告行移除{ad_removed} / 跳过{skipped_count}章({skip_desc}) / "
+          f"前三正文字数: {top3_str}")
+    print(f"  计时: 读取{t_read:.2f}s / 识别{t_scan:.2f}s / 去重{t_dedup:.2f}s / "
+          f"排序{t_sort:.2f}s / 写入{t_write:.2f}s")
+    print("=" * 60)
 
 
 def split_by_groups(src, chunk_str="40,3", out_dir="", prefix="",
                     serial_width=3, encoding=None, dedup_strategy='longest',
-                    sort_strategy='sort', volume_mode='auto', title_dedup=False):
+                    sort_strategy='sort', volume_mode='auto', title_dedup=False,
+                    ad_clean=True):
     """聚合拆分"""
     import math
 
     t_total0 = time.time()
 
     t0 = time.time()
-    if encoding:
-        enc = encoding.upper()
-        content = read_text_auto(src, encoding)
-    else:
-        enc = detect_encoding(src)
-        content = read_text_auto(src)
-    content = content.replace('\r\n', '\n').replace('\r', '\n')
-    lines = content.split('\n')
+    lines, structures, all_chapters_raw, volumes, toc_count, ad_removed, enc = \
+        load_and_scan(src, encoding, ad_clean)
     t_read = time.time() - t0
     print(f"编码: {enc}")
     print(f"源文件: {src}")
     print(f"总行数: {len(lines):,}")
+    if ad_clean:
+        print(f"广告清理: 移除垃圾行 {ad_removed} 行")
 
     t0 = time.time()
-    structures = scan_structures(lines)
-    all_chapters = get_chapters_only(structures)
-    volumes = get_volumes(structures)
+    # 目录区章节不参与去重/排序/拆分输出
+    all_chapters = [c for c in all_chapters_raw if not c.get('is_toc')]
 
     if volume_mode == 'auto':
         actual_vol_mode = 'volume' if volumes else 'flat'
@@ -1237,7 +1507,8 @@ def split_by_groups(src, chunk_str="40,3", out_dir="", prefix="",
     unit = chapters[0].get('ch_unit', '章') if chapters else '章'
     total = len(chapters)
 
-    print(f"识别章节(原始): {len(all_chapters)}")
+    print(f"识别章节(原始): {len(all_chapters_raw)}"
+          + (f"（目录区跳过{toc_count}）" if toc_count > 0 else ""))
     print(f"去重策略: {dedup_strategy}")
     print(f"排序策略: {sort_strategy}")
     print(f"卷模式: {actual_vol_mode}")
@@ -1333,15 +1604,17 @@ def split_by_groups(src, chunk_str="40,3", out_dir="", prefix="",
 
     print()
     print("=" * 60)
-    print(f"聚合拆分完成！共生成 {len(files)} 个文件")
-    print(f"输出目录: {out_dir}")
-    print(f"去重策略: {dedup_strategy}")
-    print()
-    print("【计时统计】")
-    print(f"  读取文件: {t_read:.2f} 秒")
-    print(f"  识别+去重: {t_scan:.2f} 秒")
-    print(f"  写入文件: {t_write:.2f} 秒")
-    print(f"  总计耗时: {t_total:.2f} 秒")
+    print(f"【总】聚合拆分完成：共生成 {len(files)} 个文件")
+    print(f"  输出目录: {out_dir}")
+    print(f"  总耗时: {t_total:.2f} 秒")
+    print("-" * 60)
+    print("【分】详细统计")
+    print(f"  来源: 编码{enc} / 总行数{len(lines):,} / 识别章节{len(all_chapters_raw)}"
+          + (f"（目录区跳过{toc_count}）" if toc_count > 0 else ""))
+    print(f"  质量: 去重{dedup_strategy} / 排序{sort_strategy} / 卷模式{actual_vol_mode}")
+    print(f"  清理: 广告行移除{ad_removed}")
+    print(f"  计时: 读取{t_read:.2f}s / 识别+去重+排序{t_scan:.2f}s / 写入{t_write:.2f}s")
+    print("=" * 60)
 
 
 def resolve_output_dir(src, out_dir, suffix):
@@ -1361,11 +1634,79 @@ def clean_output_dir(out_dir):
 
 
 # ===========================================================================
+# v3.4 新增：全自动模式
+#   读取+清理+扫描+目录区检测 → 深度分析 → 自动决策 → 执行清洁模式输出
+# ===========================================================================
+def auto_process(src, encoding=None, volume_mode='auto', title_dedup=False,
+                 ad_clean=True):
+    """全自动模式：一键完成分析、决策与清洁输出"""
+    src_name = os.path.splitext(os.path.basename(src))[0]
+    auto_dir = os.path.join(os.path.dirname(os.path.abspath(src)),
+                            src_name + '_自动')
+    clean_output_dir(auto_dir)
+    print(f"输出目录: {auto_dir}")
+    print()
+
+    # 1. 深度分析（总-分报告）
+    report = deep_analyze(src, encoding=encoding, ad_clean=ad_clean)
+    report_path = os.path.join(auto_dir, '分析报告.txt')
+    write_text_utf8_nobom(report_path, report)
+    print(report)
+    print()
+    print(f"分析报告已保存: {report_path}")
+    print()
+
+    # 2. 自动决策（仅用 ch_num>0 且非目录区章节）
+    lines, structures, chapters_all, volumes, toc_count, ad_removed, enc = \
+        load_and_scan(src, encoding, ad_clean)
+    dedup_strategy, sort_strategy, reason = auto_decide(chapters_all)
+    n_value, n_reason = auto_decide_n(chapters_all, lines)
+
+    print("=" * 60)
+    print("  自动方案：")
+    print(f"  • 去重策略: {dedup_strategy}  排序策略: {sort_strategy}")
+    print(f"    判定理由: {reason}")
+    print(f"  • 清洁N值: {n_value}")
+    print(f"    判定理由: {n_reason}")
+    print("=" * 60)
+    print()
+
+    # 3. 执行清洁模式输出（拆分文档子目录 + 双合并文件）
+    split_dir = os.path.join(auto_dir, '拆分文档')
+    split_by_chapter(src, out_dir=split_dir, encoding=encoding,
+                     dedup_strategy=dedup_strategy, sort_strategy=sort_strategy,
+                     volume_mode=volume_mode, min_body_len=n_value, merge_flag=1,
+                     title_dedup=title_dedup, ad_clean=ad_clean,
+                     merge_dir=auto_dir)
+
+
+# ===========================================================================
 # CLI入口
 # ===========================================================================
 def main():
+    epilog = """6种去重×排序组合（--dedup × --sort）及适用场景：
+  ┌───────────┬────────┬──────────────────────────────────┐
+  │ 去重      │ 排序   │ 适用场景                         │
+  ├───────────┼────────┼──────────────────────────────────┤
+  │ none      │ none   │ 文件干净无重复无乱序，仅拆分     │
+  │ none      │ sort   │ 无重复但整体乱序，按章号重排     │
+  │ first     │ none   │ 相邻双标题/简单重复，留首次出现  │
+  │ first     │ sort   │ 简单重复且乱序                   │
+  │ longest   │ none   │ 整块重复，留最长内容且不改顺序   │
+  │ longest   │ sort   │ 重复+乱序严重，最彻底(默认)      │
+  └───────────┴────────┴──────────────────────────────────┘
+  注: adjacent 已合并入 first、lis 已合并入 first+sort，仅兼容保留。
+
+示例：
+  python split_txt_v3.py --src 小说.txt --auto          # 全自动（推荐）
+  python split_txt_v3.py --src 小说.txt --analyze       # 深度分析
+  python split_txt_v3.py --src 小说.txt --clean 100     # 清洁模式(双合并文件)
+  python split_txt_v3.py --src 小说.txt --dedup first --sort none
+"""
     parser = argparse.ArgumentParser(
-        description="TXT章节拆分工具 v3.1（去重+乱序修复+卷级感知增强版）")
+        description="TXT章节拆分工具 v3.4（去重+乱序修复+卷级感知+目录区检测+广告清理+全自动模式）",
+        epilog=epilog,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--src", default=None, help="源TXT路径")
     parser.add_argument("--mode", choices=["chapter", "groups"], default="chapter",
                         help="拆分模式: chapter=每章一文件(默认), groups=聚合拆分")
@@ -1378,13 +1719,17 @@ def main():
     parser.add_argument("--encoding", default=None,
                         help="手动指定源文件编码")
     parser.add_argument("--analyze", action="store_true",
-                        help="深度分析：全面诊断所有问题")
+                        help="深度分析：全面诊断所有问题（总-分结构报告）")
+    parser.add_argument("--auto", action="store_true",
+                        help="全自动模式：分析→自动决策组合与清洁N值→清洁模式输出到 <名>_自动/")
     parser.add_argument("--dedup", default="longest",
                         choices=list(DEDUP_STRATEGIES.keys()),
-                        help="去重策略: none/adjacent/first/longest (默认: longest)")
+                        help="去重策略: none/first/longest (默认: longest)；"
+                             "adjacent 已合并入 first，仅兼容保留")
     parser.add_argument("--sort", default="sort",
                         choices=list(SORT_STRATEGIES.keys()),
-                        help="排序策略: none/lis/sort (默认: sort)")
+                        help="排序策略: none/sort (默认: sort)；"
+                             "lis 已合并入 first+sort，仅兼容保留")
     parser.add_argument("--volume-mode", default="auto",
                         choices=["auto", "flat", "by_volume"],
                         help="卷级处理模式: auto(自动检测)/flat(扁平)/by_volume(按卷分目录)")
@@ -1393,15 +1738,26 @@ def main():
     parser.add_argument("--min-body-len", type=int, default=0,
                         help="最小正文字数(0=不检测)")
     parser.add_argument("--clean", default=None, type=int,
-                        help="清洁模式：N=最小正文字数，输出纯净正文（仅保留≥N字的章节）")
+                        help="清洁模式：N=最小正文字数，同时生成 保留大于等于N / 清理小于N 双合并文件（纯净正文无头部）")
     parser.add_argument("--title-dedup", action="store_true", default=False,
                         help="标题级去重：去重键包含规范化标题，避免章号相同标题不同被误删")
+    parser.add_argument("--ad-clean", dest="ad_clean", action="store_true", default=True,
+                        help="广告/垃圾行清理（默认启用）：网址/推广语/分页提示/求票/分隔线等7类规则")
+    parser.add_argument("--no-ad-clean", dest="ad_clean", action="store_false",
+                        help="关闭广告/垃圾行清理，保留原文")
     args = parser.parse_args()
 
     if args.analyze:
         if not args.src:
             parser.error("--analyze 需要 --src 参数")
-        deep_analyze(args.src)
+        print(deep_analyze(args.src, encoding=args.encoding, ad_clean=args.ad_clean))
+        return
+
+    if args.auto:
+        if not args.src:
+            parser.error("--auto 需要 --src 参数")
+        auto_process(args.src, encoding=args.encoding, volume_mode=args.volume_mode,
+                     title_dedup=args.title_dedup, ad_clean=args.ad_clean)
         return
 
     if not args.src:
@@ -1414,7 +1770,7 @@ def main():
     merge_flag = None
     if args.clean is not None:
         args.min_body_len = args.clean
-        merge_flag = 1  # 固定为保留模式
+        merge_flag = 1  # 清洁模式（双合并文件）
         mode = "chapter"
 
     try:
@@ -1422,12 +1778,13 @@ def main():
             split_by_chapter(args.src, args.out, args.prefix, args.serial_width,
                              args.encoding, args.dedup, args.sort, args.volume_mode,
                              args.keep_title_only, args.min_body_len, merge_flag,
-                             title_dedup=args.title_dedup)
+                             title_dedup=args.title_dedup, ad_clean=args.ad_clean)
         else:
             chunk_str = args.chunk if args.chunk else "40,3"
             split_by_groups(args.src, chunk_str, args.out, args.prefix,
                             args.serial_width, args.encoding, args.dedup,
-                            args.sort, args.volume_mode, title_dedup=args.title_dedup)
+                            args.sort, args.volume_mode, title_dedup=args.title_dedup,
+                            ad_clean=args.ad_clean)
     except ValueError as e:
         print(f"[错误] {e}")
         sys.exit(1)
