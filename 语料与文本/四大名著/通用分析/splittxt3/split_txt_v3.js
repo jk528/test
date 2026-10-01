@@ -83,6 +83,9 @@ var ch_levels = [];      // chapter/volume/special
 var ch_patterns = [];    // 匹配的正则类型
 var ch_bodyLines = [];   // 正文行数
 var ch_isTOC = [];       // 是否为目录区章节
+// v3.6 优化：扫描时预计算，消除重复遍历
+var ch_charCounts = [];  // 每章总字符数（含换行），预计算
+var ch_hanziCounts = []; // 每章正文汉字数，预计算
 var ch_starts = [];
 var ch_ends = [];
 var ch_titles = [];
@@ -996,6 +999,42 @@ function ScanChaptersV3(lines) {
             ch_bodyLines[i] = 0;
         }
     }
+    
+    // v3.6 优化：一次预计算字符数+汉字数，后续所有环节直接读取
+    PrecomputeChapterCounts(lines);
+}
+
+// v3.6 优化：预计算每章的字符数和汉字数（一次遍历，后续所有环节复用）
+//   性能收益：消除 AutoN、清洁模式、预计算字数 三处的重复行遍历
+//   复杂度：O(总行数)，一次性完成
+function PrecomputeChapterCounts(lines) {
+    if (ch_count === 0) return;
+    var i, j, nLines, curChar, curHanzi;
+    ch_charCounts = new Array(ch_count);
+    ch_hanziCounts = new Array(ch_count);
+    
+    for (i = 0; i < ch_count; i++) {
+        nLines = ch_ends[i] - ch_starts[i] + 1;
+        if (nLines < 1) nLines = 1;
+        
+        curChar = 0;
+        curHanzi = 0;
+        
+        // 逐行累计：字符数（含换行）+ 汉字数
+        for (j = ch_starts[i]; j <= ch_ends[i]; j++) {
+            curChar += lines[j].length;
+            // 正文行（标题行之后）才计汉字
+            if (j > ch_starts[i]) {
+                curHanzi += countChineseChars(lines[j]);
+            }
+        }
+        
+        // 加上换行符数
+        if (nLines > 1) curChar += (nLines - 1);
+        
+        ch_charCounts[i] = curChar;
+        ch_hanziCounts[i] = curHanzi;
+    }
 }
 
 // v3.2：目录区自动检测
@@ -1360,22 +1399,16 @@ function CountOOOInDedup() {
 }
 
 // v3.4：自动判定清洁模式的最小正文字数 N
-// v3.5 优化：自动判定清洁模式N值（逐行计数+原生快排+上限1000）
-function AutoNFromBodies(lines) {
+// v3.6 优化：直接读取预计算的汉字数，O(章节数)
+function AutoNFromBodies() {
     if (ch_count === 0) return 100;
 
     var cnts = [];
-    var i, j, n;
+    var i;
     for (i = 0; i < ch_count; i++) {
         if ((ch_levels[i] === "chapter" || ch_levels[i] === "special") && !ch_isTOC[i]) {
-            n = ch_ends[i] - ch_starts[i];
-            if (n > 0) {
-                // v3.5 优化：逐行计数，避免拼接大字符串
-                var hanzi = 0;
-                for (j = ch_starts[i] + 1; j <= ch_ends[i]; j++) {
-                    hanzi += countChineseChars(lines[j]);
-                }
-                cnts.push(hanzi);
+            if (ch_hanziCounts[i] > 0) {
+                cnts.push(ch_hanziCounts[i]);
             }
         }
     }
@@ -1383,7 +1416,7 @@ function AutoNFromBodies(lines) {
     var cnt = cnts.length;
     if (cnt < 20) return 100;
 
-    // v3.5 优化：用原生 sort（V8/Timsort，O(n log n)）
+    // 原生 sort（V8/Timsort，O(n log n)）
     cnts.sort(function(a, b) { return a - b; });
 
     // 下半区（<=中位数）找最大相邻间隔
@@ -1404,7 +1437,7 @@ function AutoNFromBodies(lines) {
     if (maxGap < 50) return 100;
     if (secondGap > 0 && maxGap < secondGap * 2) return 100;
 
-    // v3.5：N=间隔中点取整到10，上限锁死1000
+    // N=间隔中点取整到10，上限锁死1000
     var nResult = Math.floor((cnts[maxGapAt] + cnts[maxGapAt + 1]) / 2);
     nResult = Math.floor((nResult + 5) / 10) * 10;
     if (nResult < 50) nResult = 50;
@@ -1768,19 +1801,14 @@ function SplitByChapterV3(inputPath, outputDir, fileNamePrefix, serialWidth,
     // 6. 序号位数
     if (String(dedup_count).length > serialWidth) serialWidth = String(dedup_count).length;
 
-    // 7. 预计算章节字数（v3.5 优化：逐行累加，避免拼接大字符串）
-    var charCounts = [];
+    // 7. 预计算章节字数（v3.6 优化：直接读扫描时预计算的结果，O(章节数)）
+    var charCounts = new Array(dedup_count);
     var maxChars = 0;
     var i, j, n, origIdx;
     for (i = 0; i < dedup_count; i++) {
         origIdx = dedup_indices[i];
-        n = ch_ends[origIdx] - ch_starts[origIdx] + 1;
-        if (n < 1) n = 1;
-        var total = 0;
-        for (j = 0; j < n; j++) total += lines[ch_starts[origIdx] + j].length;
-        if (n > 1) total += n - 1;  // 换行符数
-        charCounts.push(total);
-        if (total > maxChars) maxChars = total;
+        charCounts[i] = ch_charCounts[origIdx];
+        if (charCounts[i] > maxChars) maxChars = charCounts[i];
     }
     var charWidth = String(maxChars).length;
     if (charWidth < 1) charWidth = 1;
@@ -1802,13 +1830,8 @@ function SplitByChapterV3(inputPath, outputDir, fileNamePrefix, serialWidth,
             for (j = 0; j < n; j++) bodyArr.push(lines[ch_starts[origIdx] + j]);
             body = bodyArr.join("\n");
 
-            // v3.5 优化：正文汉字数（逐行计数，避免拼接大字符串）
-            var bodyLen = 0;
-            if (n > 1) {
-                for (j = 1; j < n; j++) {
-                    bodyLen += countChineseChars(lines[ch_starts[origIdx] + j]);
-                }
-            }
+            // v3.6 优化：正文汉字数直接读预计算结果，O(1)
+            var bodyLen = ch_hanziCounts[origIdx];
 
             // 判断不足
             var isInsufficient = false;
@@ -2507,8 +2530,7 @@ function DeepAnalyzeFile(filePath, outputDir) {
         recCombo = "longest+sort（稳妥默认）";
     }
 
-    var autoN = AutoNFromBodies(lines);
-
+    var autoN = AutoNFromBodies();
     var volStructDesc = (volCnt > 0) ? ("有卷（卷级标题 " + volCnt + " 个）") : "无卷";
     var tocDesc = (g_tocChapterCount > 0) ? ("有（" + g_tocChapterCount + " 章，已跳过）") : "无";
 
@@ -2774,8 +2796,8 @@ function 自动TXTv3() {
         recComboStr = "longest+sort（稳妥默认）";
     }
 
-    // 自动判定N
-    var autoN = AutoNFromBodies(lines);
+    // 自动判定N（v3.6：直接读预计算结果，O(章节数)）
+    var autoN = AutoNFromBodies();
 
     // 卷结构统计
     var volCnt = 0;

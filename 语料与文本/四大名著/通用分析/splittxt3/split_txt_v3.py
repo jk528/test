@@ -348,13 +348,15 @@ def detect_toc(chapters, min_toc_chapters=10, max_body_lines=2):
     return toc_count
 
 
-def get_body_hanzi_count(ch, lines):
-    """章节正文汉字数（v3.5 优化：逐行计数，避免拼接大字符串）"""
+def get_body_hanzi_count(ch, lines=None):
+    """章节正文汉字数（v3.6 优化：直接读预计算结果，O(1)）"""
+    if 'hanzi_count' in ch:
+        return ch['hanzi_count']
+    # 兼容旧数据（无预计算时回退到逐行计数）
     s_line = ch['line_idx']
     e_line = max(ch['end_line'], s_line)
     if e_line <= s_line:
         return 0
-    # 逐行计数，避免拼接大字符串
     total = 0
     for line in lines[s_line + 1:e_line + 1]:
         total += len(re.findall(r'[一-鿿]', line))
@@ -564,13 +566,37 @@ def scan_structures(lines):
                 matched = True
                 break
 
-    # 计算每个章节的结束行和正文字数
+    # 计算每个章节的结束行
     for ci, s in enumerate(structures):
         if ci + 1 < len(structures):
             s['end_line'] = structures[ci + 1]['line_idx'] - 1
         else:
             s['end_line'] = len(lines) - 1
         s['body_lines'] = max(0, s['end_line'] - s['line_idx'])
+    
+    # v3.6 优化：一次预计算字符数+汉字数，后续所有环节直接读取
+    # 性能收益：消除 auto_decide_n、清洁模式、预计算字数 三处重复行遍历
+    for s in structures:
+        start = s['line_idx']
+        end = s['end_line']
+        if end < start:
+            s['char_count'] = len(lines[start]) if start < len(lines) else 0
+            s['hanzi_count'] = 0
+            continue
+        char_count = 0
+        hanzi_count = 0
+        for li in range(start, end + 1):
+            line = lines[li]
+            char_count += len(line)
+            # 正文行（标题行之后）才计汉字
+            if li > start:
+                hanzi_count += len(re.findall(r'[一-鿿]', line))
+        # 加上换行符数
+        n_lines = end - start + 1
+        if n_lines > 1:
+            char_count += (n_lines - 1)
+        s['char_count'] = char_count
+        s['hanzi_count'] = hanzi_count
 
     return structures
 
@@ -1308,18 +1334,8 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
     # 6. 序号位数
     serial_width = max(serial_width, len(str(len(chapters))))
 
-    # 7. 预计算字数（v3.5 优化：逐行累加，避免拼接大字符串）
-    char_counts = []
-    for ch in chapters:
-        s_line = ch['line_idx']
-        e_line = ch['end_line']
-        if e_line < s_line:
-            e_line = s_line
-        n = e_line - s_line + 1
-        total = sum(len(lines[k]) for k in range(s_line, e_line + 1))
-        if n > 1:
-            total += n - 1  # 换行符数
-        char_counts.append(total)
+    # 7. 预计算字数（v3.6 优化：直接读扫描时预计算的结果，O(章节数)）
+    char_counts = [ch['char_count'] for ch in chapters]
     max_chars = max(char_counts) if char_counts else 0
     char_width = max(1, len(str(max_chars)))
 
@@ -1343,12 +1359,8 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
 
         body = '\n'.join(lines[start_line:end_line + 1])
 
-        # v3.5 优化：正文汉字数（逐行计数，避免拼接大字符串）
-        if n_lines > 1:
-            body_len = sum(len(re.findall(r'[一-鿿]', line))
-                          for line in lines[start_line + 1:end_line + 1])
-        else:
-            body_len = 0
+        # v3.6 优化：正文汉字数直接读预计算结果，O(1)
+        body_len = ch['hanzi_count']
 
         is_insufficient = False
         if n_lines == 1:

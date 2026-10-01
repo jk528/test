@@ -77,6 +77,9 @@ Private ch_levels() As String      ' chapter/volume/special
 Private ch_patterns() As String    ' 匹配的正则类型
 Private ch_bodyLines() As Long     ' 正文行数
 Private ch_isTOC() As Boolean      ' v3.2 新增：是否为目录区章节
+' v3.6 优化：扫描时预计算，消除重复遍历
+Private ch_charCounts() As Long    ' 每章总字符数（含换行），预计算
+Private ch_hanziCounts() As Long   ' 每章正文汉字数，预计算
 
 ' 原有数组（保持兼容）
 Private ch_starts() As Long
@@ -84,6 +87,9 @@ Private ch_ends() As Long
 Private ch_titles() As String
 Private ch_count As Long
 Private ch_unit As String
+
+' v3.6 优化：全局复用正则对象，避免反复创建
+Private g_regCn As Object          ' 汉字匹配正则，全局唯一实例
 
 ' 去重后的索引映射（原索引 → 是否保留，以及新顺序）
 Private dedup_indices() As Long    ' 去重后第i个 = 原第 dedup_indices(i) 个
@@ -545,11 +551,11 @@ End Sub
 '         N=间隔中点取整到10，clamp[50,1000]；
 '         章节<20 或 gap<50 或 最大gap<次大gap×2 → N=100
 '------------------------------------------------------------------------------
-Private Function AutoNFromBodies(ByRef lines() As String) As Long
-    Dim regCn As Object
+' v3.6 优化：直接读取预计算的汉字数，无需再次遍历行
+'   性能收益：从 O(总行数) 降到 O(章节数)
+Private Function AutoNFromBodies() As Long
     Dim cnts() As Long, cnt As Long
-    Dim i As Long, j As Long, n As Long
-    Dim tmp As Long
+    Dim i As Long
     Dim lowerCnt As Long, k As Long
     Dim gap As Long, maxGap As Long, maxGapAt As Long, secondGap As Long
     Dim nResult As Long
@@ -557,43 +563,27 @@ Private Function AutoNFromBodies(ByRef lines() As String) As Long
     AutoNFromBodies = 100
     If ch_count = 0 Then Exit Function
 
-    Set regCn = CreateObject("VBScript.RegExp")
-    regCn.Global = True
-    regCn.Pattern = "[" & ChrW(&H4E00) & "-" & ChrW(&H9FFF) & "]"
-
     ReDim cnts(0 To ch_count - 1)
     cnt = 0
     For i = 0 To ch_count - 1
         If (ch_levels(i) = "chapter" Or ch_levels(i) = "special") _
            And Not ch_isTOC(i) Then
-            n = ch_ends(i) - ch_starts(i)
-            If n > 0 Then
-                ' v3.5 优化：逐行计数，避免拼接大字符串
-                tmp = 0
-                For j = ch_starts(i) + 1 To ch_ends(i)
-                    tmp = tmp + regCn.Execute(lines(j)).Count
-                Next j
-                cnts(cnt) = tmp
+            If ch_hanziCounts(i) > 0 Then
+                cnts(cnt) = ch_hanziCounts(i)
                 cnt = cnt + 1
             End If
         End If
     Next i
 
-    If cnt < 20 Then
-        Set regCn = Nothing
-        Exit Function
-    End If
+    If cnt < 20 Then Exit Function
     ReDim Preserve cnts(0 To cnt - 1)
 
-    ' v3.5 优化：全部使用快速排序 O(n log n)
+    ' 快速排序 O(n log n)
     QuickSortLong cnts, 0, cnt - 1
 
     ' 在下半区（≤中位数）找最大相邻间隔
     lowerCnt = cnt \ 2 + 1
-    If lowerCnt < 2 Then
-        Set regCn = Nothing
-        Exit Function
-    End If
+    If lowerCnt < 2 Then Exit Function
     maxGap = 0: secondGap = 0: maxGapAt = -1
     For k = 0 To lowerCnt - 2
         gap = cnts(k + 1) - cnts(k)
@@ -606,15 +596,9 @@ Private Function AutoNFromBodies(ByRef lines() As String) As Long
         End If
     Next k
 
-    If maxGap < 50 Then
-        Set regCn = Nothing
-        Exit Function
-    End If
+    If maxGap < 50 Then Exit Function
     If secondGap > 0 Then
-        If maxGap < secondGap * 2 Then
-            Set regCn = Nothing
-            Exit Function
-        End If
+        If maxGap < secondGap * 2 Then Exit Function
     End If
 
     ' N=间隔中点取整到10，上限锁死 1000
@@ -623,8 +607,6 @@ Private Function AutoNFromBodies(ByRef lines() As String) As Long
     If nResult < 50 Then nResult = 50
     If nResult > 1000 Then nResult = 1000
     AutoNFromBodies = nResult
-
-    Set regCn = Nothing
 End Function
 
 
@@ -928,18 +910,29 @@ Private Sub ScanChaptersV3(lines() As String, ByVal lineCount As Long)
         g_regexName = "标准中文（默认回退）"
     End If
 
-    ' 初始化数组
-    ReDim ch_starts(0 To 127)
-    ReDim ch_ends(0 To 127)
-    ReDim ch_titles(0 To 127)
-    ReDim ch_nums(0 To 127)
-    ReDim ch_vols(0 To 127)
-    ReDim ch_units(0 To 127)
-    ReDim ch_levels(0 To 127)
-    ReDim ch_patterns(0 To 127)
-    ReDim ch_bodyLines(0 To 127)
-    ReDim ch_isTOC(0 To 127)          ' v3.2 新增
+    ' v3.6 优化：初始容量 2048（万章级只需扩容3次），倍增扩容
+    Dim initCap As Long
+    initCap = 2048
+    ReDim ch_starts(0 To initCap - 1)
+    ReDim ch_ends(0 To initCap - 1)
+    ReDim ch_titles(0 To initCap - 1)
+    ReDim ch_nums(0 To initCap - 1)
+    ReDim ch_vols(0 To initCap - 1)
+    ReDim ch_units(0 To initCap - 1)
+    ReDim ch_levels(0 To initCap - 1)
+    ReDim ch_patterns(0 To initCap - 1)
+    ReDim ch_bodyLines(0 To initCap - 1)
+    ReDim ch_isTOC(0 To initCap - 1)
+    ReDim ch_charCounts(0 To initCap - 1)   ' v3.6：预计算字符数
+    ReDim ch_hanziCounts(0 To initCap - 1)  ' v3.6：预计算汉字数
     ch_count = 0
+    
+    ' v3.6 优化：全局汉字正则对象，只创建一次
+    If g_regCn Is Nothing Then
+        Set g_regCn = CreateObject("VBScript.RegExp")
+        g_regCn.Global = True
+        g_regCn.Pattern = "[" & ChrW(&H4E00) & "-" & ChrW(&H9FFF) & "]"
+    End If
     ch_unit = g_selDefaultUnits(0)
     currentVol = 0
     currentVolUnit = ""
@@ -995,17 +988,22 @@ Private Sub ScanChaptersV3(lines() As String, ByVal lineCount As Long)
             ch_patterns(ch_count) = "volume"
             ch_bodyLines(ch_count) = 0
             ch_count = ch_count + 1
+            ' v3.6 优化：倍增扩容，万章级只需扩容3次（2048→4096→8192→16384）
             If ch_count > UBound(ch_starts) Then
-                ReDim Preserve ch_starts(0 To ch_count + 127)
-                ReDim Preserve ch_ends(0 To ch_count + 127)
-                ReDim Preserve ch_titles(0 To ch_count + 127)
-                ReDim Preserve ch_nums(0 To ch_count + 127)
-                ReDim Preserve ch_vols(0 To ch_count + 127)
-                ReDim Preserve ch_units(0 To ch_count + 127)
-                ReDim Preserve ch_levels(0 To ch_count + 127)
-                ReDim Preserve ch_patterns(0 To ch_count + 127)
-                ReDim Preserve ch_bodyLines(0 To ch_count + 127)
-                ReDim Preserve ch_isTOC(0 To ch_count + 127)
+                Dim newCap As Long
+                newCap = (UBound(ch_starts) + 1) * 2
+                ReDim Preserve ch_starts(0 To newCap - 1)
+                ReDim Preserve ch_ends(0 To newCap - 1)
+                ReDim Preserve ch_titles(0 To newCap - 1)
+                ReDim Preserve ch_nums(0 To newCap - 1)
+                ReDim Preserve ch_vols(0 To newCap - 1)
+                ReDim Preserve ch_units(0 To newCap - 1)
+                ReDim Preserve ch_levels(0 To newCap - 1)
+                ReDim Preserve ch_patterns(0 To newCap - 1)
+                ReDim Preserve ch_bodyLines(0 To newCap - 1)
+                ReDim Preserve ch_isTOC(0 To newCap - 1)
+                ReDim Preserve ch_charCounts(0 To newCap - 1)
+                ReDim Preserve ch_hanziCounts(0 To newCap - 1)
             End If
             GoTo NextLine5
         End If
@@ -1078,19 +1076,25 @@ Private Sub ScanChaptersV3(lines() As String, ByVal lineCount As Long)
             ch_levels(ch_count) = lvl
             ch_patterns(ch_count) = patType
             ch_bodyLines(ch_count) = 0
+            ch_charCounts(ch_count) = 0    ' v3.6：预计算初始值
+            ch_hanziCounts(ch_count) = 0   ' v3.6：预计算初始值
             ch_count = ch_count + 1
 
+            ' v3.6 优化：倍增扩容
             If ch_count > UBound(ch_starts) Then
-                ReDim Preserve ch_starts(0 To ch_count + 127)
-                ReDim Preserve ch_ends(0 To ch_count + 127)
-                ReDim Preserve ch_titles(0 To ch_count + 127)
-                ReDim Preserve ch_nums(0 To ch_count + 127)
-                ReDim Preserve ch_vols(0 To ch_count + 127)
-                ReDim Preserve ch_units(0 To ch_count + 127)
-                ReDim Preserve ch_levels(0 To ch_count + 127)
-                ReDim Preserve ch_patterns(0 To ch_count + 127)
-                ReDim Preserve ch_bodyLines(0 To ch_count + 127)
-                ReDim Preserve ch_isTOC(0 To ch_count + 127)
+                newCap = (UBound(ch_starts) + 1) * 2
+                ReDim Preserve ch_starts(0 To newCap - 1)
+                ReDim Preserve ch_ends(0 To newCap - 1)
+                ReDim Preserve ch_titles(0 To newCap - 1)
+                ReDim Preserve ch_nums(0 To newCap - 1)
+                ReDim Preserve ch_vols(0 To newCap - 1)
+                ReDim Preserve ch_units(0 To newCap - 1)
+                ReDim Preserve ch_levels(0 To newCap - 1)
+                ReDim Preserve ch_patterns(0 To newCap - 1)
+                ReDim Preserve ch_bodyLines(0 To newCap - 1)
+                ReDim Preserve ch_isTOC(0 To newCap - 1)
+                ReDim Preserve ch_charCounts(0 To newCap - 1)
+                ReDim Preserve ch_hanziCounts(0 To newCap - 1)
             End If
         End If
 NextLine5:
@@ -1107,11 +1111,56 @@ NextLine5:
         End If
     Next i
 
+    ' v3.6 优化：一次预计算字符数+汉字数，后续所有环节直接读取
+    PrecomputeChapterCounts lines, lineCount
+    
     ' 释放
     Set regVol = Nothing
     For r = 0 To g_selCount - 1
         Set regs(r) = Nothing
     Next r
+End Sub
+
+'------------------------------------------------------------------------------
+' v3.6 优化：预计算每章的字符数和汉字数（一次遍历，后续所有环节复用）
+'   性能收益：消除 AutoN、清洁模式、预计算字数 三处的重复行遍历
+'   复杂度：O(总行数)，一次性完成
+'------------------------------------------------------------------------------
+Private Sub PrecomputeChapterCounts(ByRef lines() As String, ByVal lineCount As Long)
+    Dim i As Long, j As Long, curChar As Long, curHanzi As Long
+    Dim nLines As Long
+    
+    If ch_count = 0 Then Exit Sub
+    
+    ' 确保全局正则对象存在
+    If g_regCn Is Nothing Then
+        Set g_regCn = CreateObject("VBScript.RegExp")
+        g_regCn.Global = True
+        g_regCn.Pattern = "[" & ChrW(&H4E00) & "-" & ChrW(&H9FFF) & "]"
+    End If
+    
+    For i = 0 To ch_count - 1
+        nLines = ch_ends(i) - ch_starts(i) + 1
+        If nLines < 1 Then nLines = 1
+        
+        curChar = 0
+        curHanzi = 0
+        
+        ' 逐行累计：字符数（含换行）+ 汉字数
+        For j = ch_starts(i) To ch_ends(i)
+            curChar = curChar + Len(lines(j))
+            ' 正文行（标题行之后）才计汉字
+            If j > ch_starts(i) Then
+                curHanzi = curHanzi + g_regCn.Execute(lines(j)).Count
+            End If
+        Next j
+        
+        ' 加上换行符数（和之前 Join(vbLf) 结果一致）
+        If nLines > 1 Then curChar = curChar + (nLines - 1)
+        
+        ch_charCounts(i) = curChar
+        ch_hanziCounts(i) = curHanzi
+    Next i
 End Sub
 
 '------------------------------------------------------------------------------
@@ -2173,8 +2222,8 @@ NextNumKey:
         recCombo = "longest+sort（稳妥默认）"
     End If
 
-    ' 建议清洁N值
-    autoN = AutoNFromBodies(lines)
+    ' 建议清洁N值（v3.6：直接读预计算结果，O(章节数)）
+    autoN = AutoNFromBodies()
 
     If volCnt > 0 Then
         volStructDesc = "有卷（卷级标题 " & volCnt & " 个）"
@@ -2498,8 +2547,8 @@ Public Sub 自动TXTv3()
         recComboStr = "longest+sort（稳妥默认）"
     End If
 
-    ' 自动判定N
-    autoN = AutoNFromBodies(lines)
+    ' 自动判定N（v3.6：直接读预计算结果，O(章节数)）
+    autoN = AutoNFromBodies()
 
     ' 卷结构统计
     volCnt = 0
@@ -2661,22 +2710,14 @@ Public Sub SplitByChapterV3(ByVal InputPath As String, _
     Dim serialFmt As String
     serialFmt = String(SerialWidth, "0")
 
-    ' 7. 预计算字数（v3.5 优化：逐行累加，避免拼接大字符串）
+    ' 7. 预计算字数（v3.6 优化：直接读扫描时预计算的结果，O(章节数)）
     Dim charCounts() As Long, maxChars As Long, charWidth As Long, charFmt As String
     ReDim charCounts(0 To dedup_count - 1)
     maxChars = 0
-    Dim i As Long, j As Long, n As Long
+    Dim i As Long, j As Long, origIdx As Long, n As Long
     For i = 0 To dedup_count - 1
-        Dim origIdx As Long
         origIdx = dedup_indices(i)
-        n = ch_ends(origIdx) - ch_starts(origIdx) + 1
-        If n < 1 Then n = 1
-        charCounts(i) = 0
-        For j = 0 To n - 1
-            charCounts(i) = charCounts(i) + Len(lines(ch_starts(origIdx) + j))
-        Next j
-        ' 加上换行符数（和之前 Join(vbLf) 结果一致）
-        If n > 1 Then charCounts(i) = charCounts(i) + (n - 1)
+        charCounts(i) = ch_charCounts(origIdx)
         If charCounts(i) > maxChars Then maxChars = charCounts(i)
     Next i
     charWidth = Len(CStr(maxChars))
@@ -2687,7 +2728,6 @@ Public Sub SplitByChapterV3(ByVal InputPath As String, _
     Dim titleOnlyCount As Long, writtenCount As Long, skippedCount As Long
     Dim shortBodyCount As Long, bodyLen As Long, isInsufficient As Boolean
     Dim top1 As Long, top2 As Long, top3 As Long, topStr As String
-    Dim regCn As Object
     Dim keptTexts As Collection, skippedTexts As Collection
     Dim skippedTitles As Collection, skippedBodyLens As Collection
     titleOnlyCount = 0: writtenCount = 0: skippedCount = 0
@@ -2696,9 +2736,7 @@ Public Sub SplitByChapterV3(ByVal InputPath As String, _
     Set skippedTexts = New Collection
     Set skippedTitles = New Collection
     Set skippedBodyLens = New Collection
-    Set regCn = CreateObject("VBScript.RegExp")
-    regCn.Global = True
-    regCn.Pattern = "[" & ChrW(&H4E00) & "-" & ChrW(&H9FFF) & "]"
+    ' v3.6：全局正则对象只创建一次，此处无需再创建
 
     t0 = Timer
     On Error GoTo WriteErrV3
@@ -2714,15 +2752,8 @@ Public Sub SplitByChapterV3(ByVal InputPath As String, _
         Next j
         body = Join(bodyLines, vbLf)
 
-        ' v3.5 优化：正文汉字数（逐行计数，避免拼接大字符串）
-        If n > 1 Then
-            bodyLen = 0
-            For j = ch_starts(origIdx) + 1 To ch_ends(origIdx)
-                bodyLen = bodyLen + regCn.Execute(lines(j)).Count
-            Next j
-        Else
-            bodyLen = 0
-        End If
+        ' v3.6 优化：正文汉字数直接读预计算结果，O(1)
+        bodyLen = ch_hanziCounts(origIdx)
 
         ' 判断不足
         isInsufficient = False
@@ -2817,7 +2848,6 @@ Public Sub SplitByChapterV3(ByVal InputPath As String, _
 NextChapterV3:
     Next i
     On Error GoTo 0
-    Set regCn = Nothing
     tWrite = Timer - t0
 
     ' 清洁模式合并文件（MergeFlag=2 同时输出保留和清理两个合并文件）
