@@ -349,13 +349,16 @@ def detect_toc(chapters, min_toc_chapters=10, max_body_lines=2):
 
 
 def get_body_hanzi_count(ch, lines):
-    """章节正文汉字数"""
+    """章节正文汉字数（v3.5 优化：逐行计数，避免拼接大字符串）"""
     s_line = ch['line_idx']
     e_line = max(ch['end_line'], s_line)
     if e_line <= s_line:
         return 0
-    body_text = ''.join(lines[s_line + 1:e_line + 1])
-    return len(re.sub(r'[^一-鿿]', '', body_text))
+    # 逐行计数，避免拼接大字符串
+    total = 0
+    for line in lines[s_line + 1:e_line + 1]:
+        total += len(re.findall(r'[一-鿿]', line))
+    return total
 
 
 def count_ooo(chapters):
@@ -408,9 +411,9 @@ def auto_decide(chapters):
 
 
 def auto_decide_n(chapters, lines):
-    """v3.4 自动判定清洁N值
+    """v3.5 优化：自动判定清洁N值
     所有章节正文汉字数升序排序，下半区(≤中位数)找最大相邻间隔gap，
-    N=间隔中点取整到10，clamp[50,2000]；
+    N=间隔中点取整到10，clamp[50,1000]（上限锁死1000）；
     章节<20 或 gap<50 或 最大gap<次大gap×2 → N=100
     返回 (N, 判定理由)"""
     valid = [c for c in chapters if not c.get('is_toc')]
@@ -435,7 +438,7 @@ def auto_decide_n(chapters, lines):
         return 100, f'最大间隔{max_gap}不显著(次大{gaps[1][0]}×2)，使用默认值'
 
     n = int(round((gap_lo + gap_hi) / 2 / 10.0)) * 10
-    n = max(50, min(2000, n))
+    n = max(50, min(1000, n))
     return n, f'下半区最大间隔{gap_lo}~{gap_hi}字，取中点得N={n}'
 
 
@@ -1305,14 +1308,18 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
     # 6. 序号位数
     serial_width = max(serial_width, len(str(len(chapters))))
 
-    # 7. 预计算字数
+    # 7. 预计算字数（v3.5 优化：逐行累加，避免拼接大字符串）
     char_counts = []
     for ch in chapters:
         s_line = ch['line_idx']
         e_line = ch['end_line']
         if e_line < s_line:
             e_line = s_line
-        char_counts.append(len('\n'.join(lines[s_line:e_line + 1])))
+        n = e_line - s_line + 1
+        total = sum(len(lines[k]) for k in range(s_line, e_line + 1))
+        if n > 1:
+            total += n - 1  # 换行符数
+        char_counts.append(total)
     max_chars = max(char_counts) if char_counts else 0
     char_width = max(1, len(str(max_chars)))
 
@@ -1336,10 +1343,10 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
 
         body = '\n'.join(lines[start_line:end_line + 1])
 
-        # 正文汉字数
+        # v3.5 优化：正文汉字数（逐行计数，避免拼接大字符串）
         if n_lines > 1:
-            body_text = ''.join(lines[start_line + 1:end_line + 1])
-            body_len = len(re.sub(r'[^一-鿿]', '', body_text))
+            body_len = sum(len(re.findall(r'[一-鿿]', line))
+                          for line in lines[start_line + 1:end_line + 1])
         else:
             body_len = 0
 

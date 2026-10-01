@@ -1360,20 +1360,22 @@ function CountOOOInDedup() {
 }
 
 // v3.4：自动判定清洁模式的最小正文字数 N
+// v3.5 优化：自动判定清洁模式N值（逐行计数+原生快排+上限1000）
 function AutoNFromBodies(lines) {
     if (ch_count === 0) return 100;
 
     var cnts = [];
-    var i, j, n, bodyText;
+    var i, j, n;
     for (i = 0; i < ch_count; i++) {
         if ((ch_levels[i] === "chapter" || ch_levels[i] === "special") && !ch_isTOC[i]) {
             n = ch_ends[i] - ch_starts[i];
             if (n > 0) {
-                bodyText = "";
+                // v3.5 优化：逐行计数，避免拼接大字符串
+                var hanzi = 0;
                 for (j = ch_starts[i] + 1; j <= ch_ends[i]; j++) {
-                    bodyText += lines[j];
+                    hanzi += countChineseChars(lines[j]);
                 }
-                cnts.push(countChineseChars(bodyText));
+                cnts.push(hanzi);
             }
         }
     }
@@ -1381,14 +1383,8 @@ function AutoNFromBodies(lines) {
     var cnt = cnts.length;
     if (cnt < 20) return 100;
 
-    // 升序排序（冒泡）
-    for (i = 0; i < cnt - 1; i++) {
-        for (j = i + 1; j < cnt; j++) {
-            if (cnts[j] < cnts[i]) {
-                var tmp = cnts[i]; cnts[i] = cnts[j]; cnts[j] = tmp;
-            }
-        }
-    }
+    // v3.5 优化：用原生 sort（V8/Timsort，O(n log n)）
+    cnts.sort(function(a, b) { return a - b; });
 
     // 下半区（<=中位数）找最大相邻间隔
     var lowerCnt = Math.floor(cnt / 2) + 1;
@@ -1408,11 +1404,11 @@ function AutoNFromBodies(lines) {
     if (maxGap < 50) return 100;
     if (secondGap > 0 && maxGap < secondGap * 2) return 100;
 
-    // N=间隔中点取整到10
+    // v3.5：N=间隔中点取整到10，上限锁死1000
     var nResult = Math.floor((cnts[maxGapAt] + cnts[maxGapAt + 1]) / 2);
     nResult = Math.floor((nResult + 5) / 10) * 10;
     if (nResult < 50) nResult = 50;
-    if (nResult > 2000) nResult = 2000;
+    if (nResult > 1000) nResult = 1000;
     return nResult;
 }
 
@@ -1772,19 +1768,19 @@ function SplitByChapterV3(inputPath, outputDir, fileNamePrefix, serialWidth,
     // 6. 序号位数
     if (String(dedup_count).length > serialWidth) serialWidth = String(dedup_count).length;
 
-    // 7. 预计算章节字数（含标题和换行，用于文件名显示）
+    // 7. 预计算章节字数（v3.5 优化：逐行累加，避免拼接大字符串）
     var charCounts = [];
     var maxChars = 0;
-    var i, j, n, origIdx, bodyArr, body;
+    var i, j, n, origIdx;
     for (i = 0; i < dedup_count; i++) {
         origIdx = dedup_indices[i];
         n = ch_ends[origIdx] - ch_starts[origIdx] + 1;
         if (n < 1) n = 1;
-        bodyArr = [];
-        for (j = 0; j < n; j++) bodyArr.push(lines[ch_starts[origIdx] + j]);
-        body = bodyArr.join("\n");
-        charCounts.push(body.length);
-        if (body.length > maxChars) maxChars = body.length;
+        var total = 0;
+        for (j = 0; j < n; j++) total += lines[ch_starts[origIdx] + j].length;
+        if (n > 1) total += n - 1;  // 换行符数
+        charCounts.push(total);
+        if (total > maxChars) maxChars = total;
     }
     var charWidth = String(maxChars).length;
     if (charWidth < 1) charWidth = 1;
@@ -1806,12 +1802,12 @@ function SplitByChapterV3(inputPath, outputDir, fileNamePrefix, serialWidth,
             for (j = 0; j < n; j++) bodyArr.push(lines[ch_starts[origIdx] + j]);
             body = bodyArr.join("\n");
 
-            // 正文汉字数（不含标题行）
+            // v3.5 优化：正文汉字数（逐行计数，避免拼接大字符串）
             var bodyLen = 0;
             if (n > 1) {
-                var bodyTextArr = [];
-                for (j = 1; j < n; j++) bodyTextArr.push(lines[ch_starts[origIdx] + j]);
-                bodyLen = countChineseChars(bodyTextArr.join(""));
+                for (j = 1; j < n; j++) {
+                    bodyLen += countChineseChars(lines[ch_starts[origIdx] + j]);
+                }
             }
 
             // 判断不足

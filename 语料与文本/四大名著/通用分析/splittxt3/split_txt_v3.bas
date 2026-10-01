@@ -487,16 +487,69 @@ Private Function CountOOOInDedup() As Long
 End Function
 
 '------------------------------------------------------------------------------
-' v3.4 新增：自动判定清洁模式的最小正文字数 N
+'------------------------------------------------------------------------------
+' v3.5 优化：Long 数组快速排序（章节数>1000 时性能远优于冒泡）
+'------------------------------------------------------------------------------
+Private Sub QuickSortLong(arr() As Long, ByVal left As Long, ByVal right As Long)
+    Dim pivot As Long, i As Long, j As Long, tmp As Long
+    If left >= right Then Exit Sub
+    pivot = arr((left + right) \ 2)
+    i = left: j = right
+    Do While i <= j
+        Do While arr(i) < pivot: i = i + 1: Loop
+        Do While arr(j) > pivot: j = j - 1: Loop
+        If i <= j Then
+            tmp = arr(i): arr(i) = arr(j): arr(j) = tmp
+            i = i + 1: j = j - 1
+        End If
+    Loop
+    If left < j Then QuickSortLong arr, left, j
+    If i < right Then QuickSortLong arr, i, right
+End Sub
+
+'------------------------------------------------------------------------------
+' v3.5 优化：按 (卷号, 章号) 对索引数组快速排序（三数组并行交换）
+'------------------------------------------------------------------------------
+Private Sub QuickSortByVolCh( _
+    idxArr() As Long, volArr() As Long, chArr() As Long, _
+    ByVal left As Long, ByVal right As Long)
+    Dim pv As Long, pc As Long
+    Dim i As Long, j As Long
+    Dim ti As Long, tv As Long, tc As Long
+    If left >= right Then Exit Sub
+    pv = volArr((left + right) \ 2)
+    pc = chArr((left + right) \ 2)
+    i = left: j = right
+    Do While i <= j
+        Do While volArr(i) < pv Or (volArr(i) = pv And chArr(i) < pc)
+            i = i + 1
+        Loop
+        Do While volArr(j) > pv Or (volArr(j) = pv And chArr(j) > pc)
+            j = j - 1
+        Loop
+        If i <= j Then
+            ti = idxArr(i): idxArr(i) = idxArr(j): idxArr(j) = ti
+            tv = volArr(i): volArr(i) = volArr(j): volArr(j) = tv
+            tc = chArr(i): chArr(i) = chArr(j): chArr(j) = tc
+            i = i + 1: j = j - 1
+        End If
+    Loop
+    If left < j Then QuickSortByVolCh idxArr, volArr, chArr, left, j
+    If i < right Then QuickSortByVolCh idxArr, volArr, chArr, i, right
+End Sub
+
+'------------------------------------------------------------------------------
+' v3.5 优化：自动判定清洁模式的最小正文字数 N
+'   性能优化：逐行正则计数（避免大字符串拼接）、>1000章用快速排序
 '   规则：收集所有章节正文汉字数，升序排序，在下半区（≤中位数）找最大相邻间隔 gap，
-'         N=间隔中点取整到10，clamp[50,2000]；
+'         N=间隔中点取整到10，clamp[50,1000]；
 '         章节<20 或 gap<50 或 最大gap<次大gap×2 → N=100
 '------------------------------------------------------------------------------
 Private Function AutoNFromBodies(ByRef lines() As String) As Long
     Dim regCn As Object
     Dim cnts() As Long, cnt As Long
     Dim i As Long, j As Long, n As Long
-    Dim bodyText As String, tmp As Long
+    Dim tmp As Long
     Dim lowerCnt As Long, k As Long
     Dim gap As Long, maxGap As Long, maxGapAt As Long, secondGap As Long
     Dim nResult As Long
@@ -515,11 +568,12 @@ Private Function AutoNFromBodies(ByRef lines() As String) As Long
            And Not ch_isTOC(i) Then
             n = ch_ends(i) - ch_starts(i)
             If n > 0 Then
-                bodyText = ""
+                ' v3.5 优化：逐行计数，避免拼接大字符串
+                tmp = 0
                 For j = ch_starts(i) + 1 To ch_ends(i)
-                    bodyText = bodyText & lines(j)
+                    tmp = tmp + regCn.Execute(lines(j)).Count
                 Next j
-                cnts(cnt) = regCn.Execute(bodyText).Count
+                cnts(cnt) = tmp
                 cnt = cnt + 1
             End If
         End If
@@ -531,14 +585,8 @@ Private Function AutoNFromBodies(ByRef lines() As String) As Long
     End If
     ReDim Preserve cnts(0 To cnt - 1)
 
-    ' 升序排序（冒泡）
-    For i = 0 To cnt - 2
-        For j = i + 1 To cnt - 1
-            If cnts(j) < cnts(i) Then
-                tmp = cnts(i): cnts(i) = cnts(j): cnts(j) = tmp
-            End If
-        Next j
-    Next i
+    ' v3.5 优化：全部使用快速排序 O(n log n)
+    QuickSortLong cnts, 0, cnt - 1
 
     ' 在下半区（≤中位数）找最大相邻间隔
     lowerCnt = cnt \ 2 + 1
@@ -569,11 +617,11 @@ Private Function AutoNFromBodies(ByRef lines() As String) As Long
         End If
     End If
 
-    ' N=间隔中点取整到10
+    ' N=间隔中点取整到10，上限锁死 1000
     nResult = (cnts(maxGapAt) + cnts(maxGapAt + 1)) \ 2
     nResult = ((nResult + 5) \ 10) * 10
     If nResult < 50 Then nResult = 50
-    If nResult > 2000 Then nResult = 2000
+    If nResult > 1000 Then nResult = 1000
     AutoNFromBodies = nResult
 
     Set regCn = Nothing
@@ -1438,80 +1486,59 @@ Private Sub SortLISFromIndices(ByVal volMode As String)
 End Sub
 
 '------------------------------------------------------------------------------
-' 在 dedup_indices 基础上按(卷号,章号)完全重排
+' v3.5 优化：在 dedup_indices 基础上按(卷号,章号)完全重排（快速排序版）
 '------------------------------------------------------------------------------
 Private Sub SortFullFromIndices(ByVal volMode As String)
-    Dim n As Long, i As Long, j As Long
-    Dim keys_vol() As Long, keys_ch() As Long
-    Dim origIdxArr() As Long
-    Dim isSpecial() As Boolean
+    Dim n As Long, i As Long
+    Dim nVol() As Long, nCh() As Long, nIdx() As Long  ' normal 数组
+    Dim sIdx() As Long                                    ' special 数组
     Dim specialCnt As Long, normalCnt As Long
+    Dim origIdx As Long
     
     n = dedup_count
     If n = 0 Then Exit Sub
     
-    ReDim keys_vol(0 To n - 1)
-    ReDim keys_ch(0 To n - 1)
-    ReDim origIdxArr(0 To n - 1)
-    ReDim isSpecial(0 To n - 1)
+    ReDim nVol(0 To n - 1)
+    ReDim nCh(0 To n - 1)
+    ReDim nIdx(0 To n - 1)
+    ReDim sIdx(0 To n - 1)
     
     ' 分离 special 和 normal（与去重键逻辑一致：无号+special才算）
     specialCnt = 0
     normalCnt = 0
     For i = 0 To n - 1
-        origIdxArr(i) = dedup_indices(i)
-        If ch_nums(origIdxArr(i)) <= 0 And ch_levels(origIdxArr(i)) = "special" Then
-            isSpecial(i) = True
+        origIdx = dedup_indices(i)
+        If ch_nums(origIdx) <= 0 And ch_levels(origIdx) = "special" Then
+            sIdx(specialCnt) = origIdx
             specialCnt = specialCnt + 1
         Else
-            isSpecial(i) = False
-            keys_vol(i) = ch_vols(origIdxArr(i))
-            If ch_nums(origIdxArr(i)) = 0 Then
-                keys_ch(i) = 999999
+            nIdx(normalCnt) = origIdx
+            nVol(normalCnt) = ch_vols(origIdx)
+            If ch_nums(origIdx) = 0 Then
+                nCh(normalCnt) = 999999
             Else
-                keys_ch(i) = ch_nums(origIdxArr(i))
+                nCh(normalCnt) = ch_nums(origIdx)
             End If
-            If volMode = "flat" Then keys_vol(i) = 0
+            If volMode = "flat" Then nVol(normalCnt) = 0
             normalCnt = normalCnt + 1
         End If
     Next i
     
-    ' 对 normal 章节按 (卷号, 章号) 冒泡排序（数量不大）
-    For i = 0 To n - 2
-        If isSpecial(i) Then GoTo next_sort_i
-        For j = i + 1 To n - 1
-            If isSpecial(j) Then GoTo next_sort_j
-            If keys_vol(i) > keys_vol(j) Or _
-               (keys_vol(i) = keys_vol(j) And keys_ch(i) > keys_ch(j)) Then
-                ' 交换
-                Dim tv As Long, tc As Long, ti As Long
-                Dim ts As Boolean
-                tv = keys_vol(i): keys_vol(i) = keys_vol(j): keys_vol(j) = tv
-                tc = keys_ch(i): keys_ch(i) = keys_ch(j): keys_ch(j) = tc
-                ti = origIdxArr(i): origIdxArr(i) = origIdxArr(j): origIdxArr(j) = ti
-                ts = isSpecial(i): isSpecial(i) = isSpecial(j): isSpecial(j) = ts
-            End If
-next_sort_j:
-        Next j
-next_sort_i:
-    Next i
+    ' v3.5 优化：normal 部分用快速排序 O(n log n)
+    If normalCnt > 1 Then
+        QuickSortByVolCh nIdx, nVol, nCh, 0, normalCnt - 1
+    End If
     
-    ' 写回：special 在前（保持原顺序），normal 在后（按排序后顺序）
+    ' 写回：special 在前（保持原顺序），normal 在后（排序后）
     Dim outIdx As Long
     outIdx = 0
-    ' 先写 special
-    For i = 0 To n - 1
-        If isSpecial(i) Then
-            dedup_indices(outIdx) = origIdxArr(i)
-            outIdx = outIdx + 1
-        End If
+    For i = 0 To specialCnt - 1
+        dedup_indices(outIdx) = sIdx(i)
+        outIdx = outIdx + 1
     Next i
-    ' 再写 normal（排序后的）
-    For i = 0 To n - 1
-        If Not isSpecial(i) Then
-            dedup_indices(outIdx) = origIdxArr(i)
-            outIdx = outIdx + 1
-        End If
+    For i = 0 To normalCnt - 1
+        dedup_indices(outIdx) = nIdx(i)
+        outIdx = outIdx + 1
     Next i
     ' dedup_count 不变
 End Sub
@@ -1763,11 +1790,27 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String, Optional ByVal outputDir A
     AddRptLine lines_arr, rptIdx, "  扁平视角（忽略卷）:"
 
     Set flatMap = CreateObject("Scripting.Dictionary")
+    ' v3.5 优化：同时建立章号信息索引（标题+前5行号），避免Top10时O(M*N)遍历
+    Dim infoMap As Object
+    Set infoMap = CreateObject("Scripting.Dictionary")
     For i = 0 To ch_count - 1
         If ch_levels(i) = "chapter" And ch_nums(i) > 0 Then
             numKey = CStr(ch_nums(i))
-            If Not flatMap.Exists(numKey) Then flatMap.Add numKey, 0
-            flatMap(numKey) = flatMap(numKey) + 1
+            If Not flatMap.Exists(numKey) Then
+                flatMap.Add numKey, 1
+                ' 首次出现：记录标题和行号
+                infoMap.Add numKey, ch_titles(i) & "|" & (ch_starts(i) + 1)
+            Else
+                flatMap(numKey) = flatMap(numKey) + 1
+                ' 后续出现：追加行号（最多5个）
+                Dim infoParts() As String, lineList As String, lineCnt As Long
+                infoParts = Split(infoMap(numKey), "|")
+                lineList = infoParts(1)
+                lineCnt = UBound(Split(lineList, "、")) + 1
+                If lineCnt < 5 Then
+                    infoMap(numKey) = infoParts(0) & "|" & lineList & "、" & (ch_starts(i) + 1)
+                End If
+            End If
         End If
     Next i
 
@@ -1810,22 +1853,11 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String, Optional ByVal outputDir A
                     Next mv
                     topNums(insPos) = CLng(k)
                     topCounts(insPos) = vv
-                    ' 收集该章号的首次标题和前5次行号
-                    Dim occLines As String, occCnt As Long, fi As Long
-                    occLines = "": occCnt = 0
-                    For fi = 0 To ch_count - 1
-                        If ch_levels(fi) = "chapter" And ch_nums(fi) = topNums(insPos) Then
-                            If occCnt = 0 Then
-                                topTitles(insPos) = ch_titles(fi)
-                            End If
-                            If occCnt < 5 Then
-                                If occCnt > 0 Then occLines = occLines & "、"
-                                occLines = occLines & (ch_starts(fi) + 1)
-                            End If
-                            occCnt = occCnt + 1
-                        End If
-                    Next fi
-                    topLineInfo(insPos) = occLines
+                    ' v3.5 优化：直接从预建索引取标题和行号（O(1)，不再O(N)遍历）
+                    Dim infoArr() As String
+                    infoArr = Split(infoMap(CStr(k)), "|")
+                    topTitles(insPos) = infoArr(0)
+                    topLineInfo(insPos) = infoArr(1)
                     If topCount < 10 Then topCount = topCount + 1
                 End If
             End If
@@ -1905,6 +1937,7 @@ NextNumKey:
         Set titleDiffDict = Nothing
         Set titleDiffCntDict = Nothing
     End If
+    Set infoMap = Nothing
     Set flatMap = Nothing
     AddRptLine lines_arr, rptIdx, ""
 
@@ -2628,23 +2661,22 @@ Public Sub SplitByChapterV3(ByVal InputPath As String, _
     Dim serialFmt As String
     serialFmt = String(SerialWidth, "0")
 
-    ' 7. 预计算字数
+    ' 7. 预计算字数（v3.5 优化：逐行累加，避免拼接大字符串）
     Dim charCounts() As Long, maxChars As Long, charWidth As Long, charFmt As String
     ReDim charCounts(0 To dedup_count - 1)
     maxChars = 0
     Dim i As Long, j As Long, n As Long
-    Dim bodyLines() As String, body As String
     For i = 0 To dedup_count - 1
         Dim origIdx As Long
         origIdx = dedup_indices(i)
         n = ch_ends(origIdx) - ch_starts(origIdx) + 1
         If n < 1 Then n = 1
-        ReDim bodyLines(0 To n - 1)
+        charCounts(i) = 0
         For j = 0 To n - 1
-            bodyLines(j) = lines(ch_starts(origIdx) + j)
+            charCounts(i) = charCounts(i) + Len(lines(ch_starts(origIdx) + j))
         Next j
-        body = Join(bodyLines, vbLf)
-        charCounts(i) = Len(body)
+        ' 加上换行符数（和之前 Join(vbLf) 结果一致）
+        If n > 1 Then charCounts(i) = charCounts(i) + (n - 1)
         If charCounts(i) > maxChars Then maxChars = charCounts(i)
     Next i
     charWidth = Len(CStr(maxChars))
@@ -2682,15 +2714,12 @@ Public Sub SplitByChapterV3(ByVal InputPath As String, _
         Next j
         body = Join(bodyLines, vbLf)
 
-        ' 正文汉字数
+        ' v3.5 优化：正文汉字数（逐行计数，避免拼接大字符串）
         If n > 1 Then
-            Dim bodyText As String
-            ReDim bodyLines(0 To n - 2)
-            For j = 0 To n - 2
-                bodyLines(j) = lines(ch_starts(origIdx) + 1 + j)
+            bodyLen = 0
+            For j = ch_starts(origIdx) + 1 To ch_ends(origIdx)
+                bodyLen = bodyLen + regCn.Execute(lines(j)).Count
             Next j
-            bodyText = Join(bodyLines, "")
-            bodyLen = regCn.Execute(bodyText).Count
         Else
             bodyLen = 0
         End If
