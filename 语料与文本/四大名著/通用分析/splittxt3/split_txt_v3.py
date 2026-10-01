@@ -1412,7 +1412,7 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
             f.write('\n'.join(skipped_texts))
         print(f"合并文件：{skipped_name}（{len(skipped_texts)}章合并）")
 
-    # ===== 报告（v3.4：总-分结构；v3.5：清洁模式同时落盘 分析报告.txt，凑齐四件套） =====
+    # ===== 报告（v3.4：总-分结构；v3.5：清洁模式落盘 拆分完成报告.txt，与VBA版一致） =====
     mode_label = f"清洁模式(N={min_body_len})" if merge_flag is not None else "拆分"
     src_name_r = os.path.splitext(os.path.basename(src))[0]
     rpt = []
@@ -1449,7 +1449,8 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
         print(_line)
     if merge_flag is not None:
         _rdir = merge_dir if merge_dir else out_dir
-        with open(os.path.join(_rdir, "分析报告.txt"), 'w', encoding='utf-8') as _f:
+        # v3.5：改名为"拆分完成报告.txt"，与VBA版一致（避免与深度"分析报告.txt"混淆）
+        with open(os.path.join(_rdir, "拆分完成报告.txt"), 'w', encoding='utf-8') as _f:
             _f.write('\n'.join(rpt) + '\n')
 
 
@@ -1780,7 +1781,7 @@ def main():
             _out = args.out
             _mdir = None
             if merge_flag is not None:
-                # v3.5: 清洁模式固定四件套结构（拆分文档\ + 双合并 + 分析报告.txt 在输出根目录）
+                # v3.5: 清洁模式固定五件套结构（拆分文档\ + 双合并 + 分析报告.txt + 拆分完成报告.txt 在输出根目录）
                 if not _out:
                     _out = os.path.splitext(os.path.basename(args.src))[0] + "_自动"
                 _mdir = _out

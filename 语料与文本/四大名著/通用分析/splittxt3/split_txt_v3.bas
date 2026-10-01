@@ -1304,239 +1304,9 @@ End Sub
 ' 策略4：最长递增子序列（LIS）—— O(n log n)
 '   排序键：(卷号, 章号)，严格递增
 '------------------------------------------------------------------------------
-Private Sub DedupLIS(ByVal volMode As String, _
-        ByRef outIndices() As Long, ByRef outCount As Long, _
-        Optional ByVal titleDedup As Boolean = False)
-    Dim chapIdx() As Long, chapCnt As Long
-    Dim n As Long, i As Long
-    Dim tails() As Long, tailVals_vol() As Long, tailVals_ch() As Long
-    Dim prevArr() As Long, lisIdx() As Long
-    Dim left As Long, right As Long, pos As Long
-    Dim curr As Long, cnt As Long
-    Dim tailLen As Long
-    Dim vol_i As Long, ch_i As Long
-    Dim mid As Long
-    
-    ' v3.3 标题级去重：先按标题键去重，再做LIS排序
-    If titleDedup Then
-        Dim tmpIdx() As Long, tmpCnt As Long
-        Dim seenDict As Object, tKey As String, tOrder As Object
-        Set seenDict = CreateObject("Scripting.Dictionary")
-        Set tOrder = CreateObject("Scripting.Dictionary")
-        
-        GetChapterIndices chapIdx, chapCnt
-        If chapCnt = 0 Then outCount = 0: Exit Sub
-        
-        For i = 0 To chapCnt - 1
-            If ch_nums(chapIdx(i)) <= 0 And ch_levels(chapIdx(i)) = "special" Then
-                tKey = "S|" & ch_titles(chapIdx(i))
-            Else
-                tKey = DedupKey(chapIdx(i), volMode, True)
-            End If
-            If Not seenDict.Exists(tKey) Then
-                seenDict.Add tKey, chapIdx(i)
-                tOrder.Add tOrder.Count, tKey
-            End If
-        Next i
-        
-        tmpCnt = tOrder.Count
-        ReDim tmpIdx(0 To tmpCnt - 1)
-        For i = 0 To tmpCnt - 1
-            tmpIdx(i) = seenDict(tOrder(i))
-        Next i
-        
-        ' 用去重后的结果做LIS
-        Erase chapIdx
-        ReDim chapIdx(0 To tmpCnt - 1)
-        For i = 0 To tmpCnt - 1
-            chapIdx(i) = tmpIdx(i)
-        Next i
-        n = tmpCnt
-        
-        Set seenDict = Nothing
-        Set tOrder = Nothing
-    Else
-        GetChapterIndices chapIdx, chapCnt
-        If chapCnt = 0 Then outCount = 0: Exit Sub
-        n = chapCnt
-    End If
-
-    ReDim tails(0 To n - 1)
-    ReDim tailVals_vol(0 To n - 1)
-    ReDim tailVals_ch(0 To n - 1)
-    ReDim prevArr(0 To n - 1)
-    For i = 0 To n - 1
-        prevArr(i) = -1
-    Next i
-
-    tailLen = 0
-
-    For i = 0 To n - 1
-        vol_i = ch_vols(chapIdx(i))
-        ch_i = ch_nums(chapIdx(i))
-        If ch_i = 0 Then ch_i = -1  ' 无号章节放最前面
-        If volMode = "flat" Then vol_i = 0
-
-        ' 二分查找：找第一个 >= (vol_i, ch_i) 的位置
-        left = 0: right = tailLen
-        Do While left < right
-            mid = (left + right) \ 2
-            If tailVals_vol(mid) < vol_i Then
-                left = mid + 1
-            ElseIf tailVals_vol(mid) > vol_i Then
-                right = mid
-            Else
-                ' 卷号相同，比较章号
-                If tailVals_ch(mid) < ch_i Then
-                    left = mid + 1
-                Else
-                    right = mid
-                End If
-            End If
-        Loop
-        pos = left
-
-        If pos = tailLen Then
-            tailVals_vol(tailLen) = vol_i
-            tailVals_ch(tailLen) = ch_i
-            tails(tailLen) = i
-            tailLen = tailLen + 1
-        Else
-            tailVals_vol(pos) = vol_i
-            tailVals_ch(pos) = ch_i
-            tails(pos) = i
-        End If
-
-        If pos > 0 Then
-            prevArr(i) = tails(pos - 1)
-        End If
-    Next i
-
-    ' 回溯
-    ReDim lisIdx(0 To tailLen - 1)
-    curr = tails(tailLen - 1)
-    cnt = tailLen
-    Do While curr <> -1
-        cnt = cnt - 1
-        lisIdx(cnt) = curr
-        curr = prevArr(curr)
-        If cnt = 0 Then Exit Do
-    Loop
-    ' 修正：上面循环可能有问题，重新回溯
-    ReDim lisIdx(0 To tailLen - 1)
-    curr = tails(tailLen - 1)
-    For i = tailLen - 1 To 0 Step -1
-        lisIdx(i) = curr
-        If i > 0 Then curr = prevArr(curr)
-    Next i
-
-    ' 输出
-    ReDim outIndices(0 To tailLen - 1)
-    For i = 0 To tailLen - 1
-        outIndices(i) = chapIdx(lisIdx(i))
-    Next i
-    outCount = tailLen
-End Sub
-
+' v3.4.1：已删除 DedupLIS / DedupSort / ParseDedupKey 三个死代码函数
+'   （旧版"去重即排序"架构遗留，现由 ApplyDedup + ApplySort 两段式架构替代）
 '------------------------------------------------------------------------------
-' 策略5：按（卷号,章号）重新排序
-'------------------------------------------------------------------------------
-Private Sub DedupSort(ByVal volMode As String, _
-        ByRef outIndices() As Long, ByRef outCount As Long, _
-        Optional ByVal titleDedup As Boolean = False)
-    Dim chapIdx() As Long, chapCnt As Long
-    Dim i As Long, j As Long
-    Dim best As Object, orderKeys As Object
-    Dim key As String
-    Dim specialKeys As Object, normalKeys As Object
-    Dim k As Variant
-    Dim nc As Long
-    Dim ki As String, kj As String
-    Dim vi As Long, ci As Long, vj As Long, cj As Long
-    Dim totalCnt As Long, idx As Long
-
-    Set best = CreateObject("Scripting.Dictionary")
-    Set orderKeys = CreateObject("Scripting.Dictionary")
-    Set specialKeys = CreateObject("Scripting.Dictionary")
-    Set normalKeys = CreateObject("Scripting.Dictionary")
-
-    GetChapterIndices chapIdx, chapCnt
-    If chapCnt = 0 Then outCount = 0: Exit Sub
-
-    ' 第一步：找每个key的最佳（最长）
-    For i = 0 To chapCnt - 1
-        If ch_nums(chapIdx(i)) <= 0 And ch_levels(chapIdx(i)) = "special" Then
-            key = "S|" & ch_titles(chapIdx(i))
-        Else
-            key = DedupKey(chapIdx(i), volMode, titleDedup)
-        End If
-
-        If Not best.Exists(key) Then
-            best.Add key, chapIdx(i)
-        Else
-            If ch_bodyLines(chapIdx(i)) > ch_bodyLines(best(key)) Then
-                best(key) = chapIdx(i)
-            End If
-        End If
-    Next i
-
-    ' 第二步：分离 special 和 normal，分别排序
-    For Each k In best.Keys
-        If Left(k, 2) = "S|" Then
-            specialKeys.Add specialKeys.Count, k
-        Else
-            normalKeys.Add normalKeys.Count, k
-        End If
-    Next k
-
-    ' 对 normalKeys 按 (卷号, 章号) 排序（简单冒泡，数量不大）
-    nc = normalKeys.Count
-    For i = 0 To nc - 2
-        For j = i + 1 To nc - 1
-            ki = normalKeys(i): kj = normalKeys(j)
-            ParseDedupKey ki, volMode, vi, ci
-            ParseDedupKey kj, volMode, vj, cj
-            If vi > vj Or (vi = vj And ci > cj) Then
-                normalKeys(i) = kj: normalKeys(j) = ki
-            End If
-        Next j
-    Next i
-
-    ' 合并输出：special在前，normal在后
-    totalCnt = specialKeys.Count + normalKeys.Count
-    ReDim outIndices(0 To totalCnt - 1)
-    idx = 0
-    For i = 0 To specialKeys.Count - 1
-        outIndices(idx) = best(specialKeys(i))
-        idx = idx + 1
-    Next i
-    For i = 0 To normalKeys.Count - 1
-        outIndices(idx) = best(normalKeys(i))
-        idx = idx + 1
-    Next i
-
-    outCount = totalCnt
-    Set best = Nothing
-    Set orderKeys = Nothing
-    Set specialKeys = Nothing
-    Set normalKeys = Nothing
-End Sub
-
-'------------------------------------------------------------------------------
-' 解析去重键（用于排序比较）
-'------------------------------------------------------------------------------
-Private Sub ParseDedupKey(ByVal key As String, ByVal volMode As String, _
-        ByRef volNum As Long, ByRef chNum As Long)
-    Dim parts() As String
-    parts = Split(key, "|")
-    If parts(0) = "F" Then
-        volNum = 0
-        chNum = CLng(parts(1))
-    Else
-        volNum = CLng(parts(1))
-        chNum = CLng(parts(2))
-    End If
-End Sub
 
 '------------------------------------------------------------------------------
 ' 执行去重（调度函数）
@@ -2726,19 +2496,11 @@ Public Sub 自动TXTv3()
     ' 生成分析报告
     DeepAnalyzeFile filePath, autoDir
 
-    ' 拆分（清洁模式，MergeFlag=2）
+    ' 拆分（清洁模式，MergeFlag=2，合并文件直接写到 autoDir）
     SplitByChapterV3 InputPath:=filePath, OutputDir:=autoSubDir, _
-                     GenerateTitleOnly:=False, MinBodyLen:=autoN, MergeFlag:=2
+                     GenerateTitleOnly:=False, MinBodyLen:=autoN, _
+                     MergeFlag:=2, MergeOutputDir:=autoDir
 
-    ' 把合并文件从 autoSubDir 移到 autoDir
-    On Error Resume Next
-    Dim mvFile As Object
-    For Each mvFile In fso.GetFolder(autoSubDir).Files
-        If InStr(mvFile.Name, "保留大于等于") > 0 Or InStr(mvFile.Name, "清理小于") > 0 Then
-            fso.MoveFile mvFile.Path, autoDir & "\"
-        End If
-    Next mvFile
-    On Error GoTo 0
 End Sub
 
 
@@ -2786,7 +2548,8 @@ Public Sub SplitByChapterV3(ByVal InputPath As String, _
                             Optional ByVal SerialWidth As Long = 3, _
                             Optional ByVal GenerateTitleOnly As Boolean = False, _
                             Optional ByVal MinBodyLen As Long = 0, _
-                            Optional ByVal MergeFlag As Long = -1)
+                            Optional ByVal MergeFlag As Long = -1, _
+                            Optional ByVal MergeOutputDir As String = "")
     Dim fso As Object
     Dim content As String
     Dim lines() As String, lineCount As Long
@@ -3030,18 +2793,28 @@ NextChapterV3:
     If MergeFlag >= 0 Then
         Dim srcBaseName As String
         Dim mergeName2 As String, mergeBody2 As String
+        Dim mergeDir As String
         srcBaseName = fso.GetBaseName(InputPath)
+        
+        ' v3.4.1：优先使用 MergeOutputDir，否则用 outDirFull
+        If Len(MergeOutputDir) > 0 Then
+            mergeDir = MergeOutputDir
+        Else
+            mergeDir = outDirFull
+        End If
+        ' 确保目录存在
+        If Dir(mergeDir, vbDirectory) = "" Then MkDir mergeDir
 
         If keptTexts.Count > 0 Then
             mergeName2 = "保留大于等于" & MinBodyLen & "_" & srcBaseName & ".txt"
             mergeBody2 = JoinCollection(keptTexts)
-            WriteTextUTF8NoBOM outDirFull & "\" & mergeName2, mergeBody2
+            WriteTextUTF8NoBOM mergeDir & "\" & mergeName2, mergeBody2
             Debug.Print "合并文件：" & mergeName2 & "（" & keptTexts.Count & "章合并）"
         End If
         If MergeFlag = 2 And skippedTexts.Count > 0 Then
             mergeName2 = "清理小于" & MinBodyLen & "_" & srcBaseName & ".txt"
             mergeBody2 = JoinCollection(skippedTexts)
-            WriteTextUTF8NoBOM outDirFull & "\" & mergeName2, mergeBody2
+            WriteTextUTF8NoBOM mergeDir & "\" & mergeName2, mergeBody2
             Debug.Print "合并文件：" & mergeName2 & "（" & skippedTexts.Count & "章合并）"
         End If
     End If
@@ -3075,8 +2848,16 @@ NextChapterV3:
         rptTitle = "按章节拆分"
     End If
 
+    ' v3.4.1：拆分完成报告文件路径
+    Dim rptPath As String
+    If MergeFlag >= 0 And Len(mergeDir) > 0 Then
+        rptPath = mergeDir & "\拆分完成报告.txt"
+    Else
+        rptPath = ""
+    End If
+
     ShowCompleteReportV3 rptTitle, writtenCount, outDirFull, _
-                         tRead, tScan, tDedup, tWrite, extraInfo
+                         tRead, tScan, tDedup, tWrite, extraInfo, rptPath
     Exit Sub
 
 WriteErrV3:
@@ -3343,7 +3124,8 @@ End Function
 Private Sub ShowCompleteReportV3(ByVal title As String, ByVal fileCount As Long, _
         ByVal outDir As String, ByVal tRead As Double, _
         ByVal tScan As Double, ByVal tDedup As Double, _
-        ByVal tWrite As Double, Optional ByVal extraInfo As String = "")
+        ByVal tWrite As Double, Optional ByVal extraInfo As String = "", _
+        Optional ByVal ReportPath As String = "")
     ' v3.4：重构为 总-分 结构
     Dim tTotal As Double, msg As String
     Dim skippedTotal As Long
@@ -3400,6 +3182,12 @@ Private Sub ShowCompleteReportV3(ByVal title As String, ByVal fileCount As Long,
 
     If Len(extraInfo) > 0 Then
         msg = msg & vbCrLf & extraInfo
+    End If
+    
+    ' v3.4.1：写入拆分完成报告文件
+    If Len(ReportPath) > 0 Then
+        WriteTextUTF8NoBOM ReportPath, msg
+        Debug.Print "完成报告：" & ReportPath
     End If
 
     MsgBox msg, vbInformation, "完成"
