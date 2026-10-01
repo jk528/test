@@ -2739,6 +2739,7 @@ Public Sub SplitByChapterV3(ByVal InputPath As String, _
     Dim top1 As Long, top2 As Long, top3 As Long, topStr As String
     Dim keptTexts As Collection, skippedTexts As Collection
     Dim skippedTitles As Collection, skippedBodyLens As Collection
+    Dim body As String, bodyLines() As String
     titleOnlyCount = 0: writtenCount = 0: skippedCount = 0
     shortBodyCount = 0: top1 = 0: top2 = 0: top3 = 0
     Set keptTexts = New Collection
