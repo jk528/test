@@ -621,12 +621,16 @@ function SelectRegexPattern() {
 
     // 处理自定义正则
     if (hasCustom) {
+        // v3.6 优化：更宽泛的默认值，允许缩进+可选第字+多种单位词，减少用户输入
+        var defaultPat = "^[ \\t　]*(?:第)?([0-9０-９一二三四五六七八九十百千万亿零〇○两]+)[章回节卷篇集话]?.*$";
         var customPattern = Application.InputBox("请输入自定义正则表达式：\n\n" +
                               "示例：\n" +
                               "  ^第(\\d+)章\\s*(.*)$\n" +
                               "  ^卷(\\d+)\\s*(.*)$\n\n" +
+                              "默认值（宽泛匹配：缩进+可选第+章/回/节/卷等）：\n" +
+                              "  " + defaultPat + "\n\n" +
                               "提示：数字建议写 [0-9０-９] 同时匹配半角/全角。",
-                              "自定义正则", "", 100, 100, "", 0, 2);
+                              "自定义正则", defaultPat, 100, 100, "", 0, 2);
         if (customPattern === false) return false;
         customPattern = trimStr(String(customPattern));
         if (customPattern.length === 0) return false;

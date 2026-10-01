@@ -257,12 +257,17 @@ Private Function SelectRegexPattern() As Boolean
     ' 处理自定义正则
     If hasCustom Then
         Dim customPattern As String
+        Dim defaultPat As String
+        ' v3.6 优化：更宽泛的默认值，允许缩进+可选第字+多种单位词，减少用户输入
+        defaultPat = "^[ \t　]*(?:第)?([0-9０-９一二三四五六七八九十百千万亿零〇○两]+)[章回节卷篇集话]?.*$"
         customPattern = InputBox("请输入自定义正则表达式：" & vbCrLf & vbCrLf & _
                                   "示例：" & vbCrLf & _
                                   "  ^第(\d+)章\s*(.*)$" & vbCrLf & _
                                   "  ^卷(\d+)\s*(.*)$" & vbCrLf & vbCrLf & _
+                                  "默认值（宽泛匹配：缩进+可选第+章/回/节/卷等）：" & vbCrLf & _
+                                  "  " & defaultPat & vbCrLf & vbCrLf & _
                                   "提示：数字建议写 [0-9０-９] 同时匹配半角/全角。", _
-                                  "自定义正则", "")
+                                  "自定义正则", defaultPat)
         If StrPtr(customPattern) = 0 Then
             SelectRegexPattern = False
             Exit Function

@@ -444,7 +444,7 @@ def auto_decide_n(chapters, lines):
     return n, f'下半区最大间隔{gap_lo}~{gap_hi}字，取中点得N={n}'
 
 
-def scan_structures(lines):
+def scan_structures(lines, extra_patterns=None):
     """扫描所有层级结构（卷+章），返回结构化数据
 
     返回: chapters 列表，每个元素是 dict：
@@ -464,6 +464,16 @@ def scan_structures(lines):
     current_vol = None  # 当前卷号
     current_vol_unit = None
     current_vol_title = None
+
+    # v3.6：支持追加自定义正则
+    chapter_patterns = list(CHAPTER_PATTERNS)
+    if extra_patterns:
+        for pat_str in extra_patterns:
+            try:
+                pat = re.compile(pat_str)
+                chapter_patterns.append((pat, 'custom'))
+            except re.error:
+                print(f"[警告] 自定义正则无效，已跳过: {pat_str}")
 
     for i, line in enumerate(lines):
         # v3.4：先归一化再匹配（仅影响匹配，title 仍取原始行）
@@ -525,7 +535,7 @@ def scan_structures(lines):
             continue
 
         # 最后尝试章节级标题（按优先级）
-        for pat, ptype in CHAPTER_PATTERNS:
+        for pat, ptype in chapter_patterns:
             m = pat.match(line_stripped)
             if m:
                 if ptype == 'standard':
@@ -548,6 +558,17 @@ def scan_structures(lines):
                     ch_num = 0  # 无号章节标记为0
                     ch_unit = '章'
                     sub = m.group(1) + ((' ' + m.group(2)) if m.group(2) else '')
+                elif ptype == 'custom':
+                    # v3.6：自定义正则，捕获组1作为章号
+                    try:
+                        ch_num = cn_to_int(m.group(1))
+                    except (ValueError, IndexError):
+                        ch_num = 0
+                    ch_unit = '章'
+                    sub = ''
+                    # 如果有第2个捕获组，作为子标题
+                    if m.lastindex and m.lastindex >= 2:
+                        sub = m.group(2) or ''
                 else:
                     continue
 
@@ -813,7 +834,7 @@ SORT_STRATEGIES = {
 # ===========================================================================
 # 深度分析报告（v3.4：总-分结构，返回报告文本，print 由调用方做）
 # ===========================================================================
-def load_and_scan(file_path, encoding=None, ad_clean=True):
+def load_and_scan(file_path, encoding=None, ad_clean=True, extra_patterns=None):
     """读取→(可选)广告清理→扫描→目录区检测
     返回 (lines, structures, chapters, volumes, toc_count, ad_removed, enc)"""
     if encoding:
@@ -829,20 +850,20 @@ def load_and_scan(file_path, encoding=None, ad_clean=True):
     if ad_clean:
         lines, ad_removed = clean_ad_lines(lines)
 
-    structures = scan_structures(lines)
+    structures = scan_structures(lines, extra_patterns=extra_patterns)
     chapters = get_chapters_only(structures)
     volumes = get_volumes(structures)
     toc_count = detect_toc(chapters)
     return lines, structures, chapters, volumes, toc_count, ad_removed, enc
 
 
-def deep_analyze(file_path, encoding=None, ad_clean=False):
+def deep_analyze(file_path, encoding=None, ad_clean=False, extra_patterns=None):
     """深度分析：全面诊断所有问题。返回报告文本（总-分结构）"""
     out = []
     p = out.append
 
     lines, structures, chapters_all, volumes, toc_count, ad_removed, enc = \
-        load_and_scan(file_path, encoding, ad_clean)
+        load_and_scan(file_path, encoding, ad_clean, extra_patterns=extra_patterns)
     content_len = sum(len(l) for l in lines) + len(lines)
 
     # 目录区章节不参与分析
@@ -1263,14 +1284,14 @@ def format_range(ch_start, ch_end, unit):
 def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
                      dedup_strategy='longest', sort_strategy='sort', volume_mode='auto',
                      generate_title_only=False, min_body_len=0, merge_flag=None,
-                     title_dedup=True, ad_clean=False, merge_dir=None):
+                     title_dedup=True, ad_clean=False, merge_dir=None, extra_patterns=None):
     """按章节一一拆分"""
     t_total0 = time.time()
 
     # 1. 读取 + 广告清理 + 扫描 + 目录区检测
     t0 = time.time()
     lines, structures, all_chapters_raw, volumes, toc_count, ad_removed, enc = \
-        load_and_scan(src, encoding, ad_clean)
+        load_and_scan(src, encoding, ad_clean, extra_patterns=extra_patterns)
     t_read = time.time() - t0
     print(f"编码: {enc}")
     print(f"源文件: {src}")
@@ -1495,7 +1516,7 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
 def split_by_groups(src, chunk_str="40,3", out_dir="", prefix="",
                     serial_width=3, encoding=None, dedup_strategy='longest',
                     sort_strategy='sort', volume_mode='auto', title_dedup=True,
-                    ad_clean=False):
+                    ad_clean=False, extra_patterns=None):
     """聚合拆分"""
     import math
 
@@ -1503,7 +1524,7 @@ def split_by_groups(src, chunk_str="40,3", out_dir="", prefix="",
 
     t0 = time.time()
     lines, structures, all_chapters_raw, volumes, toc_count, ad_removed, enc = \
-        load_and_scan(src, encoding, ad_clean)
+        load_and_scan(src, encoding, ad_clean, extra_patterns=extra_patterns)
     t_read = time.time() - t0
     print(f"编码: {enc}")
     print(f"源文件: {src}")
@@ -1677,7 +1698,7 @@ def clean_output_dir(out_dir):
 #   读取+清理+扫描+目录区检测 → 深度分析 → 自动决策 → 执行清洁模式输出
 # ===========================================================================
 def auto_process(src, encoding=None, volume_mode='auto', title_dedup=True,
-                 ad_clean=False):
+                 ad_clean=False, extra_patterns=None):
     """全自动模式：一键完成分析、决策与清洁输出"""
     src_name = os.path.splitext(os.path.basename(src))[0]
     auto_dir = os.path.join(os.path.dirname(os.path.abspath(src)),
@@ -1687,7 +1708,8 @@ def auto_process(src, encoding=None, volume_mode='auto', title_dedup=True,
     print()
 
     # 1. 深度分析（总-分报告）
-    report = deep_analyze(src, encoding=encoding, ad_clean=ad_clean)
+    report = deep_analyze(src, encoding=encoding, ad_clean=ad_clean,
+                          extra_patterns=extra_patterns)
     report_path = os.path.join(auto_dir, '分析报告.txt')
     write_text_utf8_nobom(report_path, report)
     print(report)
@@ -1716,7 +1738,7 @@ def auto_process(src, encoding=None, volume_mode='auto', title_dedup=True,
                      dedup_strategy=dedup_strategy, sort_strategy=sort_strategy,
                      volume_mode=volume_mode, min_body_len=n_value, merge_flag=1,
                      title_dedup=title_dedup, ad_clean=ad_clean,
-                     merge_dir=auto_dir)
+                     merge_dir=auto_dir, extra_patterns=extra_patterns)
 
 
 # ===========================================================================
@@ -1786,19 +1808,30 @@ def main():
                         help="广告/垃圾行清理（默认关闭）：网址/推广语/分页提示/求票/分隔线等7类规则")
     parser.add_argument("--no-ad-clean", dest="ad_clean", action="store_false",
                         help="关闭广告/垃圾行清理（默认行为，保留原文）")
+    parser.add_argument("--custom-regex", default=None,
+                        help="自定义章节正则（追加到内置规则之后）。用捕获组1作为章号。"
+                             "支持多个，用 | 分隔。"
+                             "宽泛默认值参考：^[ \\t　]*(?:第)?([0-9０-９一二三四五六七八九十百千万亿零〇○两]+)[章回节卷篇集话]?.*$")
     args = parser.parse_args()
+
+    # v3.6：解析自定义正则（支持多个，用 | 分隔）
+    extra_patterns = None
+    if args.custom_regex:
+        extra_patterns = [p.strip() for p in args.custom_regex.split('|') if p.strip()]
 
     if args.analyze:
         if not args.src:
             parser.error("--analyze 需要 --src 参数")
-        print(deep_analyze(args.src, encoding=args.encoding, ad_clean=args.ad_clean))
+        print(deep_analyze(args.src, encoding=args.encoding, ad_clean=args.ad_clean,
+                           extra_patterns=extra_patterns))
         return
 
     if args.auto:
         if not args.src:
             parser.error("--auto 需要 --src 参数")
         auto_process(args.src, encoding=args.encoding, volume_mode=args.volume_mode,
-                     title_dedup=args.title_dedup, ad_clean=args.ad_clean)
+                     title_dedup=args.title_dedup, ad_clean=args.ad_clean,
+                     extra_patterns=extra_patterns)
         return
 
     if not args.src:
@@ -1828,13 +1861,13 @@ def main():
                              args.encoding, args.dedup, args.sort, args.volume_mode,
                              args.keep_title_only, args.min_body_len, merge_flag,
                              title_dedup=args.title_dedup, ad_clean=args.ad_clean,
-                             merge_dir=_mdir)
+                             merge_dir=_mdir, extra_patterns=extra_patterns)
         else:
             chunk_str = args.chunk if args.chunk else "40,3"
             split_by_groups(args.src, chunk_str, args.out, args.prefix,
                             args.serial_width, args.encoding, args.dedup,
                             args.sort, args.volume_mode, title_dedup=args.title_dedup,
-                            ad_clean=args.ad_clean)
+                            ad_clean=args.ad_clean, extra_patterns=extra_patterns)
     except ValueError as e:
         print(f"[错误] {e}")
         sys.exit(1)
