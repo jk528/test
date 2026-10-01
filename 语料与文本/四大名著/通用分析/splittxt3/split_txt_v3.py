@@ -1412,19 +1412,20 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
             f.write('\n'.join(skipped_texts))
         print(f"合并文件：{skipped_name}（{len(skipped_texts)}章合并）")
 
-    # ===== 报告（v3.4：总-分结构） =====
+    # ===== 报告（v3.4：总-分结构；v3.5：清洁模式同时落盘 分析报告.txt，凑齐四件套） =====
     mode_label = f"清洁模式(N={min_body_len})" if merge_flag is not None else "拆分"
-    print()
-    print("=" * 60)
-    print(f"【总】{mode_label}完成：共生成 {written_count} 个文件")
-    print(f"  输出目录: {out_dir}")
-    print(f"  总耗时: {t_total:.2f} 秒")
-    print("-" * 60)
-    print("【分】详细统计")
-    print(f"  来源: 编码{enc} / 总行数{len(lines):,} / 识别章节{len(all_chapters_raw)}"
-          + (f"（目录区跳过{toc_count}）" if toc_count > 0 else ""))
-    print(f"  质量: 去重{dedup_strategy}(减少{dedup_removed}章) / "
-          f"排序{sort_strategy}(修序{ooo_fixed}处) / 卷模式{actual_vol_mode}")
+    src_name_r = os.path.splitext(os.path.basename(src))[0]
+    rpt = []
+    rpt.append("=" * 60)
+    rpt.append(f"【总】{mode_label}完成：共生成 {written_count} 个文件")
+    rpt.append(f"  输出目录: {out_dir}")
+    rpt.append(f"  总耗时: {t_total:.2f} 秒")
+    rpt.append("-" * 60)
+    rpt.append("【分】详细统计")
+    rpt.append(f"  来源: 编码{enc} / 总行数{len(lines):,} / 识别章节{len(all_chapters_raw)}"
+               + (f"（目录区跳过{toc_count}）" if toc_count > 0 else ""))
+    rpt.append(f"  质量: 去重{dedup_strategy}(减少{dedup_removed}章) / "
+               f"排序{sort_strategy}(修序{ooo_fixed}处) / 卷模式{actual_vol_mode}")
     parts = []
     if title_only_count > 0:
         parts.append(f"{title_only_count}个仅有标题")
@@ -1433,11 +1434,23 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
     skip_desc = '、'.join(parts) if parts else '无'
     top3 = sorted(skipped_body_lens, reverse=True)[:3]
     top3_str = '、'.join(f'{x}字' for x in top3) if top3 else '无'
-    print(f"  清理: 广告行移除{ad_removed} / 跳过{skipped_count}章({skip_desc}) / "
-          f"前三正文字数: {top3_str}")
-    print(f"  计时: 读取{t_read:.2f}s / 识别{t_scan:.2f}s / 去重{t_dedup:.2f}s / "
-          f"排序{t_sort:.2f}s / 写入{t_write:.2f}s")
-    print("=" * 60)
+    rpt.append(f"  清理: 广告行移除{ad_removed} / 跳过{skipped_count}章({skip_desc}) / "
+               f"前三正文字数: {top3_str}")
+    rpt.append(f"  计时: 读取{t_read:.2f}s / 识别{t_scan:.2f}s / 去重{t_dedup:.2f}s / "
+               f"排序{t_sort:.2f}s / 写入{t_write:.2f}s")
+    if merge_flag is not None:
+        rpt.append("-" * 60)
+        rpt.append(f"  文件清单: 保留大于等于{min_body_len}_{src_name_r}.txt（{len(kept_texts)}章） / "
+                   f"清理小于{min_body_len}_{src_name_r}.txt（{len(skipped_texts)}章） / "
+                   f"拆分文档\\（{written_count}个单章文件）")
+    rpt.append("=" * 60)
+    print()
+    for _line in rpt:
+        print(_line)
+    if merge_flag is not None:
+        _rdir = merge_dir if merge_dir else out_dir
+        with open(os.path.join(_rdir, "分析报告.txt"), 'w', encoding='utf-8') as _f:
+            _f.write('\n'.join(rpt) + '\n')
 
 
 def split_by_groups(src, chunk_str="40,3", out_dir="", prefix="",
@@ -1467,6 +1480,10 @@ def split_by_groups(src, chunk_str="40,3", out_dir="", prefix="",
         actual_vol_mode = 'volume' if volumes else 'flat'
     else:
         actual_vol_mode = volume_mode if volume_mode != 'by_volume' else 'volume'
+    # v3.5: 聚合优先级大于卷——聚合按全局章号连续切块，卷分组无意义，强制扁平
+    if actual_vol_mode != 'flat':
+        actual_vol_mode = 'flat'
+        print("卷模式: 聚合拆分优先 → 强制扁平（忽略卷结构）")
 
     # 去重
     chapters = all_chapters
@@ -1760,10 +1777,19 @@ def main():
 
     try:
         if mode == "chapter":
-            split_by_chapter(args.src, args.out, args.prefix, args.serial_width,
+            _out = args.out
+            _mdir = None
+            if merge_flag is not None:
+                # v3.5: 清洁模式固定四件套结构（拆分文档\ + 双合并 + 分析报告.txt 在输出根目录）
+                if not _out:
+                    _out = os.path.splitext(os.path.basename(args.src))[0] + "_自动"
+                _mdir = _out
+                _out = os.path.join(_out, "拆分文档")
+            split_by_chapter(args.src, _out, args.prefix, args.serial_width,
                              args.encoding, args.dedup, args.sort, args.volume_mode,
                              args.keep_title_only, args.min_body_len, merge_flag,
-                             title_dedup=args.title_dedup, ad_clean=args.ad_clean)
+                             title_dedup=args.title_dedup, ad_clean=args.ad_clean,
+                             merge_dir=_mdir)
         else:
             chunk_str = args.chunk if args.chunk else "40,3"
             split_by_groups(args.src, chunk_str, args.out, args.prefix,

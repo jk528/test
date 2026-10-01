@@ -3096,6 +3096,11 @@ Public Sub SplitByGroupsV3(ByVal InputPath As String, _
 
     ' 3. 卷模式
     actualVolMode = ResolveVolMode(g_volumeMode)
+    ' v3.5: 聚合优先级大于卷——聚合按全局章号连续切块，卷分组无意义，强制扁平
+    If actualVolMode <> "flat" Then
+        actualVolMode = "flat"
+        Application.Echo "卷模式: 聚合拆分优先 → 强制扁平（忽略卷结构）"
+    End If
     g_actualVolMode = actualVolMode
 
     ' 4. 去重（统计减少章数）
