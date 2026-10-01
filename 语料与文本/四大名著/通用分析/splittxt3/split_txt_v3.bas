@@ -352,7 +352,7 @@ Private Function SelectDedupSortCombo() As Boolean
 End Function
 
 '------------------------------------------------------------------------------
-' v3.4 新增：从注册表读取默认设置（缺省 "1","1","1"）
+' v3.4 新增：从注册表读取默认设置（缺省 "0","1","1"）
 '------------------------------------------------------------------------------
 Private Sub LoadSettings()
     Dim sAd As String, sTitle As String, sVol As String
@@ -417,10 +417,11 @@ Public Sub 设置TXTv3()
 End Sub
 
 '------------------------------------------------------------------------------
-' v3.3.1 新增：删除注册表设置（重置为默认值）
-'   删除整个 SplitTxtV3 应用的注册表项，下次运行时会使用默认值
+' v3.5 清理注册表痕迹：删除 SplitTxtV3 在注册表中的所有设置项
+'   日常使用可忽略，仅在需要彻底清除工具痕迹时运行
+'   删除后下次运行自动恢复默认值（0,1,1）
 '------------------------------------------------------------------------------
-Public Sub 重置设置TXTv3()
+Public Sub 清理注册表痕迹TXTv3()
     Dim prompt As String, resp As VbMsgBoxResult
     Dim sAd As String, sTitle As String, sVol As String
 
@@ -429,15 +430,16 @@ Public Sub 重置设置TXTv3()
     sTitle = GetSetting("SplitTxtV3", "Defaults", "TitleDedup", "1")
     sVol = GetSetting("SplitTxtV3", "Defaults", "VolMode", "1")
 
-    prompt = "确定要重置所有设置吗？" & vbCrLf & vbCrLf & _
-             "当前设置：" & vbCrLf & _
+    prompt = "⚠ 确定要清理 SplitTxtV3 的注册表痕迹吗？" & vbCrLf & vbCrLf & _
+             "当前注册表中保存的设置：" & vbCrLf & _
              "  广告清理：" & sAd & vbCrLf & _
              "  标题级去重：" & sTitle & vbCrLf & _
              "  卷模式：" & sVol & vbCrLf & vbCrLf & _
-             "重置后将恢复默认值（0,1,1）" & vbCrLf & _
+             "清理后注册表中将不再留有 SplitTxtV3 任何记录" & vbCrLf & _
+             "下次运行时自动恢复默认值（0,1,1）" & vbCrLf & vbCrLf & _
              "是否继续？"
 
-    resp = MsgBox(prompt, vbYesNo + vbQuestion + vbDefaultButton2, "重置设置TXTv3")
+    resp = MsgBox(prompt, vbYesNo + vbQuestion + vbDefaultButton2, "清理注册表痕迹")
     If resp <> vbYes Then Exit Sub
 
     ' 删除整个应用的注册表项（包括所有节和键）
@@ -445,11 +447,11 @@ Public Sub 重置设置TXTv3()
     DeleteSetting "SplitTxtV3"
     On Error GoTo 0
 
-    MsgBox "注册表设置已删除。" & vbCrLf & vbCrLf & _
+    MsgBox "✓ 注册表痕迹已清理完毕。" & vbCrLf & vbCrLf & _
+           "SplitTxtV3 在注册表中已无任何记录。" & vbCrLf & _
            "下次运行时将使用默认值：" & vbCrLf & _
-           "  广告清理：0（不清理）" & vbCrLf & _
-           "  标题级去重：1（启用）" & vbCrLf & _
-           "  卷模式：1（自动）", vbInformation, "重置完成"
+           "  广告清理=关、标题级去重=开、卷模式=自动", _
+           vbInformation, "清理完成"
 End Sub
 
 '------------------------------------------------------------------------------
