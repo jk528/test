@@ -26,7 +26,7 @@
 //   广告清理 1/0(默认1)，标题去重 0/1(默认0)，卷模式 1自动/2扁平/3分卷(默认1)
 //
 // 自动TXTv3 决策规则（仅统计 ch_num>0 且非目录区章节）：
-//   dup=0且ooo=0 → none+none；adjRatio>=0.3且ooo<10 → first+none；
+//   dup=0且ooo=0 → none+none；adjRatio>=0.3且ooo<10 → longest+none；
 //   ooo>=10 → longest+sort；dup>0 → longest+none；其余 → longest+sort
 //   N自动：章节正文汉字数升序，下半区(<=中位数)最大相邻间隔中点取整到10，
 //          clamp[50,2000]；章节<20 或 gap<50 或 最大gap<次大×2 → 100
@@ -2490,7 +2490,7 @@ function DeepAnalyzeFile(filePath, outputDir) {
         rpt.push("  • 有重复但乱序轻微，推荐 longest 策略（保留内容最长的）");
     }
     if (adjRatio > 0.3) {
-        rpt.push("  • 每章双标题明显，用组合3 保留首次+不排序 即可");
+        rpt.push("  • 每章双标题明显，用组合3 保留最长+不排序 即可");
     }
     if (volCnt > 1) {
         rpt.push("  • 检测到多卷结构，注意选择正确的卷模式");
@@ -2502,7 +2502,7 @@ function DeepAnalyzeFile(filePath, outputDir) {
     if (dupCnt === 0 && oooCnt === 0) {
         recCombo = "none+none（干净型：不去重不排序）";
     } else if (adjRatio >= 0.3 && oooCnt < 10) {
-        recCombo = "first+none（双标题型：保留首次不排序）";
+        recCombo = "longest+none（双标题型：保留最长不排序）";
     } else if (oooCnt >= 10) {
         recCombo = "longest+sort（乱序严重：保留最长并排序）";
     } else if (dupCnt > 0) {
@@ -2765,8 +2765,8 @@ function 自动TXTv3() {
         recDedup = "none"; recSort = "none";
         recComboStr = "none+none（干净型）";
     } else if (adjRatio >= 0.3 && oooCnt < 10) {
-        recDedup = "first"; recSort = "none";
-        recComboStr = "first+none（双标题型）";
+        recDedup = "longest"; recSort = "none";
+        recComboStr = "longest+none（双标题型）";
     } else if (oooCnt >= 10) {
         recDedup = "longest"; recSort = "sort";
         recComboStr = "longest+sort（乱序严重）";

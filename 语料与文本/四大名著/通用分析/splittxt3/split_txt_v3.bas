@@ -2113,7 +2113,7 @@ NextNumKey:
         AddRptLine lines_arr, rptIdx, "  • 有重复但乱序轻微，推荐 longest 策略（保留内容最长的）"
     End If
     If adjRatio > 0.3 Then
-        AddRptLine lines_arr, rptIdx, "  • 每章双标题明显，组合3（保留首次+不排序）即可解决大部分问题"
+        AddRptLine lines_arr, rptIdx, "  • 每章双标题明显，组合3（保留最长+不排序）即可解决大部分问题"
     End If
     If volCnt > 1 Then
         AddRptLine lines_arr, rptIdx, "  • 检测到多卷结构，注意选择正确的卷模式"
@@ -2131,7 +2131,7 @@ NextNumKey:
     If dupCnt = 0 And oooCnt = 0 Then
         recCombo = "none+none（干净型：不去重不排序）"
     ElseIf adjRatio >= 0.3 And oooCnt < 10 Then
-        recCombo = "first+none（双标题型：保留首次不排序）"
+        recCombo = "longest+none（双标题型：保留最长不排序）"
     ElseIf oooCnt >= 10 Then
         recCombo = "longest+sort（乱序严重：保留最长并排序）"
     ElseIf dupCnt > 0 Then
@@ -2452,8 +2452,8 @@ Public Sub 自动TXTv3()
         recDedup = "none": recSort = "none"
         recComboStr = "none+none（干净型）"
     ElseIf adjRatio >= 0.3 And oooCnt < 10 Then
-        recDedup = "first": recSort = "none"
-        recComboStr = "first+none（双标题型）"
+        recDedup = "longest": recSort = "none"
+        recComboStr = "longest+none（双标题型）"
     ElseIf oooCnt >= 10 Then
         recDedup = "longest": recSort = "sort"
         recComboStr = "longest+sort（乱序严重）"

@@ -399,7 +399,7 @@ def auto_decide(chapters):
     if dup_num_count == 0 and ooo_count == 0:
         return 'none', 'none', '无重复章号且无乱序，文件质量良好'
     if adj_ratio >= 0.3 and ooo_count < 10:
-        return 'first', 'none', f'相邻双标题占比{adj_ratio:.1%}≥30%且乱序{ooo_count}处<10'
+        return 'longest', 'none', f'相邻双标题占比{adj_ratio:.1%}≥30%且乱序{ooo_count}处<10'
     if ooo_count >= 10:
         return 'longest', 'sort', f'乱序{ooo_count}处≥10，需最彻底修复'
     if dup_num_count > 0:
@@ -1174,7 +1174,7 @@ def deep_analyze(file_path, encoding=None, ad_clean=False):
         suggestions.append("• 有重复但乱序轻微，推荐 --dedup longest --sort none（保留最长且不改顺序）")
 
     if adj_ratio > 0.3:
-        suggestions.append("• 每章双标题明显，推荐 --dedup first --sort none")
+        suggestions.append("• 每章双标题明显，推荐 --dedup longest --sort none")
 
     if not suggestions:
         suggestions.append("• 文件质量较好，可根据需要选择组合")
