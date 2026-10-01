@@ -12,7 +12,7 @@ TXT章节拆分工具 v3.4（去重+乱序修复+卷级感知+目录区检测+�
   - 目录区检测：文件前30%内连续≥10个短正文(≤2行)且章号递增 → 自动跳过去重/排序/拆分
   - 广告/垃圾行清理：7类规则（网址/站点推广/分页提示/求票求收藏/符号分隔线/手机提示/加入书架）
     默认启用，--no-ad-clean 关闭
-  - CLI 6组合：去重 none/first/longest × 排序 none/sort（adjacent、lis 仅兼容保留）
+  - CLI 6组合：去重 none/first/longest × 排序 none/sort（lis 仅兼容保留；双标题场景由目录区检测+清洁模式覆盖）
   - --clean N 双合并文件：同时生成 保留大于等于N_*.txt 和 清理小于N_*.txt
   - --auto 全自动：分析→自动决策去重/排序组合→自动判定清洁N值→一键输出
   - 报告总-分结构：【总】结论建议 + 【分】七维度明细
@@ -45,7 +45,7 @@ TXT章节拆分工具 v3.4（去重+乱序修复+卷级感知+目录区检测+�
   first   + sort   — 简单重复且乱序
   longest + none   — 整块重复，保留内容最长且不改顺序
   longest + sort   — 重复+乱序严重，最彻底（默认）★推荐
-  （adjacent 已合并入 first、lis 已合并入 first+sort，仅兼容保留）
+  （lis 已合并入 first+sort，仅兼容保留；相邻双标题由目录区检测+清洁模式覆盖）
 
 【3种卷级处理模式】
   auto       — 自动检测：有卷结构则启用卷-章二级去重（默认）
@@ -635,24 +635,8 @@ def _dedup_key(ch, volume_mode, title_dedup=False):
     return tuple(base)
 
 
-def dedup_adjacent(chapters, volume_mode='auto', title_dedup=False):
-    """策略1：相邻重复去重"""
-    if not chapters:
-        return []
-    result = [chapters[0]]
-    for ch in chapters[1:]:
-        key = _dedup_key(ch, volume_mode, title_dedup)
-        last_key = _dedup_key(result[-1], volume_mode, title_dedup)
-        if ch['ch_num'] > 0 and key == last_key:
-            if ch['body_lines'] > result[-1]['body_lines']:
-                result[-1] = ch
-            continue
-        result.append(ch)
-    return result
-
-
 def dedup_first(chapters, volume_mode='auto', title_dedup=False):
-    """策略2：保留首次出现"""
+    """策略1：保留首次出现"""
     seen = set()
     result = []
     for ch in chapters:
@@ -668,7 +652,7 @@ def dedup_first(chapters, volume_mode='auto', title_dedup=False):
 
 
 def dedup_longest(chapters, volume_mode='auto', title_dedup=False):
-    """策略3：保留内容最长的"""
+    """策略2：保留内容最长的"""
     best = OrderedDict()
     order = []
 
@@ -786,7 +770,6 @@ def dedup_sort(chapters, volume_mode='auto', title_dedup=False):
 
 DEDUP_STRATEGIES = {
     'none': None,
-    'adjacent': dedup_adjacent,
     'first': dedup_first,
     'longest': dedup_longest,
 }
@@ -824,7 +807,7 @@ def load_and_scan(file_path, encoding=None, ad_clean=True):
     return lines, structures, chapters, volumes, toc_count, ad_removed, enc
 
 
-def deep_analyze(file_path, encoding=None, ad_clean=True):
+def deep_analyze(file_path, encoding=None, ad_clean=False):
     """深度分析：全面诊断所有问题。返回报告文本（总-分结构）"""
     out = []
     p = out.append
@@ -1127,7 +1110,7 @@ def deep_analyze(file_path, encoding=None, ad_clean=True):
     p("-" * 50)
     p("【七、6组合效果预览（扁平模式）】")
 
-    title_dedup = False
+    title_dedup = True
     combos = [
         ("none+none",    "none",    "none"),
         ("none+sort",    "none",    "sort"),
@@ -1232,7 +1215,7 @@ def format_range(ch_start, ch_end, unit):
 def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
                      dedup_strategy='longest', sort_strategy='sort', volume_mode='auto',
                      generate_title_only=False, min_body_len=0, merge_flag=None,
-                     title_dedup=False, ad_clean=True, merge_dir=None):
+                     title_dedup=True, ad_clean=False, merge_dir=None):
     """按章节一一拆分"""
     t_total0 = time.time()
 
@@ -1459,8 +1442,8 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
 
 def split_by_groups(src, chunk_str="40,3", out_dir="", prefix="",
                     serial_width=3, encoding=None, dedup_strategy='longest',
-                    sort_strategy='sort', volume_mode='auto', title_dedup=False,
-                    ad_clean=True):
+                    sort_strategy='sort', volume_mode='auto', title_dedup=True,
+                    ad_clean=False):
     """聚合拆分"""
     import math
 
@@ -1637,8 +1620,8 @@ def clean_output_dir(out_dir):
 # v3.4 新增：全自动模式
 #   读取+清理+扫描+目录区检测 → 深度分析 → 自动决策 → 执行清洁模式输出
 # ===========================================================================
-def auto_process(src, encoding=None, volume_mode='auto', title_dedup=False,
-                 ad_clean=True):
+def auto_process(src, encoding=None, volume_mode='auto', title_dedup=True,
+                 ad_clean=False):
     """全自动模式：一键完成分析、决策与清洁输出"""
     src_name = os.path.splitext(os.path.basename(src))[0]
     auto_dir = os.path.join(os.path.dirname(os.path.abspath(src)),
@@ -1695,7 +1678,7 @@ def main():
   │ longest   │ none   │ 整块重复，留最长内容且不改顺序   │
   │ longest   │ sort   │ 重复+乱序严重，最彻底(默认)      │
   └───────────┴────────┴──────────────────────────────────┘
-  注: adjacent 已合并入 first、lis 已合并入 first+sort，仅兼容保留。
+  注: lis 已合并入 first+sort，仅兼容保留；相邻双标题由目录区检测+清洁模式覆盖。
 
 示例：
   python split_txt_v3.py --src 小说.txt --auto          # 全自动（推荐）
@@ -1725,7 +1708,7 @@ def main():
     parser.add_argument("--dedup", default="longest",
                         choices=list(DEDUP_STRATEGIES.keys()),
                         help="去重策略: none/first/longest (默认: longest)；"
-                             "adjacent 已合并入 first，仅兼容保留")
+                             "双标题场景由目录区检测+清洁模式覆盖")
     parser.add_argument("--sort", default="sort",
                         choices=list(SORT_STRATEGIES.keys()),
                         help="排序策略: none/sort (默认: sort)；"
@@ -1739,12 +1722,14 @@ def main():
                         help="最小正文字数(0=不检测)")
     parser.add_argument("--clean", default=None, type=int,
                         help="清洁模式：N=最小正文字数，同时生成 保留大于等于N / 清理小于N 双合并文件（纯净正文无头部）")
-    parser.add_argument("--title-dedup", action="store_true", default=False,
-                        help="标题级去重：去重键包含规范化标题，避免章号相同标题不同被误删")
-    parser.add_argument("--ad-clean", dest="ad_clean", action="store_true", default=True,
-                        help="广告/垃圾行清理（默认启用）：网址/推广语/分页提示/求票/分隔线等7类规则")
+    parser.add_argument("--title-dedup", dest="title_dedup", action="store_true", default=True,
+                        help="标题级去重（默认开启）：同章号同标题才算重复，不同标题保留为不同章节")
+    parser.add_argument("--no-title-dedup", dest="title_dedup", action="store_false",
+                        help="关闭标题级去重：仅按章号去重（同章号不同标题会被误删）")
+    parser.add_argument("--ad-clean", dest="ad_clean", action="store_true", default=False,
+                        help="广告/垃圾行清理（默认关闭）：网址/推广语/分页提示/求票/分隔线等7类规则")
     parser.add_argument("--no-ad-clean", dest="ad_clean", action="store_false",
-                        help="关闭广告/垃圾行清理，保留原文")
+                        help="关闭广告/垃圾行清理（默认行为，保留原文）")
     args = parser.parse_args()
 
     if args.analyze:

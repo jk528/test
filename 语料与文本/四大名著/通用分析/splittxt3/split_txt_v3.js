@@ -1,4 +1,4 @@
-﻿// =============================================================================
+// =============================================================================
 // TXT章节拆分工具 v3.4（去重+乱序修复+卷级感知增强版）—— WPS JS宏 版
 //   与 split_txt_v3.bas v3.4 功能对齐，JScript ES3 语法（JScript 5.8+ 兼容）
 //   复制粘贴到 WPS JS宏编辑器即可运行，无需导入其他模块
@@ -71,7 +71,7 @@ var g_selOrigIndices = [];
 var g_selCount = 0;
 
 // --- 去重、排序与卷 ---
-var g_dedupStrategy = "longest";   // none/adjacent/first/longest
+var g_dedupStrategy = "longest";   // none/first/longest（双标题场景由目录区检测+清洁模式覆盖）
 var g_sortStrategy = "sort";       // none/lis/sort
 var g_volumeMode = "auto";         // auto/flat/by_volume
 
@@ -98,12 +98,12 @@ var g_tocStartIdx = -1;
 var g_tocEndIdx = -1;
 var g_tocChapterCount = 0;
 
-// 广告清理
-var g_cleanAds = true;
+// 广告清理（默认关闭：用户自行确认是否清理）
+var g_cleanAds = false;
 var g_adRemovedCount = 0;
 
-// 标题级去重
-var g_titleDedup = false;
+// 标题级去重（默认开启：同章号同标题才算重复，不同标题保留）
+var g_titleDedup = true;
 var g_titleDiffCount = 0;
 
 // v3.4 统计（总-分报告用）
@@ -427,8 +427,8 @@ function regWriteSafe(name, val) {
 }
 
 function LoadSettings() {
-    var sAd = regReadSafe("AdClean", "1");
-    var sTitle = regReadSafe("TitleDedup", "0");
+    var sAd = regReadSafe("AdClean", "0");
+    var sTitle = regReadSafe("TitleDedup", "1");
     var sVol = regReadSafe("VolMode", "1");
 
     g_cleanAds = (sAd === "1");
@@ -443,15 +443,15 @@ function LoadSettings() {
 }
 
 function 设置TXTv3() {
-    var sAd = regReadSafe("AdClean", "1");
-    var sTitle = regReadSafe("TitleDedup", "0");
+    var sAd = regReadSafe("AdClean", "0");
+    var sTitle = regReadSafe("TitleDedup", "1");
     var sVol = regReadSafe("VolMode", "1");
 
     var prompt = "默认设置（当前值 " + sAd + "," + sTitle + "," + sVol + "）：\n\n" +
-                 "  第1位 广告/垃圾行清理：1=清理(默认) 0=不清理\n" +
-                 "  第2位 标题级去重：0=仅章号(默认) 1=双重判定(章号+标题)\n" +
+                 "  第1位 广告/垃圾行清理：0=不清理(默认) 1=清理\n" +
+                 "  第2位 标题级去重：1=双重判定(默认，章号+标题) 0=仅章号\n" +
                  "  第3位 卷级别处理：1=自动判定(默认) 2=强制扁平 3=按卷分目录\n\n" +
-                 "输入格式 1,0,1（直接回车=保持不变）：";
+                 "输入格式 0,1,1（直接回车=保持不变）：";
 
     var inputVal = Application.InputBox(prompt, "设置TXTv3 - 默认设置", sAd + "," + sTitle + "," + sVol, 100, 100, "", 0, 2);
     if (inputVal === false) return;
@@ -1123,30 +1123,7 @@ function DedupKey(idx, volMode, titleDedup) {
     return key;
 }
 
-// 策略1：相邻重复去重
-function DedupAdjacent(volMode, titleDedup) {
-    var chapIdx = GetChapterIndices();
-    if (chapIdx.length === 0) return [];
-
-    var out = [chapIdx[0]];
-    var lastKey = DedupKey(chapIdx[0], volMode, titleDedup);
-
-    for (var i = 1; i < chapIdx.length; i++) {
-        var curKey = DedupKey(chapIdx[i], volMode, titleDedup);
-        if (ch_nums[chapIdx[i]] > 0 && curKey === lastKey) {
-            // 相邻重复：保留正文更长的
-            if (ch_bodyLines[chapIdx[i]] > ch_bodyLines[out[out.length - 1]]) {
-                out[out.length - 1] = chapIdx[i];
-            }
-        } else {
-            out.push(chapIdx[i]);
-            lastKey = curKey;
-        }
-    }
-    return out;
-}
-
-// 策略2：保留首次出现
+// 策略1：保留首次出现
 function DedupFirst(volMode, titleDedup) {
     var chapIdx = GetChapterIndices();
     if (chapIdx.length === 0) return [];
@@ -1169,7 +1146,7 @@ function DedupFirst(volMode, titleDedup) {
     return out;
 }
 
-// 策略3：保留内容最长的
+// 策略2：保留内容最长的
 function DedupLongest(volMode, titleDedup) {
     var chapIdx = GetChapterIndices();
     if (chapIdx.length === 0) return [];
@@ -1209,9 +1186,7 @@ function ApplyDedup(strategy, volMode, titleDedup) {
         return;
     }
     var out = null;
-    if (strategy === "adjacent") {
-        out = DedupAdjacent(volMode, titleDedup);
-    } else if (strategy === "first") {
+    if (strategy === "first") {
         out = DedupFirst(volMode, titleDedup);
     } else if (strategy === "longest") {
         out = DedupLongest(volMode, titleDedup);
@@ -2480,9 +2455,9 @@ function DeepAnalyzeFile(filePath, outputDir) {
     rpt.push(repeatStr("-", 50));
     rpt.push("【七、各策略组合效果预览（扁平模式）】");
 
-    var comboLabels = ["adjacent", "first", "longest", "none+lis", "longest+lis", "longest+sort"];
-    var comboDedup = ["adjacent", "first", "longest", "none", "longest", "longest"];
-    var comboSort = ["none", "none", "none", "lis", "lis", "sort"];
+    var comboLabels = ["none+none", "none+sort", "first+none", "first+sort", "longest+none", "longest+sort"];
+    var comboDedup = ["none", "none", "first", "first", "longest", "longest"];
+    var comboSort = ["none", "sort", "none", "sort", "none", "sort"];
 
     for (var sIdx = 0; sIdx < 6; sIdx++) {
         ApplyDedup(comboDedup[sIdx], "flat", false);
@@ -2510,7 +2485,7 @@ function DeepAnalyzeFile(filePath, outputDir) {
         rpt.push("  • 有重复但乱序轻微，推荐 longest 策略（保留内容最长的）");
     }
     if (adjRatio > 0.3) {
-        rpt.push("  • 每章双标题明显，adjacent 策略即可解决大部分问题");
+        rpt.push("  • 每章双标题明显，用组合3 保留首次+不排序 即可");
     }
     if (volCnt > 1) {
         rpt.push("  • 检测到多卷结构，注意选择正确的卷模式");

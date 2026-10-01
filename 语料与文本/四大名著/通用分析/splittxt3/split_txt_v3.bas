@@ -5,8 +5,8 @@ Option Explicit
 '   以 splittxt2 多正则版为底本，增加：
 '     - 中文数字转阿拉伯数字（支持万/亿/大写/繁体/俗写）
 '     - 卷/部/册/篇 级别识别与卷感知去重
-'     - 5种去重策略：adjacent / first / longest / lis / sort
-'     - 乱序自动修复（LIS最长递增子序列 + 按章号重排）
+'     - 3种去重策略（none/first/longest）× 2种排序（none/sort）= 6组合
+'     - 乱序自动修复（按章号重排；LIS保留为兼容选项）
 '     - 深度分析报告（重复/乱序/多轨/格式/连续性 七大维度）
 '     - 按卷分目录输出
 '     - 无号章节识别（序章/楔子/番外/尾声等）
@@ -22,18 +22,20 @@ Option Explicit
 '   - 完成报告与分析报告改为 总-分 结构
 '   - 新增自动化入口 自动TXTv3（自动判定组合与清洁N，一次确认即执行）
 '   - 删除旧的"按章节一一拆分"模式（清洁模式本身即输出每章单文件）
+'   - 删除 adjacent 相邻重复去重策略（双标题场景由目录区检测+清洁模式覆盖）
 '
 ' 入口：运行 拆分TXTv3（选择文件 → 选择正则 → 选择组合 → 输出模式 → 生成）
 '       运行 分析TXTv3（仅分析不拆分，输出总-分结构详细报告）
 '       运行 自动TXTv3（全自动决策，一次确认即完成拆分）
 '       运行 设置TXTv3（查看/修改默认设置）
 '
-' 去重策略：
-'   1. adjacent   — 相邻重复去重（仅合并连续相同章号，适合双标题）
-'   2. first      — 保留首次出现（每个章号只留第一次）
-'   3. longest    — 保留内容最长的（每个章号只留正文最多的）
-'   4. lis        — 最长递增子序列（智能找主线，去重+修序二合一）★推荐
-'   5. sort       — 按章号重新排序（最彻底，章号齐全，完全有序）★推荐
+' 去重×排序 6组合（弹窗3六选一）：
+'   1. none+none    不去重+不排序（原样保留）
+'   2. none+sort    不去重+按章号重排
+'   3. first+none   保留首次+不排序（双标题/简单重复）
+'   4. first+sort   保留首次+重排
+'   5. longest+none 保留最长+不排序（整块重复）
+'   6. longest+sort 保留最长+重排 ★推荐（默认）
 '
 ' 卷模式：
 '   auto         — 自动检测：有多卷则卷感知，无则扁平
@@ -62,7 +64,7 @@ Private g_selOrigIndices() As Long
 Private g_selCount As Long
 
 ' --- v3 新增：去重、排序与卷 ---
-Private g_dedupStrategy As String       ' none/adjacent/first/longest
+Private g_dedupStrategy As String       ' none/first/longest
 Private g_sortStrategy As String        ' none/lis/sort
 Private g_volumeMode As String          ' auto/flat/by_volume
 
@@ -350,12 +352,12 @@ Private Function SelectDedupSortCombo() As Boolean
 End Function
 
 '------------------------------------------------------------------------------
-' v3.4 新增：从注册表读取默认设置（缺省 "1","0","1"）
+' v3.4 新增：从注册表读取默认设置（缺省 "1","1","1"）
 '------------------------------------------------------------------------------
 Private Sub LoadSettings()
     Dim sAd As String, sTitle As String, sVol As String
-    sAd = GetSetting("SplitTxtV3", "Defaults", "AdClean", "1")
-    sTitle = GetSetting("SplitTxtV3", "Defaults", "TitleDedup", "0")
+    sAd = GetSetting("SplitTxtV3", "Defaults", "AdClean", "0")
+    sTitle = GetSetting("SplitTxtV3", "Defaults", "TitleDedup", "1")
     sVol = GetSetting("SplitTxtV3", "Defaults", "VolMode", "1")
 
     g_cleanAds = (sAd = "1")
@@ -375,15 +377,15 @@ Public Sub 设置TXTv3()
     Dim prompt As String, inputVal As String, parts() As String
     Dim newAd As String, newTitle As String, newVol As String
 
-    sAd = GetSetting("SplitTxtV3", "Defaults", "AdClean", "1")
-    sTitle = GetSetting("SplitTxtV3", "Defaults", "TitleDedup", "0")
+    sAd = GetSetting("SplitTxtV3", "Defaults", "AdClean", "0")
+    sTitle = GetSetting("SplitTxtV3", "Defaults", "TitleDedup", "1")
     sVol = GetSetting("SplitTxtV3", "Defaults", "VolMode", "1")
 
     prompt = "默认设置（当前值 " & sAd & "," & sTitle & "," & sVol & "）：" & vbCrLf & vbCrLf & _
-             "  第1位 广告/垃圾行清理：1=清理(默认) 0=不清理" & vbCrLf & _
-             "  第2位 标题级去重：0=仅章号(默认) 1=双重判定(章号+标题)" & vbCrLf & _
+             "  第1位 广告/垃圾行清理：0=不清理(默认) 1=清理" & vbCrLf & _
+             "  第2位 标题级去重：1=双重判定(默认，章号+标题) 0=仅章号" & vbCrLf & _
              "  第3位 卷级别处理：1=自动判定(默认) 2=强制扁平 3=按卷分目录" & vbCrLf & vbCrLf & _
-             "输入格式 1,0,1（直接回车=保持不变）："
+             "输入格式 0,1,1（直接回车=保持不变）："
 
     inputVal = InputBox(prompt, "设置TXTv3 - 默认设置", sAd & "," & sTitle & "," & sVol)
     If StrPtr(inputVal) = 0 Then Exit Sub
@@ -1183,42 +1185,7 @@ Private Function DedupKey(ByVal idx As Long, ByVal volMode As String, _
 End Function
 
 '------------------------------------------------------------------------------
-' 策略1：相邻重复去重
-'------------------------------------------------------------------------------
-Private Sub DedupAdjacent(ByVal volMode As String, _
-        ByRef outIndices() As Long, ByRef outCount As Long, _
-        Optional ByVal titleDedup As Boolean = False)
-    Dim chapIdx() As Long, chapCnt As Long
-    Dim i As Long, resultCnt As Long
-    Dim lastKey As String, curKey As String
-
-    GetChapterIndices chapIdx, chapCnt
-    If chapCnt = 0 Then outCount = 0: Exit Sub
-
-    ReDim outIndices(0 To chapCnt - 1)
-    resultCnt = 1
-    outIndices(0) = chapIdx(0)
-    lastKey = DedupKey(chapIdx(0), volMode, titleDedup)
-
-    For i = 1 To chapCnt - 1
-        curKey = DedupKey(chapIdx(i), volMode, titleDedup)
-        If ch_nums(chapIdx(i)) > 0 And curKey = lastKey Then
-            ' 相邻重复：保留正文更长的
-            If ch_bodyLines(chapIdx(i)) > ch_bodyLines(outIndices(resultCnt - 1)) Then
-                outIndices(resultCnt - 1) = chapIdx(i)
-            End If
-        Else
-            outIndices(resultCnt) = chapIdx(i)
-            lastKey = curKey
-            resultCnt = resultCnt + 1
-        End If
-    Next i
-
-    outCount = resultCnt
-End Sub
-
-'------------------------------------------------------------------------------
-' 策略2：保留首次出现
+' 策略1：保留首次出现
 '------------------------------------------------------------------------------
 Private Sub DedupFirst(ByVal volMode As String, _
         ByRef outIndices() As Long, ByRef outCount As Long, _
@@ -1253,7 +1220,7 @@ Private Sub DedupFirst(ByVal volMode As String, _
 End Sub
 
 '------------------------------------------------------------------------------
-' 策略3：保留内容最长的
+' 策略2：保留内容最长的
 '------------------------------------------------------------------------------
 Private Sub DedupLongest(ByVal volMode As String, _
         ByRef outIndices() As Long, ByRef outCount As Long, _
@@ -1537,7 +1504,7 @@ End Sub
 
 '------------------------------------------------------------------------------
 ' 执行去重（调度函数）
-'   strategy: adjacent/first/longest/lis/sort
+'   strategy: none/first/longest（双标题场景由目录区检测+清洁模式覆盖）
 '   volMode:  flat/volume
 '   输出：dedup_indices, dedup_count（全局）
 '------------------------------------------------------------------------------
@@ -1548,7 +1515,6 @@ Private Sub ApplyDedup(ByVal strategy As String, ByVal volMode As String, _
         GetChapterIndices dedup_indices, dedup_count
     Else
         Select Case strategy
-            Case "adjacent": DedupAdjacent volMode, dedup_indices, dedup_count, titleDedup
             Case "first":    DedupFirst volMode, dedup_indices, dedup_count, titleDedup
             Case "longest":  DedupLongest volMode, dedup_indices, dedup_count, titleDedup
             Case Else
@@ -2298,12 +2264,12 @@ NextNumKey:
     ReDim comboLabels(0 To 5)
     ReDim comboDedup(0 To 5)
     ReDim comboSort(0 To 5)
-    comboLabels(0) = "adjacent":      comboDedup(0) = "adjacent":  comboSort(0) = "none"
-    comboLabels(1) = "first":         comboDedup(1) = "first":     comboSort(1) = "none"
-    comboLabels(2) = "longest":       comboDedup(2) = "longest":   comboSort(2) = "none"
-    comboLabels(3) = "none+lis":      comboDedup(3) = "none":      comboSort(3) = "lis"
-    comboLabels(4) = "longest+lis":   comboDedup(4) = "longest":   comboSort(4) = "lis"
-    comboLabels(5) = "longest+sort":  comboDedup(5) = "longest":   comboSort(5) = "sort"
+    comboLabels(0) = "none+none":     comboDedup(0) = "none":    comboSort(0) = "none"
+    comboLabels(1) = "none+sort":     comboDedup(1) = "none":    comboSort(1) = "sort"
+    comboLabels(2) = "first+none":    comboDedup(2) = "first":   comboSort(2) = "none"
+    comboLabels(3) = "first+sort":    comboDedup(3) = "first":   comboSort(3) = "sort"
+    comboLabels(4) = "longest+none":  comboDedup(4) = "longest": comboSort(4) = "none"
+    comboLabels(5) = "longest+sort":  comboDedup(5) = "longest": comboSort(5) = "sort"
 
     For s_idx = 0 To 5
         ApplyDedup comboDedup(s_idx), "flat"
@@ -2339,7 +2305,7 @@ NextNumKey:
         AddRptLine lines_arr, rptIdx, "  • 有重复但乱序轻微，推荐 longest 策略（保留内容最长的）"
     End If
     If adjRatio > 0.3 Then
-        AddRptLine lines_arr, rptIdx, "  • 每章双标题明显，adjacent 策略即可解决大部分问题"
+        AddRptLine lines_arr, rptIdx, "  • 每章双标题明显，组合3（保留首次+不排序）即可解决大部分问题"
     End If
     If volCnt > 1 Then
         AddRptLine lines_arr, rptIdx, "  • 检测到多卷结构，注意选择正确的卷模式"
