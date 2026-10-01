@@ -1097,6 +1097,19 @@ def deep_analyze(file_path, encoding=None, ad_clean=False):
     p("-" * 50)
     p("【六、章号连续性分析】")
 
+    def _format_missing_list(missing_list, per_line=20, indent="    "):
+        """格式化缺失章号列表，每行per_line个，全部枚举不省略"""
+        if not missing_list:
+            return []
+        lines = []
+        for i in range(0, len(missing_list), per_line):
+            chunk = missing_list[i:i + per_line]
+            line = indent + ",".join(str(n) for n in chunk)
+            if i + per_line < len(missing_list):
+                line += ","
+            lines.append(line)
+        return lines
+
     if volumes:
         vol_chs = defaultdict(list)
         current_vol = None
@@ -1116,6 +1129,12 @@ def deep_analyze(file_path, encoding=None, ad_clean=False):
             actual = len(nums)
             missing = expected - actual
             p(f"  {vol_label}: {min_n}-{max_n}章, 应有{expected}章, 实有{actual}章, 缺{missing}章")
+            if missing > 0:
+                full_set = set(nums)
+                missing_list = [n for n in range(min_n, max_n + 1) if n not in full_set]
+                p(f"  缺失章号（共{missing}个，全部列出）:")
+                for line in _format_missing_list(missing_list):
+                    p(line)
     else:
         nums = sorted(set(ch['ch_num'] for ch in chapters if ch['ch_num'] > 0))
         if nums:
@@ -1127,12 +1146,12 @@ def deep_analyze(file_path, encoding=None, ad_clean=False):
             p(f"  实际章号数: {len(nums)}")
             p(f"  缺失章号数: {missing}")
 
-            if missing > 0 and missing < 100:
+            if missing > 0:
                 full_set = set(nums)
                 missing_list = [n for n in range(min_n, max_n + 1) if n not in full_set]
-                p(f"  缺失章号: {missing_list[:30]}")
-                if len(missing_list) > 30:
-                    p(f"    ... 共{len(missing_list)}个")
+                p(f"  缺失章号（全部列出，共{missing}个）:")
+                for line in _format_missing_list(missing_list):
+                    p(line)
 
     # ---------- 7. 各组合效果预览 ----------
     p("")

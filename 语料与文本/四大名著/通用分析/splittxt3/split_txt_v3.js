@@ -2458,19 +2458,24 @@ function DeepAnalyzeFile(filePath, outputDir) {
         rpt.push("  实际章号数: " + mapCount(numSet));
         rpt.push("  缺失章号数: " + missing);
 
-        if (missing > 0 && missing < 100) {
-            var missList = "", missCount = 0;
+        if (missing > 0) {
+            rpt.push("  缺失章号（全部列出，共" + missing + "个）:");
+            var missCount = 0;
+            var missList = "";
             for (var nn = minNum; nn <= maxNum; nn++) {
                 if (!mapHas(numSet, String(nn))) {
-                    if (missCount < 20) {
-                        if (missList.length > 0) missList += ",";
-                        missList += nn;
+                    if (missCount > 0 && missCount % 20 === 0) {
+                        rpt.push("    " + missList + ",");
+                        missList = "";
                     }
+                    if (missList.length > 0) missList += ",";
+                    missList += nn;
                     missCount++;
                 }
             }
-            rpt.push("  缺失章号: " + missList);
-            if (missCount > 20) rpt.push("    ... 共" + missCount + "个");
+            if (missList.length > 0) {
+                rpt.push("    " + missList);
+            }
         }
     }
     rpt.push("");

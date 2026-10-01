@@ -2125,20 +2125,24 @@ NextNumKey:
         AddRptLine lines_arr, rptIdx, "  实际章号数: " & numSet.Count
         AddRptLine lines_arr, rptIdx, "  缺失章号数: " & missing
 
-        If missing > 0 And missing < 100 Then
-            missList = ""
+        If missing > 0 Then
+            AddRptLine lines_arr, rptIdx, "  缺失章号（全部列出，共" & missing & "个）:"
             missCount = 0
+            missList = ""
             For nn = minNum To maxNum
                 If Not numSet.Exists(nn) Then
-                    If missCount < 20 Then
-                        If Len(missList) > 0 Then missList = missList & ","
-                        missList = missList & nn
+                    If missCount > 0 And missCount Mod 20 = 0 Then
+                        AddRptLine lines_arr, rptIdx, "    " & missList & ","
+                        missList = ""
                     End If
+                    If Len(missList) > 0 Then missList = missList & ","
+                    missList = missList & nn
                     missCount = missCount + 1
                 End If
             Next nn
-            AddRptLine lines_arr, rptIdx, "  缺失章号: " & missList
-            If missCount > 20 Then AddRptLine lines_arr, rptIdx, "    ... 共" & missCount & "个"
+            If Len(missList) > 0 Then
+                AddRptLine lines_arr, rptIdx, "    " & missList
+            End If
         End If
     End If
     Set numSet = Nothing
