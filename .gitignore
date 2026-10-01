@@ -42,3 +42,9 @@ Desktop.ini
 !.vscode/settings.json
 *.swp
 *~
+
+# 小说拆分产物（splittxt3 输出：单章小文件数千个，不进版本库）
+**/*_自动/
+**/拆分文档/
+保留大于等于*_*.txt
+清理小于*_*.txt
