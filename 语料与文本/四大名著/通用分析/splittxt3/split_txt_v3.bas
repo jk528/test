@@ -417,6 +417,42 @@ Public Sub 设置TXTv3()
 End Sub
 
 '------------------------------------------------------------------------------
+' v3.3.1 新增：删除注册表设置（重置为默认值）
+'   删除整个 SplitTxtV3 应用的注册表项，下次运行时会使用默认值
+'------------------------------------------------------------------------------
+Public Sub 重置设置TXTv3()
+    Dim prompt As String, resp As VbMsgBoxResult
+    Dim sAd As String, sTitle As String, sVol As String
+
+    ' 先读取当前值显示给用户
+    sAd = GetSetting("SplitTxtV3", "Defaults", "AdClean", "0")
+    sTitle = GetSetting("SplitTxtV3", "Defaults", "TitleDedup", "1")
+    sVol = GetSetting("SplitTxtV3", "Defaults", "VolMode", "1")
+
+    prompt = "确定要重置所有设置吗？" & vbCrLf & vbCrLf & _
+             "当前设置：" & vbCrLf & _
+             "  广告清理：" & sAd & vbCrLf & _
+             "  标题级去重：" & sTitle & vbCrLf & _
+             "  卷模式：" & sVol & vbCrLf & vbCrLf & _
+             "重置后将恢复默认值（0,1,1）" & vbCrLf & _
+             "是否继续？"
+
+    resp = MsgBox(prompt, vbYesNo + vbQuestion + vbDefaultButton2, "重置设置TXTv3")
+    If resp <> vbYes Then Exit Sub
+
+    ' 删除整个应用的注册表项（包括所有节和键）
+    On Error Resume Next
+    DeleteSetting "SplitTxtV3"
+    On Error GoTo 0
+
+    MsgBox "注册表设置已删除。" & vbCrLf & vbCrLf & _
+           "下次运行时将使用默认值：" & vbCrLf & _
+           "  广告清理：0（不清理）" & vbCrLf & _
+           "  标题级去重：1（启用）" & vbCrLf & _
+           "  卷模式：1（自动）", vbInformation, "重置完成"
+End Sub
+
+'------------------------------------------------------------------------------
 ' v3.4 新增：统计章号回退次数（乱序处数，仅用 ch_num>0 且非目录区章节）
 '------------------------------------------------------------------------------
 Private Function CountOOO() As Long
@@ -454,7 +490,7 @@ End Function
 '         N=间隔中点取整到10，clamp[50,2000]；
 '         章节<20 或 gap<50 或 最大gap<次大gap×2 → N=100
 '------------------------------------------------------------------------------
-Private Function AutoNFromBodies(ByVal lines() As String) As Long
+Private Function AutoNFromBodies(ByRef lines() As String) As Long
     Dim regCn As Object
     Dim cnts() As Long, cnt As Long
     Dim i As Long, j As Long, n As Long
@@ -1202,7 +1238,7 @@ Private Sub DedupFirst(ByVal volMode As String, _
     resultCnt = 0
 
     For i = 0 To chapCnt - 1
-        If ch_levels(chapIdx(i)) = "special" Then
+        If ch_nums(chapIdx(i)) <= 0 And ch_levels(chapIdx(i)) = "special" Then
             key = "S|" & ch_titles(chapIdx(i))
         Else
             key = DedupKey(chapIdx(i), volMode, titleDedup)
@@ -1237,7 +1273,7 @@ Private Sub DedupLongest(ByVal volMode As String, _
     If chapCnt = 0 Then outCount = 0: Exit Sub
 
     For i = 0 To chapCnt - 1
-        If ch_levels(chapIdx(i)) = "special" Then
+        If ch_nums(chapIdx(i)) <= 0 And ch_levels(chapIdx(i)) = "special" Then
             key = "S|" & ch_titles(chapIdx(i))
         Else
             key = DedupKey(chapIdx(i), volMode, titleDedup)
@@ -1292,7 +1328,7 @@ Private Sub DedupLIS(ByVal volMode As String, _
         If chapCnt = 0 Then outCount = 0: Exit Sub
         
         For i = 0 To chapCnt - 1
-            If ch_levels(chapIdx(i)) = "special" Then
+            If ch_nums(chapIdx(i)) <= 0 And ch_levels(chapIdx(i)) = "special" Then
                 tKey = "S|" & ch_titles(chapIdx(i))
             Else
                 tKey = DedupKey(chapIdx(i), volMode, True)
@@ -1429,7 +1465,7 @@ Private Sub DedupSort(ByVal volMode As String, _
 
     ' 第一步：找每个key的最佳（最长）
     For i = 0 To chapCnt - 1
-        If ch_levels(chapIdx(i)) = "special" Then
+        If ch_nums(chapIdx(i)) <= 0 And ch_levels(chapIdx(i)) = "special" Then
             key = "S|" & ch_titles(chapIdx(i))
         Else
             key = DedupKey(chapIdx(i), volMode, titleDedup)
@@ -1647,12 +1683,12 @@ Private Sub SortFullFromIndices(ByVal volMode As String)
     ReDim origIdxArr(0 To n - 1)
     ReDim isSpecial(0 To n - 1)
     
-    ' 分离 special 和 normal
+    ' 分离 special 和 normal（与去重键逻辑一致：无号+special才算）
     specialCnt = 0
     normalCnt = 0
     For i = 0 To n - 1
         origIdxArr(i) = dedup_indices(i)
-        If ch_levels(origIdxArr(i)) = "special" Then
+        If ch_nums(origIdxArr(i)) <= 0 And ch_levels(origIdxArr(i)) = "special" Then
             isSpecial(i) = True
             specialCnt = specialCnt + 1
         Else
@@ -1774,7 +1810,7 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String, Optional ByVal outputDir A
     Dim flatMap As Object
     Dim numKey As Variant       ' For Each 遍历字典键必须用 Variant
     Dim uniqueCnt As Long, dupCnt As Long
-    Dim topNums() As String, topCounts() As Long, topCount As Long
+    Dim topNums() As Long, topCounts() As Long, topCount As Long
     Dim vv As Long, insPos As Long, mv As Long
     Dim countDist As Object
     Dim cc As String
@@ -2000,13 +2036,13 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String, Optional ByVal outputDir A
                         topTitles(mv) = topTitles(mv - 1)
                         topLineInfo(mv) = topLineInfo(mv - 1)
                     Next mv
-                    topNums(insPos) = k
+                    topNums(insPos) = CLng(k)
                     topCounts(insPos) = vv
                     ' 收集该章号的首次标题和前5次行号
                     Dim occLines As String, occCnt As Long, fi As Long
                     occLines = "": occCnt = 0
                     For fi = 0 To ch_count - 1
-                        If ch_levels(fi) = "chapter" And ch_nums(fi) = CLng(k) Then
+                        If ch_levels(fi) = "chapter" And ch_nums(fi) = topNums(insPos) Then
                             If occCnt = 0 Then
                                 topTitles(insPos) = ch_titles(fi)
                             End If
@@ -2272,7 +2308,7 @@ NextNumKey:
     comboLabels(5) = "longest+sort":  comboDedup(5) = "longest": comboSort(5) = "sort"
 
     For s_idx = 0 To 5
-        ApplyDedup comboDedup(s_idx), "flat"
+        ApplyDedup comboDedup(s_idx), "flat", g_titleDedup
         ApplySort comboSort(s_idx), "flat"
         tmpIdx = dedup_indices
         tmpCnt = dedup_count
