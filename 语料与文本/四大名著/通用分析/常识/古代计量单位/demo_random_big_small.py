@@ -14,9 +14,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from number_to_chinese import (
     number_to_chinese,
     decimal_to_chinese,
-    get_big_units,
-    get_small_units,
+    get_big_units_middle,
 )
+from number_to_chinese import SMALL_UNITS
 
 
 def generate_random_number(int_digits=100, dec_digits=100):
@@ -74,26 +74,27 @@ def convert_and_save(output_dir='.'):
         f.write(f"数量级：10^{int_len - 1}\n")
 
         # 找出对应的大单位级别
-        big_units = get_big_units()
+        big_units = get_big_units_middle()  # [(单位名, 指数), ...]
         f.write(f"\n对应大数单位层级（中数体系，万进制）：\n")
         unit_index = (int_len - 1) // 4
         if unit_index < len(big_units):
+            unit_name, unit_exp = big_units[unit_index]
             f.write(f"  整数部分约等于：{int_part[0]}.{int_part[1:4]}… × 10^{int_len-1}\n")
-            f.write(f"  单位级别：第{unit_index}级（{big_units[unit_index][0]}级 = 10^{unit_index*4}）\n")
-            f.write(f"  单位名称：{big_units[unit_index][0]}（指数 10^{unit_index*4}）\n")
+            f.write(f"  单位级别：第{unit_index}级（{unit_name}级 = 10^{unit_exp}）\n")
+            f.write(f"  单位名称：{unit_name}（指数 10^{unit_exp}）\n")
         else:
-            f.write(f"  超出命名单位范围（最大单位：{big_units[-1][0]} = 10^{(len(big_units)-1)*4}）\n")
-            f.write(f"  使用科学计数法表示\n")
+            last_name, last_exp = big_units[-1]
+            f.write(f"  超出命名单位范围（最大单位：{last_name} = 10^{last_exp}）\n")
+            f.write(f"  使用溢出策略（递归/科学计数法）表示\n")
 
         f.write(f"\n小数位数：{len(dec_part)} 位\n")
         f.write(f"小数数量级：10^{-len(dec_part)}\n")
 
-        small_units = get_small_units()
+        small_units = SMALL_UNITS
         f.write(f"\n对应小数单位层级：\n")
         if len(dec_part) <= len(small_units):
-            f.write(f"  最小位单位：第{len(dec_part)}级（{small_units[len(dec_part)-1][0]} = 10^{-len(dec_part)}）\n")
-            f.write(f"  单位名称：{small_units[len(dec_part)-1][0]}（指数 10^{-len(dec_part)}）\n")
-            f.write(f"  所属体系：{small_units[len(dec_part)-1][2]}\n")
+            f.write(f"  最小位单位：第{len(dec_part)}级（{small_units[len(dec_part)-1]} = 10^{-len(dec_part)}）\n")
+            f.write(f"  单位名称：{small_units[len(dec_part)-1]}（指数 10^{-len(dec_part)}）\n")
         else:
             f.write(f"  超出命名单位范围（共{len(small_units)}个小数单位）\n")
             f.write(f"  使用逐位读法\n")
@@ -107,7 +108,8 @@ def convert_and_save(output_dir='.'):
         # 模式1：auto模式（递归表示）
         f.write("1) auto 模式（超出范围时递归表示）：\n\n")
         try:
-            result = number_to_chinese(int_part, overflow_mode='auto')
+            int_value = int(int_part)
+            result = number_to_chinese(int_value, overflow_mode='auto')
             # 分段输出，方便阅读
             f.write(f"  {result}\n")
         except Exception as e:
@@ -117,7 +119,8 @@ def convert_and_save(output_dir='.'):
         # 模式2：scientific模式（科学计数法）
         f.write("2) scientific 模式（科学计数法读法）：\n\n")
         try:
-            result = number_to_chinese(int_part, overflow_mode='scientific')
+            int_value = int(int_part)
+            result = number_to_chinese(int_value, overflow_mode='scientific')
             f.write(f"  {result}\n")
         except Exception as e:
             f.write(f"  转换失败：{e}\n")
@@ -195,7 +198,8 @@ def convert_and_save(output_dir='.'):
 
         f.write("整数部分（auto模式） + 小数部分（逐位读法）：\n\n")
         try:
-            int_result = number_to_chinese(int_part, overflow_mode='auto')
+            int_value = int(int_part)
+            int_result = number_to_chinese(int_value, overflow_mode='auto')
             f.write(f"  {int_result} 点 {dec_digit[:30]}……\n")
             f.write(f"  （小数共{len(dec_part)}位，此处仅显示前30位）\n")
         except Exception as e:
@@ -204,7 +208,8 @@ def convert_and_save(output_dir='.'):
 
         f.write("整数部分（科学计数法） + 小数部分（科学计数法）：\n\n")
         try:
-            int_sci = number_to_chinese(int_part, overflow_mode='scientific')
+            int_value = int(int_part)
+            int_sci = number_to_chinese(int_value, overflow_mode='scientific')
             f.write(f"  {int_sci} + 约 十的负 {len(dec_part)} 次方量级\n")
         except Exception as e:
             f.write(f"  转换失败：{e}\n")
