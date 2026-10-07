@@ -267,6 +267,31 @@ def build_datasource(
         )
         summary_text = first_para or full_text
 
+        # 快讯目录行（纯"国内/国际联播快讯"）：预填固定要素，AI 无需精读
+        # （第六部分渲染时会跳过目录行；父目录行仅保留在第二、五部分）
+        if "联播快讯" in safe_title:
+            items.append(
+                {
+                    "idx": str(idx),
+                    "title": safe_title,
+                    "url": v.get("url", ""),
+                    "category": "快讯目录",
+                    "importance": "一般",
+                    "summary": summary_text[:300] if summary_text else "",
+                    "full_text": full_text[:500] if full_text else "",
+                    "is_placeholder": True,
+                    "elements": {
+                        "time": "",
+                        "location": "—",
+                        "subject": "—",
+                        "event": f"播报{safe_title}",
+                        "cause": "—",
+                        "method": "目录播报",
+                    },
+                }
+            )
+            continue
+
         items.append(
             {
                 "idx": str(idx),
@@ -339,20 +364,33 @@ def build_datasource(
                 }
             )
 
+    # 指令与脱敏模式联动（不脱敏版：人物直接写职务+姓名）
+    if os.environ.get("XWLB_NO_DESENSITIZE"):
+        instructions = (
+            "不脱敏版。请根据每条 title/url/summary/full_text 填写 elements 中的 "
+            "location/subject/event/cause/method 五个字段（仅 elements 为 null 的行需要填）。"
+            "规则：人物主体直接写'职务+姓名'（如'联合国秘书长古特雷斯'），不加<u>标签；"
+            "机构名写全称（如国务院安全生产委员会办公室）；"
+            "事件核心对象写明文（如也门冲突双方）。"
+            "地点尽量精确到城市。无明确值填—，禁止大量填—（占比≤30%）。"
+            "is_placeholder=true 的行（完整版、快讯目录行）已预填，原样保留。"
+        )
+    else:
+        instructions = (
+            "请根据每条的 title/url/summary/full_text 填写 elements 中的 "
+            "location/subject/event/cause/method 五个字段（仅 elements 为 null 的行需要填）。"
+            "规则：人物用<u>占位符</u>（如<u>国家主席</u>），"
+            "机构名不加下划线（如农业农村部），"
+            "事件核心对象不加下划线（如也门冲突双方）。"
+            "无明确值填—。is_placeholder=true 的行（完整版、快讯目录行）已预填，原样保留。"
+        )
+
     return {
         "date": date_str,
         "date_display": date_display,
         "total_items": len(items),
         "ai_items": sum(1 for it in items if not it["is_placeholder"]),
-        "instructions": (
-            "请根据每条的 title/url/summary/full_text 填写 elements 中的 "
-            "location/subject/event/cause/method 五个字段。"
-            "规则：人物用<u>占位符</u>（如<u>国家主席</u>），"
-            "机构名不加下划线（如农业农村部），"
-            "事件核心对象不加下划线（如也门冲突双方）。"
-            "无明确值填—。快讯目录行（idx为纯数字且title含'联播快讯'）"
-            "填 location=—, subject=—, event=播报XX联播快讯, cause=—, method=目录播报。"
-        ),
+        "instructions": instructions,
         "news_items": items,
     }
 
@@ -532,6 +570,7 @@ def generate_part67(items, date_display, date_str):
         "国家海洋局": "国家海洋局",
         "国家测绘地理信息局": "国家测绘地理信息局",
         "中国银行保险监督管理委员会": "国家金融监督管理总局",
+        "南开大学图书馆": "南开大学图书馆",
     }
 
     # 机构后缀（用于判定 subject 是否为机构名）
@@ -539,6 +578,19 @@ def generate_part67(items, date_display, date_str):
                     "联合会", "集团", "公司", "组织", "银行", "中心", "台",
                     "管理局", "气象台", "航天局", "新闻办", "安委办",
                     "办公室", "图书馆", "大学", "委员会", "航天局")
+
+    # 人物职务关键词（不脱敏模式下识别 NAME_TO_CODE 表外人物：
+    # 外国政要、发言人、部长、院士等。取最靠右关键词，其后 2-5 字视为姓名）
+    person_title_keywords = (
+        "总书记", "国家主席", "军委主席", "委员长", "国务院总理", "总理",
+        "总统", "首相", "议长", "秘书长", "总干事", "部长", "外长", "防长",
+        "财长", "国王", "王储", "酋长", "大使", "发言人", "省委书记",
+        "市委书记", "书记", "省长", "市长", "州长", "校长", "院长",
+        "行长", "董事长", "总司令", "司令", "将军", "元帅", "院士",
+        "教授", "研究员", "总导演", "导演", "主教练", "教练", "运动员",
+        "选手", "演员", "作家", "画家", "科学家", "航天员", "宇航员",
+        "播音员", "主持人", "法官", "检察官",
+    )
 
     # 数据占位符正则（23 种，覆盖常见模式）
     data_patterns = [
@@ -554,7 +606,7 @@ def generate_part67(items, date_display, date_str):
     ]
 
     # --- 收集第七部分数据 ---
-    person_entries = {}    # 姓名/职务 -> [positions]
+    person_entries = {}    # 姓名/占位符 -> {"title": 职务, "positions": [...]}
     institutions = {}      # 简称 -> [positions]
     event_objects = {}     # 名称 -> [positions]
     locations_map = {}     # 地点 -> [positions]
@@ -614,18 +666,73 @@ def generate_part67(items, date_display, date_str):
         # --- 主体三分类 ---
         is_person = False
         if no_desensitize:
+            # 1) 已知人名表匹配（NAME_TO_CODE，覆盖20位常报人物）
+            matched_name = None
             for name in name_to_title:
                 if name in subject:
-                    person_entries.setdefault(name, [])
-                    if pos_label not in person_entries[name]:
-                        person_entries[name].append(pos_label)
-                    is_person = True
+                    matched_name = name
                     break
+            if matched_name:
+                # 职务优先取主体原文写法（可能比映射表更完整），拆不出再用映射表
+                title_raw = re.sub(
+                    r"[、，,\s]*" + re.escape(matched_name) + r"[、，,\s]*",
+                    "", subject,
+                ).strip("、，, ")
+                title = (
+                    title_raw
+                    if title_raw
+                    else name_to_title.get(matched_name, matched_name)
+                )
+                entry = person_entries.setdefault(
+                    matched_name, {"title": title, "positions": []}
+                )
+                if len(title) > len(entry["title"]):
+                    entry["title"] = title  # 保留最完整职务写法
+                if pos_label not in entry["positions"]:
+                    entry["positions"].append(pos_label)
+                is_person = True
+            else:
+                # 2) 职务关键词启发式：取最靠右关键词，其后 2-5 字视为姓名
+                #   （覆盖古特雷斯、发言人、部长等表外人物；纯职务主体也归人物类）
+                cut = -1
+                for kw in person_title_keywords:
+                    i = subject.rfind(kw)
+                    if i >= 0 and i + len(kw) > cut:
+                        cut = i + len(kw)
+                if cut > 0:
+                    name_part = subject[cut:].strip("、，, ")
+                    if not name_part:
+                        # 纯职务主体（正文未提及姓名）：职务即条目
+                        entry = person_entries.setdefault(
+                            subject, {"title": subject, "positions": []}
+                        )
+                        if pos_label not in entry["positions"]:
+                            entry["positions"].append(pos_label)
+                        is_person = True
+                    elif (
+                        2 <= len(name_part) <= 5
+                        and not any(
+                            suf in name_part
+                            for suf in ("部", "委", "局", "办", "会", "院",
+                                        "公司", "大学", "市场", "集团", "组织", "中心")
+                        )
+                    ):
+                        title = subject[:cut].rstrip("、，, ")
+                        entry = person_entries.setdefault(
+                            name_part, {"title": title, "positions": []}
+                        )
+                        if len(title) > len(entry["title"]):
+                            entry["title"] = title
+                        if pos_label not in entry["positions"]:
+                            entry["positions"].append(pos_label)
+                        is_person = True
         else:
             for pos in re.findall(r"<u>(.+?)</u>", subject):
-                person_entries.setdefault(pos, [])
-                if pos_label not in person_entries[pos]:
-                    person_entries[pos].append(pos_label)
+                entry = person_entries.setdefault(
+                    pos, {"title": pos, "positions": []}
+                )
+                if pos_label not in entry["positions"]:
+                    entry["positions"].append(pos_label)
                 is_person = True
 
         if not is_person and subject != "—":
@@ -695,9 +802,8 @@ def generate_part67(items, date_display, date_str):
     if no_desensitize:
         L("| 序号 | 姓名 | 职务/身份 | 出现位置 |")
         L("|------|------|----------|---------|")
-        for i, (name, positions) in enumerate(person_entries.items(), 1):
-            title_str = name_to_title.get(name, name)
-            L(f"| {i} | {name} | {title_str} | {'、'.join(positions)} |")
+        for i, (name, info) in enumerate(person_entries.items(), 1):
+            L(f"| {i} | {name} | {info['title']} | {'、'.join(info['positions'])} |")
         if not person_entries:
             L("| — | — | 本日无人物类 | — |")
     else:
@@ -712,8 +818,8 @@ def generate_part67(items, date_display, date_str):
             key=lambda x: position_order.index(x) if x in position_order else 99,
         )
         for i, pos in enumerate(sorted_persons, 1):
-            positions = person_entries[pos]
-            L(f"| {i} | <u>{pos}</u> | {pos} | {'、'.join(positions)} |")
+            info = person_entries[pos]
+            L(f"| {i} | <u>{pos}</u> | {pos} | {'、'.join(info['positions'])} |")
         if not sorted_persons:
             L("| — | — | 本日无人物类占位符 | — |")
     L("")
