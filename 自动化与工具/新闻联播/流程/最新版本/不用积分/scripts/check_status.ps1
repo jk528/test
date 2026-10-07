@@ -117,7 +117,7 @@ if (Test-Path $LogDir) {
 # ============================================================
 Write-Step "最近生成的报告"
 
-$archiveDir = Join-Path $ProjectRoot "..\..\归档"
+$archiveDir = Join-Path $ProjectRoot "..\..\..\归档"
 
 if (Test-Path $archiveDir) {
     $recentFiles = Get-ChildItem $archiveDir -Recurse -Filter "新闻联播总结_*.md" | 

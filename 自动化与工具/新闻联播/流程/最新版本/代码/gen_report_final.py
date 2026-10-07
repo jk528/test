@@ -477,6 +477,11 @@ def generate_part67(items, date_display, date_str):
         category = item["category"]
         elements = item.get("elements") or {}
 
+        # 跳过快讯父目录行（idx 为纯数字且 title 含"联播快讯"）
+        # 父目录行保留在第二、五部分体现央视网分条顺序，第六部分只列有实质内容的独立新闻
+        if idx.isdigit() and "联播快讯" in title:
+            continue
+
         time_val = elements.get("time", date_display[:4] + "-" + date_display[5:7] + "-" + date_display[8:10])
         location = elements.get("location", "—")
         subject = elements.get("subject", "—")

@@ -1925,6 +1925,10 @@ class Dataset:
             self.full_url, "—", True,
         ))
         for i, item in enumerate(self.news, start=1):
+            # 跳过快讯父目录行（"国内/国际联播快讯"纯目录行不进入第六部分）
+            # 父目录行保留在第二、五部分体现央视网分条顺序，第六部分只列有实质内容的独立新闻
+            if item.get("is_dir"):
+                continue
             rows.append((
                 str(i), (1, i), item["title"], item["url"], item["category"],
                 item["elements"], item["url"], item["importance"], False,
