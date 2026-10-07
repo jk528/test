@@ -2748,10 +2748,11 @@ Public Sub SplitByChapterV3(ByVal InputPath As String, _
     If charWidth < 1 Then charWidth = 1
     charFmt = String(charWidth, "0")
 
-    ' v3.6 方案四：按卷分目录的卷标题映射 + 卷宽度 + 卷内计数器
-    Dim volTitleMap As Object, volWrittenCount As Object
+    ' v3.6 方案四：按卷分目录的卷标题/单位词映射 + 卷宽度 + 卷内计数器
+    Dim volTitleMap As Object, volUnitMap As Object, volWrittenCount As Object
     Dim maxVolNum As Long, volWidth As Long, volWidthFmt As String
     Set volTitleMap = CreateObject("Scripting.Dictionary")
+    Set volUnitMap = CreateObject("Scripting.Dictionary")
     Set volWrittenCount = CreateObject("Scripting.Dictionary")
     maxVolNum = 0
     If byVolFlag Then
@@ -2763,6 +2764,10 @@ Public Sub SplitByChapterV3(ByVal InputPath As String, _
         For vi = 0 To ch_count - 1
             If ch_levels(vi) = "volume" And ch_vols(vi) > 0 Then
                 If ch_vols(vi) > maxVolNum Then maxVolNum = ch_vols(vi)
+                ' v3.6 Bug修复：存储卷的单位词（卷/部/册/篇/集/季），不能用章节单位词
+                If Not volUnitMap.Exists(ch_vols(vi)) Then
+                    volUnitMap.Add ch_vols(vi), ch_units(vi)
+                End If
                 volSub = ""
                 If regVol2.Test(ch_titles(vi)) Then
                     Set mVol = regVol2.Execute(ch_titles(vi))
@@ -2846,9 +2851,12 @@ Public Sub SplitByChapterV3(ByVal InputPath As String, _
             GoTo NextChapterV3
         End If
 
+        ' v3.6 Bug修复：卷级条目（卷标题）不生成文件，避免占用序列号导致跳号
+        If ch_levels(origIdx) = "volume" Then GoTo NextChapterV3
+
         ' 文件名
         Dim serial As String, charCnt As String, safeTitle As String
-        Dim fileName As String, outPath As String
+        Dim fileName As String, outPath As String, fileDir As String
         Dim displaySerial As String, volTagStr As String
         serial = Format(writtenCount + 1, serialFmt)
         charCnt = Format(charCounts(i), charFmt)
@@ -2858,8 +2866,14 @@ Public Sub SplitByChapterV3(ByVal InputPath As String, _
         Dim vn As Long
         vn = ch_vols(origIdx)
         If byVolFlag And vn > 0 Then
-            Dim volDir As String, volSerial As String
-            volDir = "第" & Format(vn, volWidthFmt) & ch_units(origIdx)
+            Dim volDir As String, volSerial As String, volUnitStr As String
+            ' v3.6 Bug修复：用卷的单位词（卷/部/册），不用章节的单位词（章/回/节）
+            If volUnitMap.Exists(vn) Then
+                volUnitStr = volUnitMap(vn)
+            Else
+                volUnitStr = "卷"
+            End If
+            volDir = "第" & Format(vn, volWidthFmt) & volUnitStr
             If volTitleMap.Exists(vn) Then
                 If Len(volTitleMap(vn)) > 0 Then
                     volDir = volDir & "_" & SanitizeFileName(volTitleMap(vn))
