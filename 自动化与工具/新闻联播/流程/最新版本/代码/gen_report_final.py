@@ -436,139 +436,41 @@ def phase3_merge(date_str):
 
 
 def generate_part67(items, date_display, date_str):
-    """生成第六七部分"""
-    lines = []
+    """生成第六七部分（v2.0.0 高质量渲染）
 
+    v2.0.0 重大优化（优化积分建议 优化1）：
+    - 数据占位符：23 种正则，不限数量（旧版仅 4 种限 5 条）
+    - 地点占位符：从六要素提取全部（旧版仅北京/全国）
+    - 机构全称：40+ 映射 + 兜底标注（旧版 17 个）
+    - 事件核心对象：分类逻辑（旧版 5 个硬编码关键词）
+    - 新增 7.5 内容占位符：扫描《...》书名/文件名
+    - 不脱敏版支持：人物直接列姓名+职务
+    - 空表兜底：无数据时显示"本日无XXX"
+    """
+    no_desensitize = bool(os.environ.get("XWLB_NO_DESENSITIZE"))
+
+    lines = []
     def L(s):
         lines.append(s)
 
-    # --- 第六部分 ---
-    L("---")
-    L("")
-    L("## 六、新闻六要素索引")
-    L("")
-    L(
-        '> 完整版单独列出，不纳入常规新闻编号。常规新闻按当天央视网实际分条顺序编号，'
-        '快讯子条目使用"序号-子序号"编号（如9-1、9-2）。'
-    )
-    L(
-        '> 新闻主体列填写每条新闻的核心行动者：人物使用占位符（如"国家领导人"），'
-        '不出现具体人名；无人物主体时填写机构名称或事件核心对象。'
-    )
-    L(
-        '> **脱敏标记规则**：所有由人名替换而来的占位符，均使用HTML下划线标记，'
-        '格式为 `<u>占位符</u>`。机构名称、事件核心对象等非人名替换内容不加下划线。'
-    )
-    L("")
-    L("| 序号 | 新闻标题（可点击跳转） | 类别 | 时间 | 地点 | 新闻主体 | 事件 | 原因 | 方式 | 详细信息源链接 |")
-    L("|------|---------|------|------|------|------|------|------|------|------|")
+    date_short = f"{date_display[:4]}-{date_display[5:7]}-{date_display[8:10]}"
 
-    # 收集所有人物占位符和机构（用于第七部分）
-    person_placeholders = {}  # position -> [positions_found]
-    institutions = {}  # abbr -> full_name
-    event_objects = {}  # name -> (desc, pos)
-    data_items = []  # (value, desc)
-    data_set = set()
+    # 人名映射表（不脱敏版用于拆分姓名和职务）
+    name_to_title = {}
+    try:
+        from fetch_xwlb import NAME_TO_CODE, CODE_TO_POSITION
+        for name_unicode, code in NAME_TO_CODE:
+            title = CODE_TO_POSITION.get(code, "")
+            if title:
+                name_to_title[name_unicode] = title
+    except Exception:
+        pass
 
-    for item in items:
-        idx = item["idx"]
-        title = item["title"]
-        url = item["url"]
-        category = item["category"]
-        elements = item.get("elements") or {}
-
-        # 跳过快讯父目录行（idx 为纯数字且 title 含"联播快讯"）
-        # 父目录行保留在第二、五部分体现央视网分条顺序，第六部分只列有实质内容的独立新闻
-        if idx.isdigit() and "联播快讯" in title:
-            continue
-
-        time_val = elements.get("time", date_display[:4] + "-" + date_display[5:7] + "-" + date_display[8:10])
-        location = elements.get("location", "—")
-        subject = elements.get("subject", "—")
-        event = elements.get("event", "—")
-        cause = elements.get("cause", "—")
-        method = elements.get("method", "—")
-
-        # 详细信息源链接
-        if item.get("is_placeholder"):
-            source_url = url
-            source_label = "央视网"
-        elif "-" in idx:  # 快讯子条目
-            source_url = item.get("source_url", url)
-            source_label = "央视网"
-        else:
-            source_url = url
-            source_label = "央视网"
-
-        L(f"| {idx} | [{title}]({url}) | {category} | {time_val} | {location} | {subject} | {event} | {cause} | {method} | [{source_label}]({source_url}) |")
-
-        # 收集第七部分数据
-        # 人物占位符
-        person_match = re.findall(r"<u>(.+?)</u>", subject)
-        for pos in person_match:
-            if pos not in person_placeholders:
-                person_placeholders[pos] = []
-            person_placeholders[pos].append(idx)
-
-        # 机构类（不加下划线的主体）
-        if not person_match and subject != "—" and "冲突双方" not in subject and "航线" not in subject and "货机" not in subject and "火山" not in subject and "产油国" not in subject and "服贸会" not in subject and "建设方" not in subject:
-            if subject not in institutions:
-                institutions[subject] = "快讯" if "-" in idx else f"第{idx}条"
-
-        # 事件核心对象
-        if "冲突双方" in subject or "火山" in subject or "产油国" in subject or "航线" in subject or "货机" in subject:
-            if subject not in event_objects:
-                event_objects[subject] = (title[:20], "国际快讯" if "-" in idx else f"第{idx}条")
-
-        # 数据占位符
-        text_to_scan = title + " " + item.get("summary", "") + " " + item.get("full_text", "")
-        for pat in [r"(\d+亿元)", r"(\d+亿美元)", r"(\d+\.?\d*公里)", r"(\d+万吨)"]:
-            for m in re.finditer(pat, text_to_scan):
-                d = m.group(1)
-                if d not in data_set:
-                    data_set.add(d)
-                    data_items.append((d, title[:15]))
-                if len(data_items) >= 5:
-                    break
-            if len(data_items) >= 5:
-                break
-
-    L("")
-    L(
-        '> **编号规则**：常规新闻按央视网分条编号，'
-        '快讯子条目为N-M格式，标题链接对应各来源页面。'
-    )
-    L("")
-    L("---")
-    L("")
-
-    # --- 第七部分 ---
-    L("## 七、占位符统合信息")
-    L("")
-    L("### 7.1 新闻主体占位符")
-    L("")
-    L("#### 7.1.1 人物类")
-    L("| 序号 | 占位符 | 职务/身份 | 出现位置 |")
-    L("|------|--------|----------|---------|")
-    position_order = [
-        "国家主席", "国务院总理", "全国人大常委会委员长", "全国政协主席",
-        "国家副主席", "中共中央政治局常委", "国务院副总理", "中央纪委书记",
-    ]
-    sorted_persons = sorted(
-        person_placeholders.keys(),
-        key=lambda x: position_order.index(x) if x in position_order else 99,
-    )
-    for i, pos in enumerate(sorted_persons):
-        positions = person_placeholders[pos]
-        L(f"| {i+1} | <u>{pos}</u> | {pos} | 第{'、'.join(positions)}条 |")
-    L("")
-
-    L("#### 7.1.2 机构类")
-    L("| 序号 | 占位符 | 机构全称 | 出现位置 |")
-    L("|------|--------|---------|---------|")
+    # 机构全称映射表（扩充版）
     inst_full_names = {
         "财政部": "中华人民共和国财政部",
         "最高人民法院": "中华人民共和国最高人民法院",
+        "最高人民检察院": "中华人民共和国最高人民检察院",
         "国家外汇管理局": "国家外汇管理局",
         "中央宣传部": "中共中央宣传部",
         "教育部": "中华人民共和国教育部",
@@ -581,57 +483,309 @@ def generate_part67(items, date_display, date_str):
         "国家发展改革委": "中华人民共和国国家发展和改革委员会",
         "中国人民银行": "中国人民银行",
         "中国证监会": "中国证券监督管理委员会",
-        "广西壮族自治区人民政府": "广西壮族自治区人民政府",
-        "国家外汇管理局": "国家外汇管理局",
+        "交通运输部": "中华人民共和国交通运输部",
+        "国务院新闻办": "国务院新闻办公室",
+        "国务院安委办": "国务院安全生产委员会办公室",
+        "国务院安委会办公室": "国务院安全生产委员会办公室",
+        "国家航天局": "国家航天局",
+        "国家医保局": "国家医疗保障局",
+        "国家标准委": "国家标准化管理委员会",
+        "国家统计局": "国家统计局",
+        "生态环境部": "中华人民共和国生态环境部",
+        "市场监管总局": "国家市场监督管理总局",
+        "文化和旅游部": "中华人民共和国文化和旅游部",
+        "国家文物局": "国家文物局",
+        "拱北海关": "中华人民共和国拱北海关",
+        "中国物流与采购联合会": "中国物流与采购联合会",
+        "国家知识产权局": "国家知识产权局",
+        "水利部": "中华人民共和国水利部",
+        "自然资源部": "中华人民共和国自然资源部",
+        "住房和城乡建设部": "中华人民共和国住房和城乡建设部",
+        "审计署": "中华人民共和国审计署",
+        "国家卫健委": "国家卫生健康委员会",
+        "国家林草局": "国家林业和草原局",
         "中央气象台": "中央气象台",
+        "中国航天科技集团": "中国航天科技集团",
+        "公安部": "中华人民共和国公安部",
+        "国家安全部": "中华人民共和国国家安全部",
+        "司法部": "中华人民共和国司法部",
+        "民政部": "中华人民共和国民政部",
+        "人力资源社会保障部": "中华人民共和国人力资源和社会保障部",
+        "退役军人事务部": "中华人民共和国退役军人事务部",
+        "国家广电总局": "国家广播电视总局",
+        "国务院港澳办": "国务院港澳事务办公室",
+        "国家能源局": "国家能源局",
+        "国家粮食和物资储备局": "国家粮食和物资储备局",
+        "中国民航局": "中国民用航空局",
+        "国家铁路局": "国家铁路局",
+        "中国航天局": "中国航天局",
+        "新华社": "新华通讯社",
+        "中国社会科学院": "中国社会科学院",
+        "中国工程院": "中国工程院",
+        "中国科学院": "中国科学院",
+        "国家自然科学基金委": "国家自然科学基金委员会",
+        "全国人大常委会": "全国人民代表大会常务委员会",
+        "全国政协": "中国人民政治协商会议全国委员会",
+        "中央军委": "中央军事委员会",
+        "国家国防科技工业局": "国家国防科技工业局",
+        "中国气象局": "中国气象局",
+        "国家海洋局": "国家海洋局",
+        "国家测绘地理信息局": "国家测绘地理信息局",
+        "中国银行保险监督管理委员会": "国家金融监督管理总局",
     }
-    for i, (abbr, pos) in enumerate(institutions.items()):
-        full_name = inst_full_names.get(abbr, abbr)
-        L(f"| {i+1} | {abbr} | {full_name} | {pos} |")
+
+    # 机构后缀（用于判定 subject 是否为机构名）
+    org_suffixes = ("部", "委", "局", "办", "会", "署", "院", "海关",
+                    "联合会", "集团", "公司", "组织", "银行", "中心", "台",
+                    "管理局", "气象台", "航天局", "新闻办", "安委办",
+                    "办公室", "图书馆", "大学", "委员会", "航天局")
+
+    # 数据占位符正则（23 种，覆盖常见模式）
+    data_patterns = [
+        r"(\d+\.?\d*万亿元)", r"(\d+\.?\d*亿元)", r"(\d+\.?\d*亿美元)",
+        r"(\d+\.?\d*万亿斤)", r"(\d+\.?\d*亿斤)", r"(\d+\.?\d*亿吨)",
+        r"(\d+\.?\d*亿人次)", r"(\d+\.?\d*亿)", r"(\d+\.?\d*万标箱)",
+        r"(\d+\.?\d*万人次)", r"(\d+\.?\d*万人次)", r"(\d+\.?\d*万株)",
+        r"(\d+\.?\d*万辆次)", r"(\d+\.?\d*万元)", r"(\d+\.?\d*万套)",
+        r"(\d+\.?\d*万件)", r"(\d+\.?\d*万公里)", r"(\d+\.?\d*公里)",
+        r"(\d+\.?\d*万吨)", r"(\d+\.?\d*个百分点)", r"(\d+\.?\d*%)",
+        r"(\d+\.?\d*个)", r"(\d+\.?\d*条)", r"(\d+\.?\d*家)",
+        r"(\d+\.?\d*处)", r"(\d+\.?\d*趟)", r"(\d+\.?\d*次)",
+    ]
+
+    # --- 收集第七部分数据 ---
+    person_entries = {}    # 姓名/职务 -> [positions]
+    institutions = {}      # 简称 -> [positions]
+    event_objects = {}     # 名称 -> [positions]
+    locations_map = {}     # 地点 -> [positions]
+    data_items = []         # (value, desc, pos)
+    data_set = set()
+    content_items = []     # (name, pos)
+    content_set = set()
+
+    # --- 第六部分 ---
+    L("---")
+    L("")
+    L("## 六、新闻六要素索引")
+    L("")
+    if no_desensitize:
+        L('> 完整版单独列出，不纳入常规新闻编号。常规新闻按当天央视网实际分条顺序编号，快讯子条目使用"序号-子序号"编号（如8-1、8-2）。')
+        L('> 新闻主体列填写每条新闻的核心行动者：人物直接写"职务+姓名"（如"联合国秘书长古特雷斯"），不加占位符标签；无人物主体时填写机构名称或事件核心对象。')
+        L('> **本报告为不脱敏版**：保留新闻原始人名，人物以"职务+姓名"形式呈现，与央视网原始播报一致。')
+    else:
+        L('> 完整版单独列出，不纳入常规新闻编号。常规新闻按当天央视网实际分条顺序编号，快讯子条目使用"序号-子序号"编号（如8-1、8-2）。')
+        L('> 新闻主体列填写每条新闻的核心行动者：人物使用占位符（如"国家领导人"），不出现具体人名；无人物主体时填写机构名称或事件核心对象。')
+        L('> **脱敏标记规则**：所有由人名替换而来的占位符，均使用HTML下划线标记，格式为 `<u>占位符</u>`。机构名称、事件核心对象等非人名替换内容不加下划线。')
+    L("")
+    L("| 序号 | 新闻标题（可点击跳转） | 类别 | 时间 | 地点 | 新闻主体 | 事件 | 原因 | 方式 | 详细信息源链接 |")
+    L("|------|------|------|------|------|------|------|------|------|------|")
+
+    for item in items:
+        idx = item["idx"]
+        title = item["title"]
+        url = item["url"]
+        category = item["category"]
+        elements = item.get("elements") or {}
+
+        # 跳过快讯父目录行
+        if idx.isdigit() and "联播快讯" in title:
+            continue
+
+        time_val = elements.get("time", date_short)
+        location = elements.get("location", "—")
+        subject = elements.get("subject", "—")
+        event = elements.get("event", "—")
+        cause = elements.get("cause", "—")
+        method = elements.get("method", "—")
+
+        # 详细信息源链接
+        if item.get("is_placeholder"):
+            source_url = url
+        elif "-" in idx:
+            source_url = item.get("source_url", url)
+        else:
+            source_url = url
+
+        L(f"| {idx} | [{title}]({url}) | {category} | {time_val} | {location} | {subject} | {event} | {cause} | {method} | [央视网]({source_url}) |")
+
+        # 位置标签
+        pos_label = idx if "-" in idx else f"第{idx}条"
+
+        # --- 主体三分类 ---
+        is_person = False
+        if no_desensitize:
+            for name in name_to_title:
+                if name in subject:
+                    person_entries.setdefault(name, [])
+                    if pos_label not in person_entries[name]:
+                        person_entries[name].append(pos_label)
+                    is_person = True
+                    break
+        else:
+            for pos in re.findall(r"<u>(.+?)</u>", subject):
+                person_entries.setdefault(pos, [])
+                if pos_label not in person_entries[pos]:
+                    person_entries[pos].append(pos_label)
+                is_person = True
+
+        if not is_person and subject != "—":
+            # 判定机构 vs 事件核心对象
+            is_org = (subject in inst_full_names or
+                      any(subject.endswith(suf) or suf in subject for suf in org_suffixes))
+            if is_org:
+                institutions.setdefault(subject, [])
+                if pos_label not in institutions[subject]:
+                    institutions[subject].append(pos_label)
+            else:
+                event_objects.setdefault(subject, [])
+                if pos_label not in event_objects[subject]:
+                    event_objects[subject].append(pos_label)
+
+        # --- 地点 ---
+        if location and location != "—":
+            for one in re.split(r"[、，/]", location):
+                one = one.strip()
+                if one and one != "—":
+                    locations_map.setdefault(one, [])
+                    if pos_label not in locations_map[one]:
+                        locations_map[one].append(pos_label)
+
+        # --- 数据占位符（不限数量） ---
+        text_to_scan = title + " " + item.get("summary", "") + " " + item.get("full_text", "")
+        for pat in data_patterns:
+            for m in re.finditer(pat, text_to_scan):
+                d = m.group(1)
+                if d not in data_set:
+                    data_set.add(d)
+                    data_items.append((d, title[:20], pos_label))
+
+        # --- 内容占位符（《...》书名/文件名） ---
+        for m in re.finditer(r"《([^》]+)》", text_to_scan):
+            name = m.group(1)
+            if name not in content_set:
+                content_set.add(name)
+                content_items.append((name, pos_label))
+
+    L("")
+    L("> **编号规则**：")
+    L('> - **完整版单独列出**：序号列填"完整版"（非数字），不纳入常规新闻计数')
+    L("> - **常规新闻按当天分条编号**：从1开始连续编号（1、2、3...）")
+    L('> - **快讯子条目格式**：N-M（N为父目录在央视网分条中的实际序号，M为子条目序号）')
+    L('> - **快讯父目录行不出现**：序号8、12等纯目录行不在第六部分列出，只列子条目行')
+    L("> - **常规新闻标题链接**：央视网独立视频页面，一一对应")
+    L('> - **快讯子条目标题链接**：齐鲁网独立页面，一一对应，禁止合并')
+    L('> - **详细信息源链接列**：常规新闻与国内快讯填详细来源；国际快讯填央视网快讯目录视频链接')
+    L("")
+    L("---")
     L("")
 
+    # --- 第七部分 ---
+    L("## 七、占位符统合信息")
+    L("")
+    L("### 7.1 新闻主体占位符")
+    L('> 涵盖第六部分"新闻主体"列的所有主体，包括人物、机构和事件核心对象三类。')
+    if no_desensitize:
+        L("> 不脱敏版：人物类直接列姓名与职务。")
+    else:
+        L("> 脱敏版：人物类用 <u>职务</u> 占位符。")
+    L("")
+
+    # 7.1.1 人物类
+    L("#### 7.1.1 人物类")
+    if no_desensitize:
+        L("| 序号 | 姓名 | 职务/身份 | 出现位置 |")
+        L("|------|------|----------|---------|")
+        for i, (name, positions) in enumerate(person_entries.items(), 1):
+            title_str = name_to_title.get(name, name)
+            L(f"| {i} | {name} | {title_str} | {'、'.join(positions)} |")
+        if not person_entries:
+            L("| — | — | 本日无人物类 | — |")
+    else:
+        L("| 序号 | 占位符 | 职务/身份 | 出现位置 |")
+        L("|------|--------|----------|---------|")
+        position_order = [
+            "国家主席", "国务院总理", "全国人大常委会委员长", "全国政协主席",
+            "国家副主席", "中共中央政治局常委", "国务院副总理", "中央纪委书记",
+        ]
+        sorted_persons = sorted(
+            person_entries.keys(),
+            key=lambda x: position_order.index(x) if x in position_order else 99,
+        )
+        for i, pos in enumerate(sorted_persons, 1):
+            positions = person_entries[pos]
+            L(f"| {i} | <u>{pos}</u> | {pos} | {'、'.join(positions)} |")
+        if not sorted_persons:
+            L("| — | — | 本日无人物类占位符 | — |")
+    L("")
+
+    # 7.1.2 机构类
+    L("#### 7.1.2 机构类")
+    L("| 序号 | 占位符 | 机构全称 | 出现位置 |")
+    L("|------|--------|---------|---------|")
+    for i, (abbr, positions) in enumerate(institutions.items(), 1):
+        full_name = inst_full_names.get(abbr, abbr + "（待补充全称）")
+        L(f"| {i} | {abbr} | {full_name} | {'、'.join(positions)} |")
+    if not institutions:
+        L("| — | — | 本日无机构类 | — |")
+    L("")
+
+    # 7.1.3 事件核心对象类
     L("#### 7.1.3 事件核心对象类")
     L("| 序号 | 占位符 | 说明 | 出现位置 |")
     L("|------|--------|------|---------|")
-    for i, (name, (desc, pos)) in enumerate(event_objects.items()):
-        L(f"| {i+1} | {name} | {desc} | {pos} |")
+    for i, (name, positions) in enumerate(event_objects.items(), 1):
+        L(f"| {i} | {name} | 事件核心行动者/对象 | {'、'.join(positions)} |")
+    if not event_objects:
+        L("| — | — | 本日无事件核心对象类 | — |")
     L("")
 
+    # 7.2 时间占位符
     L("### 7.2 时间占位符")
     L("| 序号 | 占位符 | 说明 | 出现位置 |")
     L("|------|--------|------|---------|")
     L(f"| 1 | {date_display} | 新闻播出日期 | 全文 |")
     L("")
 
+    # 7.3 地点占位符
     L("### 7.3 地点占位符")
     L("| 序号 | 占位符 | 说明 | 出现位置 |")
     L("|------|--------|------|---------|")
-    # 从六要素中收集地点
-    locations_seen = set()
-    for item in items:
-        elements = item.get("elements") or {}
-        loc = elements.get("location", "—")
-        if loc != "—" and loc not in locations_seen:
-            locations_seen.add(loc)
-    if "北京" in locations_seen:
-        L("| 1 | 北京 | 首都/政治中心 | 领导人活动报道 |")
-    if "全国" in locations_seen or "全国各地" in locations_seen:
-        L(f"| {'1' if '北京' not in locations_seen else '2'} | 全国各地 | 新闻涉及地域 | 国内新闻 |")
+    for i, (loc, positions) in enumerate(locations_map.items(), 1):
+        L(f"| {i} | {loc} | 新闻涉及地点 | {'、'.join(positions)} |")
+    if not locations_map:
+        L("| — | — | 本日无地点占位符 | — |")
     L("")
 
+    # 7.4 数据占位符
     L("### 7.4 数据占位符")
     L("| 序号 | 占位符 | 说明 | 出现位置 |")
     L("|------|--------|------|---------|")
-    for i, (d, desc) in enumerate(data_items):
-        L(f"| {i+1} | {d} | {desc} | 快讯/正文中 |")
+    for i, (d, desc, pos) in enumerate(data_items, 1):
+        L(f"| {i} | {d} | {desc} | {pos} |")
+    if not data_items:
+        L("| — | — | 本日无数据占位符 | — |")
     L("")
 
+    # 7.5 内容占位符
+    L("### 7.5 内容占位符")
+    L("| 序号 | 占位符 | 说明 | 出现位置 |")
+    L("|------|--------|------|---------|")
+    for i, (name, pos) in enumerate(content_items, 1):
+        L(f"| {i} | 《{name}》 | 文件/栏目名称 | {pos} |")
+    if not content_items:
+        L("| — | — | 本日无内容占位符 | — |")
+    L("")
+
+    # 尾部
     L("---")
     L("")
     L("> **数据来源**：")
     L(f"> - 央视新闻联播（{date_display}）：[央视网新闻联播列表页](https://tv.cctv.com/lm/xwlb/day/{date_str}.shtml)")
     L("> - 央视网：[tv.cctv.com](https://tv.cctv.com/)")
-    L("> - 齐鲁网：[v.iqilu.com](https://v.iqilu.com/)")
+    L("> - 财联社：[www.cls.cn](https://www.cls.cn/)")
+    L("> - 中新网：[www.chinanews.com](https://www.chinanews.com/)")
+    L("> - 新华社：[www.xinhuanet.com](https://www.xinhuanet.com/)")
+    L("> - 齐鲁网（备用）：[v.iqilu.com](https://v.iqilu.com/)")
     L("> **声明**：本报告基于公开新闻信息整理，仅供参考。播放时间节点为推算值，实际可能有±10秒误差。")
     L("")
 
