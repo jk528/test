@@ -62,12 +62,14 @@ var g_regexNames = [];
 var g_regexPatterns = [];
 var g_regexUnitGroups = [];
 var g_regexDefaultUnits = [];
+var g_regexMaxLens = [];      // v3.6：最大行长度限制（0=不限制）
 var g_regexCount = 0;
 
 var g_selPatterns = [];
 var g_selUnitGroups = [];
 var g_selDefaultUnits = [];
 var g_selOrigIndices = [];
+var g_selMaxLens = [];        // v3.6：选中正则的最大行长度限制
 var g_selCount = 0;
 
 // --- 去重、排序与卷 ---
@@ -496,17 +498,17 @@ function 设置TXTv3() {
 function InitRegexPatterns() {
     g_regexCount = 0;
 
-    // 1. 标准中文（终极数字字符类）
+    // 1. 标准中文（终极数字字符类 + 多单位词）
     g_regexCount++;
     g_regexNames[g_regexCount] = "标准中文（第N章/回/节/卷，含中文数字含〇含大写）";
     g_regexPatterns[g_regexCount] = "^[ \\t　]*第([0-9０-９一二三四五六七八九十百千万亿億零〇○两兩壹貳贰叁參肆伍陸陆柒捌玖拾佰仟廿卅卌皕萬]+)(章|回|节|卷)(?:[ \\t　：:]+(.*))?$";
     g_regexUnitGroups[g_regexCount] = 1;
     g_regexDefaultUnits[g_regexCount] = "章";
 
-    // 2. 纯阿拉伯数字
+    // 2. 无第字中文（全数字字符类 + 多单位词）
     g_regexCount++;
-    g_regexNames[g_regexCount] = "纯阿拉伯数字（第N章/回/节/卷）";
-    g_regexPatterns[g_regexCount] = "^[ \\t　]*第([0-9０-９]+)(章|回|节|卷)(?:[ \\t　：:]+(.*))?$";
+    g_regexNames[g_regexCount] = "无第字中文（N章/回/节/卷，含中文数字）";
+    g_regexPatterns[g_regexCount] = "^[ \\t　]*([0-9０-９一二三四五六七八九十百千万亿億零〇○两兩壹貳贰叁參肆伍陸陆柒捌玖拾佰仟廿卅卌皕萬]+)(章|回|节|卷)(?:[ \\t　：:]+(.*))?$";
     g_regexUnitGroups[g_regexCount] = 1;
     g_regexDefaultUnits[g_regexCount] = "章";
 
@@ -517,42 +519,28 @@ function InitRegexPatterns() {
     g_regexUnitGroups[g_regexCount] = -1;
     g_regexDefaultUnits[g_regexCount] = "Chapter";
 
-    // 4. 序章/楔子/番外（无章号）
+    // 4. 无号特殊章节
     g_regexCount++;
-    g_regexNames[g_regexCount] = "序章/楔子/番外（无章号）";
+    g_regexNames[g_regexCount] = "无号特殊章节（序章/楔子/番外/…）";
     g_regexPatterns[g_regexCount] = "^[ \\t　]*(序章|楔子|尾声|番外|引子|后记|终章|序言|前言|跋)(?:[ \\t　：:]+(.*))?$";
     g_regexUnitGroups[g_regexCount] = -1;
     g_regexDefaultUnits[g_regexCount] = "章";
 
-    // 5. 数字+标题（无"第"字）
-    g_regexCount++;
-    g_regexNames[g_regexCount] = "数字+标题（无\"第\"字，如 1章 标题）";
-    g_regexPatterns[g_regexCount] = "^[ \\t　]*([0-9０-９]+)(章|回|节|卷)(?:[ \\t　：:]+(.*))?$";
-    g_regexUnitGroups[g_regexCount] = 1;
-    g_regexDefaultUnits[g_regexCount] = "章";
-
-    // 6. 精简中文
-    g_regexCount++;
-    g_regexNames[g_regexCount] = "精简中文（仅章节，含〇，限1-7字）";
-    g_regexPatterns[g_regexCount] = "^[ \\t　]*第([零〇○一二三四五六七八九十百千两兩]{1,7})(章|节)(?:[ \\t　：:]+(.*))?$";
-    g_regexUnitGroups[g_regexCount] = 1;
-    g_regexDefaultUnits[g_regexCount] = "章";
-
-    // 7. 宽松匹配
-    g_regexCount++;
-    g_regexNames[g_regexCount] = "宽松匹配（第+任意内容+章/回/节/卷）";
-    g_regexPatterns[g_regexCount] = "^[ \\t　]*第(.+?)(章|回|节|卷)(?:[ \\t　：:]+(.*))?$";
-    g_regexUnitGroups[g_regexCount] = 1;
-    g_regexDefaultUnits[g_regexCount] = "章";
-
-    // 8. 纯数字起始
+    // 5. 纯数字起始
     g_regexCount++;
     g_regexNames[g_regexCount] = "纯数字起始（3-4位数字开头，如 001 标题）";
     g_regexPatterns[g_regexCount] = "^[ \\t　]*([0-9０-９]{3,4})(?:[ \\t　：:]+(.*))?$";
     g_regexUnitGroups[g_regexCount] = -1;
     g_regexDefaultUnits[g_regexCount] = "章";
 
-    // 9. 自定义正则
+    // 6. 宽泛通配（第N + 任意内容 + 单位词，处理特殊格式）
+    g_regexCount++;
+    g_regexNames[g_regexCount] = "宽泛通配（第N…章/回/节/卷，数字与单位词间可含内容）";
+    g_regexPatterns[g_regexCount] = "^[ \\t　]*第([0-9０-９一二三四五六七八九十百千万亿億零〇○两兩壹貳贰叁參肆伍陸陆柒捌玖拾佰仟廿卅卌皕萬]+).*?(章|回|节|卷).*$";
+    g_regexUnitGroups[g_regexCount] = 1;
+    g_regexDefaultUnits[g_regexCount] = "章";
+
+    // 7. 自定义正则
     g_regexCount++;
     g_regexNames[g_regexCount] = "自定义正则（手动输入）";
     g_regexPatterns[g_regexCount] = "";
@@ -582,10 +570,10 @@ function SelectRegexPattern() {
     prompt += "\n输入格式：\n" +
               "  单选:  1\n" +
               "  多选:  1,2,3  或  1 2 3\n" +
-              "  示例:  1,4      同时使用 标准中文 + 序章/楔子\n\n" +
+              "  示例:  1,2,4    同时使用 标准中文 + 无第字中文 + 无号特殊章节\n\n" +
               "请输入序号：";
 
-    var inputVal = Application.InputBox(prompt, "选择正则表达式（可多选）", "1,4", 100, 100, "", 0, 2);
+    var inputVal = Application.InputBox(prompt, "选择正则表达式（可多选）", "1,2,4", 100, 100, "", 0, 2);
     if (inputVal === false) return false;
 
     inputVal = normalizeSeparators(String(inputVal));
@@ -971,8 +959,6 @@ function ScanChaptersV3(lines) {
                 if (g_selOrigIndices[matchRegIdx] === 4) {
                     lvl = "special";
                     patType = "no_num";
-                } else {
-                    patType = "loose";
                 }
             }
 
@@ -2732,9 +2718,9 @@ function 自动TXTv3() {
     var lines = content.split("\n");
     var tRead = Timer() - t0;
 
-    // 自动正则：固定 "1,4"（标准中文+无号）
+    // 自动正则：固定 "1,2,4"（标准中文+无第字中文+无号特殊章节）
     InitRegexPatterns();
-    var autoParts = ["1", "4"];
+    var autoParts = ["1", "2", "4"];
     g_selPatterns = [];
     g_selUnitGroups = [];
     g_selDefaultUnits = [];

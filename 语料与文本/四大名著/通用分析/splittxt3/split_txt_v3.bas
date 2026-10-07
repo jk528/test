@@ -55,12 +55,14 @@ Private g_regexNames(1 To MAX_REGEX) As String
 Private g_regexPatterns(1 To MAX_REGEX) As String
 Private g_regexUnitGroups(1 To MAX_REGEX) As Long
 Private g_regexDefaultUnits(1 To MAX_REGEX) As String
+Private g_regexMaxLens(1 To MAX_REGEX) As Long    ' v3.6：最大行长度限制（0=不限制）
 Private g_regexCount As Long
 
 Private g_selPatterns() As String
 Private g_selUnitGroups() As Long
 Private g_selDefaultUnits() As String
 Private g_selOrigIndices() As Long
+Private g_selMaxLens() As Long         ' v3.6：选中正则的最大行长度限制
 Private g_selCount As Long
 
 ' --- v3 新增：去重、排序与卷 ---
@@ -126,19 +128,21 @@ Private g_skipShortBody As Long    ' 跳过章节中正文不足的数量
 Private Sub InitRegexPatterns()
     g_regexCount = 0
 
-    ' 1. 标准中文（终极数字字符类）
+    ' 1. 标准中文（终极数字字符类 + 多单位词）
     g_regexCount = g_regexCount + 1
     g_regexNames(g_regexCount) = "标准中文（第N章/回/节/卷，含中文数字含〇含大写）"
     g_regexPatterns(g_regexCount) = "^[ \t　]*第([0-9０-９一二三四五六七八九十百千万亿億零〇○两兩壹貳贰叁參肆伍陸陆柒捌玖拾佰仟廿卅卌皕萬]+)(章|回|节|卷)(?:[ \t　：:]+(.*))?$"
     g_regexUnitGroups(g_regexCount) = 1
     g_regexDefaultUnits(g_regexCount) = "章"
+    g_regexMaxLens(g_regexCount) = 0
 
-    ' 2. 纯阿拉伯数字
+    ' 2. 无第字中文（全数字字符类 + 多单位词）
     g_regexCount = g_regexCount + 1
-    g_regexNames(g_regexCount) = "纯阿拉伯数字（第N章/回/节/卷）"
-    g_regexPatterns(g_regexCount) = "^[ \t　]*第([0-9０-９]+)(章|回|节|卷)(?:[ \t　：:]+(.*))?$"
+    g_regexNames(g_regexCount) = "无第字中文（N章/回/节/卷，含中文数字）"
+    g_regexPatterns(g_regexCount) = "^[ \t　]*([0-9０-９一二三四五六七八九十百千万亿億零〇○两兩壹貳贰叁參肆伍陸陆柒捌玖拾佰仟廿卅卌皕萬]+)(章|回|节|卷)(?:[ \t　：:]+(.*))?$"
     g_regexUnitGroups(g_regexCount) = 1
     g_regexDefaultUnits(g_regexCount) = "章"
+    g_regexMaxLens(g_regexCount) = 0
 
     ' 3. 英文Chapter
     g_regexCount = g_regexCount + 1
@@ -146,48 +150,47 @@ Private Sub InitRegexPatterns()
     g_regexPatterns(g_regexCount) = "^[ \t　]*[Cc]hapter\s+([0-9０-９]+)(?:[ \t　]*[:\.\-]?[ \t　]+(.*))?$"
     g_regexUnitGroups(g_regexCount) = -1
     g_regexDefaultUnits(g_regexCount) = "Chapter"
+    g_regexMaxLens(g_regexCount) = 0
 
-    ' 4. 序章/楔子/番外（无章号）
+    ' 4. 无号特殊章节
     g_regexCount = g_regexCount + 1
-    g_regexNames(g_regexCount) = "序章/楔子/番外（无章号）"
+    g_regexNames(g_regexCount) = "无号特殊章节（序章/楔子/番外/…）"
     g_regexPatterns(g_regexCount) = "^[ \t　]*(序章|楔子|尾声|番外|引子|后记|终章|序言|前言|跋)(?:[ \t　：:]+(.*))?$"
     g_regexUnitGroups(g_regexCount) = -1
     g_regexDefaultUnits(g_regexCount) = "章"
+    g_regexMaxLens(g_regexCount) = 0
 
-    ' 5. 数字+标题（无"第"字）
-    g_regexCount = g_regexCount + 1
-    g_regexNames(g_regexCount) = "数字+标题（无""第""字，如 1章 标题）"
-    g_regexPatterns(g_regexCount) = "^[ \t　]*([0-9０-９]+)(章|回|节|卷)(?:[ \t　：:]+(.*))?$"
-    g_regexUnitGroups(g_regexCount) = 1
-    g_regexDefaultUnits(g_regexCount) = "章"
-
-    ' 6. 精简中文
-    g_regexCount = g_regexCount + 1
-    g_regexNames(g_regexCount) = "精简中文（仅章节，含〇，限1-7字）"
-    g_regexPatterns(g_regexCount) = "^[ \t　]*第([零〇○一二三四五六七八九十百千两兩]{1,7})(章|节)(?:[ \t　：:]+(.*))?$"
-    g_regexUnitGroups(g_regexCount) = 1
-    g_regexDefaultUnits(g_regexCount) = "章"
-
-    ' 7. 宽松匹配
-    g_regexCount = g_regexCount + 1
-    g_regexNames(g_regexCount) = "宽松匹配（第+任意内容+章/回/节/卷）"
-    g_regexPatterns(g_regexCount) = "^[ \t　]*第(.+?)(章|回|节|卷)(?:[ \t　：:]+(.*))?$"
-    g_regexUnitGroups(g_regexCount) = 1
-    g_regexDefaultUnits(g_regexCount) = "章"
-
-    ' 8. 纯数字起始
+    ' 5. 纯数字起始
     g_regexCount = g_regexCount + 1
     g_regexNames(g_regexCount) = "纯数字起始（3-4位数字开头，如 001 标题）"
     g_regexPatterns(g_regexCount) = "^[ \t　]*([0-9０-９]{3,4})(?:[ \t　：:]+(.*))?$"
     g_regexUnitGroups(g_regexCount) = -1
     g_regexDefaultUnits(g_regexCount) = "章"
+    g_regexMaxLens(g_regexCount) = 0
 
-    ' 9. 自定义正则
+    ' 6. 宽泛通配（第N + 任意内容 + 单位词，处理特殊格式）
+    g_regexCount = g_regexCount + 1
+    g_regexNames(g_regexCount) = "宽泛通配（第N…章/回/节/卷，数字与单位词间可含内容）"
+    g_regexPatterns(g_regexCount) = "^[ \t　]*第([0-9０-９一二三四五六七八九十百千万亿億零〇○两兩壹貳贰叁參肆伍陸陆柒捌玖拾佰仟廿卅卌皕萬]+).*?(章|回|节|卷).*$"
+    g_regexUnitGroups(g_regexCount) = 1
+    g_regexDefaultUnits(g_regexCount) = "章"
+    g_regexMaxLens(g_regexCount) = 0
+
+    ' 7. 超宽泛（可选第字 + 可选单位词 + 行长度限制，防止误匹配正文）
+    g_regexCount = g_regexCount + 1
+    g_regexNames(g_regexCount) = "超宽泛（第/N + 章/回/节/卷/篇/集/话，限80字内）"
+    g_regexPatterns(g_regexCount) = "^[ \t　]*(?:第)?([0-9０-９一二三四五六七八九十百千万亿億零〇○两兩壹貳贰叁參肆伍陸陆柒捌玖拾佰仟廿卅卌皕萬]+)[章回节卷篇集话部季册]?.*$"
+    g_regexUnitGroups(g_regexCount) = -1
+    g_regexDefaultUnits(g_regexCount) = "章"
+    g_regexMaxLens(g_regexCount) = 80
+
+    ' 8. 自定义正则
     g_regexCount = g_regexCount + 1
     g_regexNames(g_regexCount) = "自定义正则（手动输入）"
     g_regexPatterns(g_regexCount) = ""
     g_regexUnitGroups(g_regexCount) = -1
     g_regexDefaultUnits(g_regexCount) = "章"
+    g_regexMaxLens(g_regexCount) = 0
 End Sub
 
 '------------------------------------------------------------------------------
@@ -206,10 +209,10 @@ Private Function SelectRegexPattern() As Boolean
              "输入格式：" & vbCrLf & _
              "  单选:  1" & vbCrLf & _
              "  多选:  1,2,3  或  1 2 3" & vbCrLf & _
-             "  示例:  1,4      同时使用 标准中文 + 序章/楔子" & vbCrLf & vbCrLf & _
+             "  示例:  1,2,4    同时使用 标准中文 + 无第字中文 + 无号特殊章节" & vbCrLf & vbCrLf & _
              "请输入序号："
 
-    inputVal = InputBox(prompt, "选择正则表达式（可多选）", "1,4")
+    inputVal = InputBox(prompt, "选择正则表达式（可多选）", "1,2,4")
     If StrPtr(inputVal) = 0 Then
         SelectRegexPattern = False
         Exit Function
@@ -233,6 +236,7 @@ Private Function SelectRegexPattern() As Boolean
     ReDim g_selUnitGroups(0 To UBound(parts))
     ReDim g_selDefaultUnits(0 To UBound(parts))
     ReDim g_selOrigIndices(0 To UBound(parts))
+    ReDim g_selMaxLens(0 To UBound(parts))
     ReDim nameParts(0 To UBound(parts))
     g_selCount = 0
     hasCustom = False
@@ -289,6 +293,7 @@ Private Function SelectRegexPattern() As Boolean
         g_selUnitGroups(g_selCount) = g_regexUnitGroups(idx)
         g_selDefaultUnits(g_selCount) = g_regexDefaultUnits(idx)
         g_selOrigIndices(g_selCount) = idx
+        g_selMaxLens(g_selCount) = g_regexMaxLens(idx)
         nameParts(g_selCount) = g_regexNames(idx)
 
         On Error Resume Next
@@ -1015,11 +1020,14 @@ Private Sub ScanChaptersV3(lines() As String, ByVal lineCount As Long)
 
         ' 再检查章节级正则
         For r = 0 To g_selCount - 1
+            ' v3.6：行长度限制检查（超宽泛正则等有限制的，超长行跳过，防止误匹配正文）
+            If g_selMaxLens(r) > 0 And Len(normLine) > g_selMaxLens(r) Then GoTo NextRegCheck
             If regs(r).Test(normLine) Then
                 matched = True
                 matchRegIdx = r
                 Exit For
             End If
+NextRegCheck:
         Next r
 
         If matched Then
@@ -1064,9 +1072,6 @@ Private Sub ScanChaptersV3(lines() As String, ByVal lineCount As Long)
                 If g_selOrigIndices(matchRegIdx) = 4 Then
                     lvl = "special"
                     patType = "no_num"
-                Else
-                    ' 宽松匹配可能提取不出数字
-                    patType = "loose"
                 End If
             End If
 
@@ -2471,10 +2476,10 @@ Public Sub 自动TXTv3()
     lineCount = UBound(lines) + 1
     tRead = Timer - t0
 
-    ' 自动正则：固定 "1,4"（标准中文+无号）
+    ' 自动正则：固定 "1,2,4"（标准中文+无第字中文+无号特殊章节）
     InitRegexPatterns
     Dim autoPatterns As String
-    autoPatterns = "1,4"
+    autoPatterns = "1,2,4"
     autoPatterns = Replace(Trim(autoPatterns), " ", ",")
     ' 直接填充正则数组（不弹InputBox）
     Dim parts() As String, p As Long, idx As Long
@@ -2483,6 +2488,7 @@ Public Sub 自动TXTv3()
     ReDim g_selUnitGroups(0 To UBound(parts))
     ReDim g_selDefaultUnits(0 To UBound(parts))
     ReDim g_selOrigIndices(0 To UBound(parts))
+    ReDim g_selMaxLens(0 To UBound(parts))
     g_selCount = 0
     For p = 0 To UBound(parts)
         idx = CLng(Trim(parts(p)))
@@ -2490,9 +2496,10 @@ Public Sub 自动TXTv3()
         g_selUnitGroups(g_selCount) = g_regexUnitGroups(idx)
         g_selDefaultUnits(g_selCount) = g_regexDefaultUnits(idx)
         g_selOrigIndices(g_selCount) = idx
+        g_selMaxLens(g_selCount) = g_regexMaxLens(idx)
         g_selCount = g_selCount + 1
     Next p
-    g_regexName = "标准中文 + 序章/楔子"
+    g_regexName = "标准中文 + 无第字中文 + 无号特殊章节"
 
     t0 = Timer
     ScanChaptersV3 lines, lineCount
