@@ -114,6 +114,12 @@ def desensitize(text, mark=True):
     :param mark: 是否为占位符添加下划线标记（<u>标签）
     :return: 脱敏后文本
     """
+    # 不脱敏开关：设置环境变量 XWLB_NO_DESENSITIZE=1 时直接返回原文，
+    # 保留新闻原始人名（职务+姓名并列，如"联合国秘书长古特雷斯"）。
+    # 默认关闭，保持现有脱敏行为不变，随时可切回。
+    if os.environ.get("XWLB_NO_DESENSITIZE"):
+        return text
+
     SENTINEL = "\u0000"
     
     # ── 阶段1：人名 → 中间层代码（带SENTINEL包裹） ──
