@@ -300,7 +300,7 @@ def build_datasource(
                 "category": v.get("category", "其他"),
                 "importance": v.get("importance", "一般"),
                 "summary": summary_text[:300] if summary_text else "",
-                "full_text": full_text[:500] if full_text else "",
+                "full_text": full_text[:1200] if full_text else "",
                 "is_placeholder": False,
                 "elements": None,  # 待AI填写
             }
@@ -484,6 +484,19 @@ def phase3_merge(date_str):
     with open(report_path, "r", encoding="utf-8") as f:
         part1to5 = f.read()
 
+    # 拼接前清理中间件尾部：
+    #   a) 平台水印行：hook 会对 .md 写入自动追加 "> AI生成"，中间件被追加水印后
+    #      直接拼接会把它嵌入正文中部；最终报告写入后 hook 会在文末重新追加，
+    #      交付物上的水印仍然保留，此处只剔除中间件尾部的残留行
+    #   b) 与第六部分开头重复的 --- 分隔线（generate_part67 自带 --- 开头）
+    lines15 = part1to5.rstrip("\r\n \t").split("\n")
+    while lines15 and re.fullmatch(r"[ \t]*>[ \t]*AI[ \t]*生成[ \t]*", lines15[-1]):
+        lines15.pop()
+    cleaned15 = "\n".join(lines15).rstrip("\r\n \t")
+    if cleaned15.endswith("---"):
+        cleaned15 = cleaned15[:-3].rstrip("\r\n \t")
+    part1to5 = cleaned15 + "\n\n"
+
     part67 = generate_part67(items, date_display, date_str)
 
     # 拼接完整报告
@@ -634,6 +647,7 @@ def generate_part67(items, date_display, date_str):
     # 数据占位符正则（23 种，覆盖常见模式）
     data_patterns = [
         r"(\d+\.?\d*万亿元)", r"(\d+\.?\d*亿元)", r"(\d+\.?\d*亿美元)",
+        r"(\d+\.?\d*亿亩)", r"(\d+\.?\d*万亩)",
         r"(\d+\.?\d*万亿斤)", r"(\d+\.?\d*亿斤)", r"(\d+\.?\d*亿吨)",
         r"(\d+\.?\d*亿人次)", r"(\d+\.?\d*亿)", r"(\d+\.?\d*万标箱)",
         r"(\d+\.?\d*万人次)", r"(\d+\.?\d*万人次)", r"(\d+\.?\d*万株)",
@@ -642,6 +656,7 @@ def generate_part67(items, date_display, date_str):
         r"(\d+\.?\d*万吨)", r"(\d+\.?\d*个百分点)", r"(\d+\.?\d*%)",
         r"(\d+\.?\d*个)", r"(\d+\.?\d*条)", r"(\d+\.?\d*家)",
         r"(\d+\.?\d*处)", r"(\d+\.?\d*趟)", r"(\d+\.?\d*次)",
+        r"(\d+\.?\d*吨)",
     ]
 
     # --- 收集第七部分数据 ---
@@ -699,8 +714,12 @@ def generate_part67(items, date_display, date_str):
 
         L(f"| {idx} | [{title}]({url}) | {category} | {time_val} | {location} | {subject} | {event} | {cause} | {method} | [央视网]({source_url}) |")
 
-        # 位置标签
-        pos_label = idx if "-" in idx else f"第{idx}条"
+        # 完整版等预填行：不参与第七部分占位符收集（与示例输出一致）
+        if item.get("is_placeholder"):
+            continue
+
+        # 位置标签（纯数字序号 → 第N条；N-M 与"完整版"原样）
+        pos_label = idx if ("-" in idx or not idx.isdigit()) else f"第{idx}条"
 
         # --- 主体三分类 ---
         is_person = False
@@ -713,20 +732,20 @@ def generate_part67(items, date_display, date_str):
                     break
             if matched_name:
                 # 职务优先取主体原文写法（可能比映射表更完整），拆不出再用映射表
-                title_raw = re.sub(
+                person_title_raw = re.sub(
                     r"[、，,\s]*" + re.escape(matched_name) + r"[、，,\s]*",
                     "", subject,
                 ).strip("、，, ")
-                title = (
-                    title_raw
-                    if title_raw
+                person_title = (
+                    person_title_raw
+                    if person_title_raw
                     else name_to_title.get(matched_name, matched_name)
                 )
                 entry = person_entries.setdefault(
-                    matched_name, {"title": title, "positions": []}
+                    matched_name, {"title": person_title, "positions": []}
                 )
-                if len(title) > len(entry["title"]):
-                    entry["title"] = title  # 保留最完整职务写法
+                if len(person_title) > len(entry["title"]):
+                    entry["title"] = person_title  # 保留最完整职务写法
                 if pos_label not in entry["positions"]:
                     entry["positions"].append(pos_label)
                 is_person = True
@@ -756,12 +775,12 @@ def generate_part67(items, date_display, date_str):
                                         "公司", "大学", "市场", "集团", "组织", "中心")
                         )
                     ):
-                        title = subject[:cut].rstrip("、，, ")
+                        person_title = subject[:cut].rstrip("、，, ")
                         entry = person_entries.setdefault(
-                            name_part, {"title": title, "positions": []}
+                            name_part, {"title": person_title, "positions": []}
                         )
-                        if len(title) > len(entry["title"]):
-                            entry["title"] = title
+                        if len(person_title) > len(entry["title"]):
+                            entry["title"] = person_title
                         if pos_label not in entry["positions"]:
                             entry["positions"].append(pos_label)
                         is_person = True
@@ -796,21 +815,41 @@ def generate_part67(items, date_display, date_str):
                     if pos_label not in locations_map[one]:
                         locations_map[one].append(pos_label)
 
-        # --- 数据占位符（不限数量） ---
-        text_to_scan = title + " " + item.get("summary", "") + " " + item.get("full_text", "")
-        for pat in data_patterns:
-            for m in re.finditer(pat, text_to_scan):
-                d = m.group(1)
-                if d not in data_set:
+        # --- 数据占位符（不限数量，分组件扫描 + 跨度去重 + 短语上下文说明） ---
+        # title/summary/full_text 各自独立扫描提取，避免拼接后短语跨界；
+        # 说明列取数值所在短语（最近的 、，。；！？ 及截断省略号 ... 边界），与示例输出一致
+        b_chars = "、，。；！？"
+        for comp_text in (title, item.get("summary", ""), item.get("full_text", "")):
+            if not comp_text:
+                continue
+            accepted_spans = []
+            for pat in data_patterns:
+                for m in re.finditer(pat, comp_text):
+                    d = m.group(1)
+                    # 已被更长单位覆盖的子匹配跳过（如"3亿"被"3亿人次"覆盖）
+                    if any(s <= m.start() and m.end() <= e2 for (s, e2) in accepted_spans):
+                        continue
+                    accepted_spans.append((m.start(), m.end()))
+                    if d in data_set:
+                        continue
                     data_set.add(d)
-                    data_items.append((d, title[:20], pos_label))
+                    s0 = max(
+                        [comp_text.rfind(p, 0, m.start()) for p in b_chars]
+                        + [comp_text.rfind("...", 0, m.start()), -1]
+                    ) + 1
+                    e_cands = [comp_text.find(p, m.end()) for p in b_chars]
+                    e_cands.append(comp_text.find("...", m.end()))
+                    e0 = min([x for x in e_cands if x >= 0] or [len(comp_text)])
+                    desc = re.sub(r"\s+", " ", comp_text[s0:e0].strip())
+                    data_items.append((d, desc or title[:20], pos_label))
 
         # --- 内容占位符（《...》书名/文件名） ---
-        for m in re.finditer(r"《([^》]+)》", text_to_scan):
-            name = m.group(1)
-            if name not in content_set:
-                content_set.add(name)
-                content_items.append((name, pos_label))
+        for comp_text in (title, item.get("summary", ""), item.get("full_text", "")):
+            for m in re.finditer(r"《([^》]+)》", comp_text):
+                name = m.group(1)
+                if name not in content_set:
+                    content_set.add(name)
+                    content_items.append((name, pos_label))
 
     L("")
     L("> **编号规则**：")
