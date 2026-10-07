@@ -555,14 +555,14 @@ def generate_summary(title, detail):
     if "俄乌" in safe_title:
         return "冲突持续，双方各有表态，国际社会呼吁和平解决"
 
-    # 默认：从首段提取前50字作为概括
+    # 默认：从首段提取第一个完整句子作为概括
     if len(first_para) > 50:
         # 找第一个完整句子
         sentence_match = re.match(r'^(.+?[。！？])', first_para)
         if sentence_match:
             summary = sentence_match.group(1)
-            if len(summary) > 60:
-                summary = summary[:55] + "..."
+            if len(summary) > 120:
+                summary = summary[:115] + "..."
             return summary
         return first_para[:50] + "..."
 
@@ -1665,8 +1665,12 @@ def generate_report(date_str, videos, domestic_briefs, international_briefs, iqi
         for i, item in enumerate(domestic_briefs):
             title = desensitize(item["title"])
             link_url = item.get("iqilu_url") or domestic_url
-            summary = item["summary"]
-            L(f"> ({i+1}) [{title}]({link_url}) — {summary}")
+            # 优先用央视网完整正文（fetch_kuaixun_details 的 full_text），
+            # 禁止用截断 summary；空 > 行分隔每条快讯（模板 4.1/4.2 规范）
+            body = desensitize(item.get("full_text") or item.get("summary", ""))
+            if i > 0:
+                L(">")
+            L(f"> ({i+1}) [{title}]({link_url}) — {body}")
     else:
         L("> 暂无国内快讯数据")
     L("")
@@ -1682,8 +1686,10 @@ def generate_report(date_str, videos, domestic_briefs, international_briefs, iqi
         for i, item in enumerate(international_briefs):
             title = desensitize(item["title"])
             link_url = item.get("iqilu_url") or international_url
-            summary = item["summary"]
-            L(f"> ({i+1}) [{title}]({link_url}) — {summary}")
+            body = desensitize(item.get("full_text") or item.get("summary", ""))
+            if i > 0:
+                L(">")
+            L(f"> ({i+1}) [{title}]({link_url}) — {body}")
     else:
         L("> 暂无国际快讯数据")
     L("")

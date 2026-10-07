@@ -316,10 +316,14 @@ def build_datasource(
         for i, item in enumerate(domestic_briefs):
             sub_idx = f"{domestic_idx}-{i+1}"
             safe_title = desensitize(item["title"])
-            detail = item.get("detail", {})
-            full_text = (
-                detail.get("full_text", "") if isinstance(detail, dict) else ""
-            )
+            # 优先用央视网完整正文（fetch_kuaixun_details 的 full_text）
+            # 齐鲁网 detail.full_text 已知会返回 JS 脚本（坑6），仅作兑底
+            full_text = item.get("full_text") or ""
+            if (
+                (not full_text or "设为首页" in full_text)
+                and isinstance(item.get("detail"), dict)
+            ):
+                full_text = item["detail"].get("full_text", "")
             items.append(
                 {
                     "idx": sub_idx,
@@ -345,10 +349,14 @@ def build_datasource(
         for i, item in enumerate(international_briefs):
             sub_idx = f"{international_idx}-{i+1}"
             safe_title = desensitize(item["title"])
-            detail = item.get("detail", {})
-            full_text = (
-                detail.get("full_text", "") if isinstance(detail, dict) else ""
-            )
+            # 优先用央视网完整正文（fetch_kuaixun_details 的 full_text）
+            # 齐鲁网 detail.full_text 已知会返回 JS 脚本（坑6），仅作兑底
+            full_text = item.get("full_text") or ""
+            if (
+                (not full_text or "设为首页" in full_text)
+                and isinstance(item.get("detail"), dict)
+            ):
+                full_text = item["detail"].get("full_text", "")
             items.append(
                 {
                     "idx": sub_idx,
@@ -437,13 +445,44 @@ def phase3_merge(date_str):
     with open(result_json_path, "r", encoding="utf-8") as f:
         ai_result = json.load(f)
 
-    # 读取1-5部分
-    with open(report_path, "r", encoding="utf-8") as f:
-        part1to5 = f.read()
-
     # 生成第六七部分
     date_display = ai_result.get("date_display", "")
     items = ai_result.get("news_items", [])
+
+    # 精简格式支持（优化1）：AI 可只提交 idx + elements（+可选 category 修正），
+    # 基础字段（title/url/summary/full_text/source_url/is_placeholder）自动从数据源补齐；
+    # 预填行（完整版、快讯目录行）可省略，未出现的行也从数据源自动补回
+    if items and os.path.exists(datasource_json_path):
+        need_enrich = any(
+            not it.get("title") for it in items if not it.get("is_placeholder")
+        ) or any(
+            it.get("idx") and not it.get("title") for it in items
+        )
+        missing_prefill = False
+        with open(datasource_json_path, "r", encoding="utf-8") as f:
+            ds = json.load(f)
+        ds_map = {it["idx"]: it for it in ds.get("news_items", [])}
+        if need_enrich:
+            enriched = []
+            for it in items:
+                base = dict(ds_map.get(it.get("idx"), {}))
+                base.update(it)  # AI 提供的字段优先（elements/category 等）
+                enriched.append(base)
+            items = enriched
+        # 补回结果中省略的预填行（如完整版、快讯目录行）
+        seen_idx = {it.get("idx") for it in items}
+        for it in ds.get("news_items", []):
+            if it.get("idx") not in seen_idx:
+                items.append(dict(it))
+                missing_prefill = True
+        if need_enrich or missing_prefill:
+            logger.info(
+                f"结果JSON为精简格式：已从数据源补齐基础字段与预填行"
+            )
+
+    # 读取1-5部分
+    with open(report_path, "r", encoding="utf-8") as f:
+        part1to5 = f.read()
 
     part67 = generate_part67(items, date_display, date_str)
 
