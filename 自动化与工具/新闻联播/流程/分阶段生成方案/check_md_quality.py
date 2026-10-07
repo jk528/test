@@ -114,27 +114,30 @@ def check_file(filepath):
         issues.append(f"[WARNING] malformed_iqilu_url: {u}")
     
     # ── 5. Desensitization check ──
-    # 动态从 fetch_xwlb.py 导入敏感词列表，保持一致性；导入失败时使用内置备选列表
-    SENSITIVE_NAMES = []
-    try:
-        sys.path.insert(0, SCRIPT_DIR)
-        from fetch_xwlb import NAME_TO_CODE
-        SENSITIVE_NAMES = [name for name, _ in NAME_TO_CODE]
-    except Exception:
-        # 内置备选列表（与fetch_xwlb.py映射表保持同步，定期手动更新）
-        SENSITIVE_NAMES = [
-            "\u4e60\u8fd1\u5e73", "\u674e\u5f3a", "\u8d75\u4e50\u9645",
-            "\u6817\u6218\u4e66", "\u97e9\u6b63", "\u738b\u6caa\u5b81",
-            "\u8521\u5947", "\u4e01\u859b\u7965", "\u5185\u5854\u5c3c\u4e9a\u80e1",
-            "\u5362\u5361\u7533\u79d1", "\u8f9b\u9c8d\u59c6", "\u65af\u5854\u9ed8",
-            "\u683c\u7f57\u897f", "\u666e\u4eac", "\u6cfd\u8fde\u65af\u57fa",
-            "\u7279\u6717\u666e", "\u9a6c\u514b\u9f99", "\u7231\u4e3d\u7eee",
-            "\u5cb3\u8fc8\u952e",
-        ]
-    
-    for name in SENSITIVE_NAMES:
-        if name in content:
-            issues.append(f"[CRITICAL] sensitive_name_found: {name}")
+    # 不脱敏开关：设置环境变量 XWLB_NO_DESENSITIZE=1 时跳过敏感人名检查，
+    # 适配不脱敏版报告（人物以"职务+姓名"呈现）。默认关闭，保持现有行为。
+    if not os.environ.get("XWLB_NO_DESENSITIZE"):
+        # 动态从 fetch_xwlb.py 导入敏感词列表，保持一致性；导入失败时使用内置备选列表
+        SENSITIVE_NAMES = []
+        try:
+            sys.path.insert(0, SCRIPT_DIR)
+            from fetch_xwlb import NAME_TO_CODE
+            SENSITIVE_NAMES = [name for name, _ in NAME_TO_CODE]
+        except Exception:
+            # 内置备选列表（与fetch_xwlb.py映射表保持同步，定期手动更新）
+            SENSITIVE_NAMES = [
+                "\u4e60\u8fd1\u5e73", "\u674e\u5f3a", "\u8d75\u4e50\u9645",
+                "\u6817\u6218\u4e66", "\u97e9\u6b63", "\u738b\u6caa\u5b81",
+                "\u8521\u5947", "\u4e01\u859b\u7965", "\u5185\u5854\u5c3c\u4e9a\u80e1",
+                "\u5362\u5361\u7533\u79d1", "\u8f9b\u9c8d\u59c6", "\u65af\u5854\u9ed8",
+                "\u683c\u7f57\u897f", "\u666e\u4eac", "\u6cfd\u8fde\u65af\u57fa",
+                "\u7279\u6717\u666e", "\u9a6c\u514b\u9f99", "\u7231\u4e3d\u7eee",
+                "\u5cb3\u8fc8\u952e",
+            ]
+
+        for name in SENSITIVE_NAMES:
+            if name in content:
+                issues.append(f"[CRITICAL] sensitive_name_found: {name}")
     
     # ── 6. Double-tag check ──
     double_tags = re.findall(r'<u><u>[^<]+</u></u>', content)
