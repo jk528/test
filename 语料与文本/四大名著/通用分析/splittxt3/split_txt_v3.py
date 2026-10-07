@@ -210,8 +210,10 @@ CHAPTER_PATTERNS = [
     (re.compile(r'^[ \t\u3000]*([0-9０-９]{3,4})(?:[ \t\u3000：:]+(.*))?$'), 'pure_num', 60),
     # 6. 宽泛通配：第N + 任意内容 + 章/回/节/卷（处理特殊格式）
     (re.compile(r'^[ \t\u3000]*第(' + _NUM + r'+).*?(章|回|节|卷).*$'), 'loose', 100),
-    # 7. 超宽泛：可选第字 + 可选单位词 + 行长度限制（80字），防止误匹配正文
-    (re.compile(r'^[ \t\u3000]*(?:第)?(' + _NUM + r'+)[章回节卷篇集话部季册]?.*$'), 'super_loose', 80),
+    # 7. 超宽泛：可选第字 + 必选单位词（扩展集）+ 行长度限制（80字），防止误匹配正文
+    (re.compile(r'^[ \t\u3000]*(?:第)?(' + _NUM + r'+)[章回节卷篇集话部季册].*$'), 'super_loose', 80),
+    # 8. 超超级宽泛：可选第字 + 可选单位词 + 严格行长度限制（50字），有误匹配风险
+    (re.compile(r'^[ \t\u3000]*(?:第)?(' + _NUM + r'+)[章回节卷篇集话部季册]?.*$'), 'ultra_loose', 50),
 ]
 
 
@@ -572,7 +574,12 @@ def scan_structures(lines, extra_patterns=None):
                     ch_unit = m.group(2) if m.lastindex and m.lastindex >= 2 else '章'
                     sub = ''
                 elif ptype == 'super_loose':
-                    # 超宽泛：捕获组1=章号，单位词可选
+                    # 超宽泛：捕获组1=章号，单位词必选
+                    ch_num = cn_to_int(m.group(1))
+                    ch_unit = '章'
+                    sub = ''
+                elif ptype == 'ultra_loose':
+                    # 超超级宽泛：捕获组1=章号，单位词可选
                     ch_num = cn_to_int(m.group(1))
                     ch_unit = '章'
                     sub = ''
@@ -1279,15 +1286,22 @@ def deep_analyze(file_path, encoding=None, ad_clean=False, extra_patterns=None):
 # 文件名工具
 # ===========================================================================
 def sanitize_filename(name):
-    s = name.replace(' ', '\u3000')
-    for c in '\\/:*?"<>|':
+    # v3.6：清理控制字符（\t \n \r \0 等）和零宽字符
+    s = re.sub(r'[\x00-\x1f\x7f\u200b\u200c\u200d\ufeff]', '', name)
+    # 非法文件名字符替换为全角空格
+    for c in '\\/:*?"<>|\t':
         s = s.replace(c, '\u3000')
+    # 普通空格也替换为全角空格（保持对齐）
+    s = s.replace(' ', '\u3000')
+    # 合并连续全角空格
     while '\u3000\u3000' in s:
         s = s.replace('\u3000\u3000', '\u3000')
+    # 去首尾空白
     s = s.strip()
     if not s:
         s = 'untitled'
-    return s[:60]
+    # v3.6：截断到50字（防止超长路径）
+    return s[:50]
 
 
 def format_range(ch_start, ch_end, unit):

@@ -176,15 +176,23 @@ Private Sub InitRegexPatterns()
     g_regexDefaultUnits(g_regexCount) = "章"
     g_regexMaxLens(g_regexCount) = 100
 
-    ' 7. 超宽泛（可选第字 + 可选单位词 + 行长度限制，防止误匹配正文）
+    ' 7. 超宽泛（可选第字 + 必选单位词扩展集 + 行长度限制，防止误匹配正文）
     g_regexCount = g_regexCount + 1
     g_regexNames(g_regexCount) = "超宽泛（第/N + 章/回/节/卷/篇/集/话，限80字内）"
-    g_regexPatterns(g_regexCount) = "^[ \t　]*(?:第)?([0-9０-９一二三四五六七八九十百千万亿億零〇○两兩壹貳贰叁參肆伍陸陆柒捌玖拾佰仟廿卅卌皕萬]+)[章回节卷篇集话部季册]?.*$"
+    g_regexPatterns(g_regexCount) = "^[ \t　]*(?:第)?([0-9０-９一二三四五六七八九十百千万亿億零〇○两兩壹貳贰叁參肆伍陸陆柒捌玖拾佰仟廿卅卌皕萬]+)[章回节卷篇集话部季册].*$"
     g_regexUnitGroups(g_regexCount) = -1
     g_regexDefaultUnits(g_regexCount) = "章"
     g_regexMaxLens(g_regexCount) = 80
 
-    ' 8. 自定义正则
+    ' 8. 超超级宽泛（可选第字 + 可选单位词 + 严格行长度限制50字，有误匹配风险）
+    g_regexCount = g_regexCount + 1
+    g_regexNames(g_regexCount) = "超超级宽泛（第/N + 可选单位词，限50字内，有误匹配风险）"
+    g_regexPatterns(g_regexCount) = "^[ \t　]*(?:第)?([0-9０-９一二三四五六七八九十百千万亿億零〇○两兩壹貳贰叁參肆伍陸陆柒捌玖拾佰仟廿卅卌皕萬]+)[章回节卷篇集话部季册]?.*$"
+    g_regexUnitGroups(g_regexCount) = -1
+    g_regexDefaultUnits(g_regexCount) = "章"
+    g_regexMaxLens(g_regexCount) = 50
+
+    ' 9. 自定义正则
     g_regexCount = g_regexCount + 1
     g_regexNames(g_regexCount) = "自定义正则（手动输入）"
     g_regexPatterns(g_regexCount) = ""
@@ -2841,26 +2849,46 @@ Public Sub SplitByChapterV3(ByVal InputPath As String, _
         ' 文件名
         Dim serial As String, charCnt As String, safeTitle As String
         Dim fileName As String, outPath As String
+        Dim displaySerial As String, volTagStr As String
         serial = Format(writtenCount + 1, serialFmt)
         charCnt = Format(charCounts(i), charFmt)
         safeTitle = SanitizeFileName(ch_titles(origIdx))
 
-        If Len(FileNamePrefix) > 0 Then
-            fileName = FileNamePrefix & "_" & serial & "_" & charCnt & "_" & safeTitle & ".txt"
-        Else
-            fileName = serial & "_" & charCnt & "_" & safeTitle & ".txt"
-        End If
-
-        ' 按卷分目录
-        Dim fileDir As String
-        If byVolFlag And ch_vols(origIdx) > 0 Then
-            Dim volDir As String
-            volDir = "第" & ch_vols(origIdx) & ch_units(origIdx)
-            volDir = SanitizeFileName(volDir)
+        ' v3.6 方案四：按卷分目录 — 卷号零填充+卷标题+卷内重编号+V前缀
+        Dim vn As Long
+        vn = ch_vols(origIdx)
+        If byVolFlag And vn > 0 Then
+            Dim volDir As String, volSerial As String
+            volDir = "第" & Format(vn, volWidthFmt) & ch_units(origIdx)
+            If volTitleMap.Exists(vn) Then
+                If Len(volTitleMap(vn)) > 0 Then
+                    volDir = volDir & "_" & SanitizeFileName(volTitleMap(vn))
+                End If
+            End If
             fileDir = outDirFull & "\" & volDir
             If Dir(fileDir, vbDirectory) = "" Then MkDir fileDir
+            ' 卷内序号
+            If volWrittenCount.Exists(vn) Then
+                volWrittenCount(vn) = volWrittenCount(vn) + 1
+            Else
+                volWrittenCount.Add vn, 1
+            End If
+            volSerial = Format(volWrittenCount(vn), serialFmt)
+            volTagStr = "V" & Format(vn, volWidthFmt)
+            If Len(FileNamePrefix) > 0 Then
+                fileName = FileNamePrefix & "_" & volTagStr & "_" & volSerial & "_" & charCnt & "_" & safeTitle & ".txt"
+            Else
+                fileName = volTagStr & "_" & volSerial & "_" & charCnt & "_" & safeTitle & ".txt"
+            End If
+            displaySerial = volTagStr & "-" & volSerial
         Else
             fileDir = outDirFull
+            If Len(FileNamePrefix) > 0 Then
+                fileName = FileNamePrefix & "_" & serial & "_" & charCnt & "_" & safeTitle & ".txt"
+            Else
+                fileName = serial & "_" & charCnt & "_" & safeTitle & ".txt"
+            End If
+            displaySerial = serial
         End If
 
         outPath = fileDir & "\" & fileName
@@ -2884,12 +2912,12 @@ Public Sub SplitByChapterV3(ByVal InputPath As String, _
             Else
                 tag = "  (" & n & "行)"
             End If
-            If ch_vols(origIdx) > 0 Then
-                volTag = "[卷" & ch_vols(origIdx) & "] "
+            If vn > 0 Then
+                volTag = "[卷" & Format(vn, volWidthFmt) & "] "
             Else
                 volTag = ""
             End If
-            Debug.Print "  [" & serial & "] " & volTag & fileName & tag
+            Debug.Print "  [" & displaySerial & "] " & volTag & fileName & tag
         ElseIf writtenCount = 3 Then
             Debug.Print "  ..."
         End If
@@ -3176,8 +3204,20 @@ End Function
 
 Private Function SanitizeFileName(ByVal name As String) As String
     Dim s As String, chars As String, k As Long
-    s = Replace(name, " ", "　")
-    chars = "\/:*?""<>|"
+    s = name
+    ' v3.6：清理控制字符（Tab/CR/LF/NUL 等）
+    Dim cc As Long
+    For cc = 0 To 31
+        s = Replace(s, Chr(cc), "")
+    Next cc
+    s = Replace(s, Chr(127), "")
+    ' v3.6：清理零宽字符
+    s = Replace(s, ChrW(&H200B), "")
+    s = Replace(s, ChrW(&H200C), "")
+    s = Replace(s, ChrW(&H200D), "")
+    s = Replace(s, ChrW(&HFEFF), "")
+    s = Replace(s, " ", "　")
+    chars = "\/:*?""<>|" & vbTab
     For k = 1 To Len(chars)
         s = Replace(s, Mid(chars, k, 1), "　")
     Next k
@@ -3186,7 +3226,8 @@ Private Function SanitizeFileName(ByVal name As String) As String
     Loop
     s = Trim(s)
     If Len(s) = 0 Then s = "untitled"
-    If Len(s) > 60 Then s = Left(s, 60)
+    ' v3.6：截断到50字（防止超长路径）
+    If Len(s) > 50 Then s = Left(s, 50)
     SanitizeFileName = s
 End Function
 

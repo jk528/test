@@ -546,15 +546,23 @@ function InitRegexPatterns() {
     g_regexDefaultUnits[g_regexCount] = "章";
     g_regexMaxLens[g_regexCount] = 100;
 
-    // 7. 超宽泛（可选第字 + 可选单位词 + 行长度限制，防止误匹配正文）
+    // 7. 超宽泛（可选第字 + 必选单位词扩展集 + 行长度限制，防止误匹配正文）
     g_regexCount++;
     g_regexNames[g_regexCount] = "超宽泛（第/N + 章/回/节/卷/篇/集/话，限80字内）";
-    g_regexPatterns[g_regexCount] = "^[ \\t　]*(?:第)?([0-9０-９一二三四五六七八九十百千万亿億零〇○两兩壹貳贰叁參肆伍陸陆柒捌玖拾佰仟廿卅卌皕萬]+)[章回节卷篇集话部季册]?.*$";
+    g_regexPatterns[g_regexCount] = "^[ \\t　]*(?:第)?([0-9０-９一二三四五六七八九十百千万亿億零〇○两兩壹貳贰叁參肆伍陸陆柒捌玖拾佰仟廿卅卌皕萬]+)[章回节卷篇集话部季册].*$";
     g_regexUnitGroups[g_regexCount] = -1;
     g_regexDefaultUnits[g_regexCount] = "章";
     g_regexMaxLens[g_regexCount] = 80;
 
-    // 8. 自定义正则
+    // 8. 超超级宽泛（可选第字 + 可选单位词 + 严格行长度限制50字，有误匹配风险）
+    g_regexCount++;
+    g_regexNames[g_regexCount] = "超超级宽泛（第/N + 可选单位词，限50字内，有误匹配风险）";
+    g_regexPatterns[g_regexCount] = "^[ \\t　]*(?:第)?([0-9０-９一二三四五六七八九十百千万亿億零〇○两兩壹貳贰叁參肆伍陸陆柒捌玖拾佰仟廿卅卌皕萬]+)[章回节卷篇集话部季册]?.*$";
+    g_regexUnitGroups[g_regexCount] = -1;
+    g_regexDefaultUnits[g_regexCount] = "章";
+    g_regexMaxLens[g_regexCount] = 50;
+
+    // 9. 自定义正则
     g_regexCount++;
     g_regexNames[g_regexCount] = "自定义正则（手动输入）";
     g_regexPatterns[g_regexCount] = "";
@@ -1624,8 +1632,11 @@ function ExpandGroups(groupLens, groupSpaces, groupCount, total) {
 // =============================================================================
 
 function sanitizeFileName(name) {
-    var s = repAll(name, " ", "　");
-    var chars = "\\/:*?\"<>|";
+    var s = name;
+    // v3.6：清理控制字符（0x00-0x1F, 0x7F）和零宽字符
+    s = s.replace(/[\x00-\x1f\x7f\u200b\u200c\u200d\ufeff]/g, "");
+    s = repAll(s, " ", "　");
+    var chars = "\\/:*?\"<>|\t";
     for (var k = 0; k < chars.length; k++) {
         s = repAll(s, chars.charAt(k), "　");
     }
@@ -1634,7 +1645,8 @@ function sanitizeFileName(name) {
     }
     s = trimStr(s);
     if (s.length === 0) s = "untitled";
-    if (s.length > 60) s = s.substring(0, 60);
+    // v3.6：截断到50字（防止超长路径）
+    if (s.length > 50) s = s.substring(0, 50);
     return s;
 }
 
@@ -1822,6 +1834,29 @@ function SplitByChapterV3(inputPath, outputDir, fileNamePrefix, serialWidth,
     var charWidth = String(maxChars).length;
     if (charWidth < 1) charWidth = 1;
 
+    // v3.6 方案四：按卷分目录的卷标题映射 + 卷宽度 + 卷内计数器
+    var volTitleMap = {};    // {vol_num: vol_subtitle}
+    var volWrittenCount = {};  // {vol_num: count}
+    var maxVolNum = 0;
+    if (byVolFlag) {
+        var regVol2 = new RegExp("^[ \\t　]*第([0-9０-９一二三四五六七八九十百千万亿億零〇○两兩壹貳贰叁參肆伍陸陆柒捌玖拾佰仟廿卅卌皕萬]+)(卷|部|册|篇|集|季)(?:[ \\t　：:]+(.*))?$");
+        for (var vi = 0; vi < ch_count; vi++) {
+            if (ch_levels[vi] === "volume" && ch_vols[vi] > 0) {
+                if (ch_vols[vi] > maxVolNum) maxVolNum = ch_vols[vi];
+                var volSub = "";
+                var mVol = regVol2.exec(ch_titles[vi]);
+                if (mVol && mVol[3]) {
+                    volSub = trimStr(mVol[3]);
+                }
+                if (volSub.length > 0) {
+                    volTitleMap[ch_vols[vi]] = volSub;
+                }
+            }
+        }
+    }
+    var volWidth = 2;
+    if (String(maxVolNum).length > 2) volWidth = String(maxVolNum).length;
+
     // 8. 写文件
     var titleOnlyCount = 0, writtenCount = 0, skippedCount = 0, shortBodyCount = 0;
     var top1 = 0, top2 = 0, top3 = 0;
@@ -1874,20 +1909,36 @@ function SplitByChapterV3(inputPath, outputDir, fileNamePrefix, serialWidth,
             var serial = zeroPad(writtenCount + 1, serialWidth);
             var charCnt = zeroPad(charCounts[i], charWidth);
             var safeTitle = sanitizeFileName(ch_titles[origIdx]);
-            var fileName;
-            if (fileNamePrefix.length > 0) {
-                fileName = fileNamePrefix + "_" + serial + "_" + charCnt + "_" + safeTitle + ".txt";
-            } else {
-                fileName = serial + "_" + charCnt + "_" + safeTitle + ".txt";
-            }
+            var fileName, displaySerial;
 
-            // 按卷分目录
-            var fileDir = outDirFull;
-            if (byVolFlag && ch_vols[origIdx] > 0) {
-                var volDir = "第" + ch_vols[origIdx] + ch_units[origIdx];
-                volDir = sanitizeFileName(volDir);
-                fileDir = outDirFull + "\\" + volDir;
+            // v3.6 方案四：按卷分目录 — 卷号零填充+卷标题+卷内重编号+V前缀
+            var vn = ch_vols[origIdx] || 0;
+            if (byVolFlag && vn > 0) {
+                var volDir = "第" + zeroPad(vn, volWidth) + ch_units[origIdx];
+                if (volTitleMap[vn] && volTitleMap[vn].length > 0) {
+                    volDir += "_" + sanitizeFileName(volTitleMap[vn]);
+                }
+                var fileDir = outDirFull + "\\" + volDir;
                 if (!fso.FolderExists(fileDir)) fso.CreateFolder(fileDir);
+                // 卷内序号
+                if (!volWrittenCount[vn]) volWrittenCount[vn] = 0;
+                volWrittenCount[vn]++;
+                var volSerial = zeroPad(volWrittenCount[vn], serialWidth);
+                var volTagStr = "V" + zeroPad(vn, volWidth);
+                if (fileNamePrefix.length > 0) {
+                    fileName = fileNamePrefix + "_" + volTagStr + "_" + volSerial + "_" + charCnt + "_" + safeTitle + ".txt";
+                } else {
+                    fileName = volTagStr + "_" + volSerial + "_" + charCnt + "_" + safeTitle + ".txt";
+                }
+                displaySerial = volTagStr + "-" + volSerial;
+            } else {
+                var fileDir = outDirFull;
+                if (fileNamePrefix.length > 0) {
+                    fileName = fileNamePrefix + "_" + serial + "_" + charCnt + "_" + safeTitle + ".txt";
+                } else {
+                    fileName = serial + "_" + charCnt + "_" + safeTitle + ".txt";
+                }
+                displaySerial = serial;
             }
 
             outPath = fileDir + "\\" + fileName;
