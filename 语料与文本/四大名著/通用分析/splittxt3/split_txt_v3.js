@@ -504,6 +504,7 @@ function InitRegexPatterns() {
     g_regexPatterns[g_regexCount] = "^[ \\t　]*第([0-9０-９一二三四五六七八九十百千万亿億零〇○两兩壹貳贰叁參肆伍陸陆柒捌玖拾佰仟廿卅卌皕萬]+)(章|回|节|卷)(?:[ \\t　：:]+(.*))?$";
     g_regexUnitGroups[g_regexCount] = 1;
     g_regexDefaultUnits[g_regexCount] = "章";
+    g_regexMaxLens[g_regexCount] = 0;
 
     // 2. 无第字中文（全数字字符类 + 多单位词）
     g_regexCount++;
@@ -511,6 +512,7 @@ function InitRegexPatterns() {
     g_regexPatterns[g_regexCount] = "^[ \\t　]*([0-9０-９一二三四五六七八九十百千万亿億零〇○两兩壹貳贰叁參肆伍陸陆柒捌玖拾佰仟廿卅卌皕萬]+)(章|回|节|卷)(?:[ \\t　：:]+(.*))?$";
     g_regexUnitGroups[g_regexCount] = 1;
     g_regexDefaultUnits[g_regexCount] = "章";
+    g_regexMaxLens[g_regexCount] = 0;
 
     // 3. 英文Chapter
     g_regexCount++;
@@ -518,6 +520,7 @@ function InitRegexPatterns() {
     g_regexPatterns[g_regexCount] = "^[ \\t　]*[Cc]hapter\\s+([0-9０-９]+)(?:[ \\t　]*[:\\.\\-]?[ \\t　]+(.*))?$";
     g_regexUnitGroups[g_regexCount] = -1;
     g_regexDefaultUnits[g_regexCount] = "Chapter";
+    g_regexMaxLens[g_regexCount] = 0;
 
     // 4. 无号特殊章节
     g_regexCount++;
@@ -525,6 +528,7 @@ function InitRegexPatterns() {
     g_regexPatterns[g_regexCount] = "^[ \\t　]*(序章|楔子|尾声|番外|引子|后记|终章|序言|前言|跋)(?:[ \\t　：:]+(.*))?$";
     g_regexUnitGroups[g_regexCount] = -1;
     g_regexDefaultUnits[g_regexCount] = "章";
+    g_regexMaxLens[g_regexCount] = 0;
 
     // 5. 纯数字起始
     g_regexCount++;
@@ -532,6 +536,7 @@ function InitRegexPatterns() {
     g_regexPatterns[g_regexCount] = "^[ \\t　]*([0-9０-９]{3,4})(?:[ \\t　：:]+(.*))?$";
     g_regexUnitGroups[g_regexCount] = -1;
     g_regexDefaultUnits[g_regexCount] = "章";
+    g_regexMaxLens[g_regexCount] = 60;
 
     // 6. 宽泛通配（第N + 任意内容 + 单位词，处理特殊格式）
     g_regexCount++;
@@ -539,13 +544,23 @@ function InitRegexPatterns() {
     g_regexPatterns[g_regexCount] = "^[ \\t　]*第([0-9０-９一二三四五六七八九十百千万亿億零〇○两兩壹貳贰叁參肆伍陸陆柒捌玖拾佰仟廿卅卌皕萬]+).*?(章|回|节|卷).*$";
     g_regexUnitGroups[g_regexCount] = 1;
     g_regexDefaultUnits[g_regexCount] = "章";
+    g_regexMaxLens[g_regexCount] = 100;
 
-    // 7. 自定义正则
+    // 7. 超宽泛（可选第字 + 可选单位词 + 行长度限制，防止误匹配正文）
+    g_regexCount++;
+    g_regexNames[g_regexCount] = "超宽泛（第/N + 章/回/节/卷/篇/集/话，限80字内）";
+    g_regexPatterns[g_regexCount] = "^[ \\t　]*(?:第)?([0-9０-９一二三四五六七八九十百千万亿億零〇○两兩壹貳贰叁參肆伍陸陆柒捌玖拾佰仟廿卅卌皕萬]+)[章回节卷篇集话部季册]?.*$";
+    g_regexUnitGroups[g_regexCount] = -1;
+    g_regexDefaultUnits[g_regexCount] = "章";
+    g_regexMaxLens[g_regexCount] = 80;
+
+    // 8. 自定义正则
     g_regexCount++;
     g_regexNames[g_regexCount] = "自定义正则（手动输入）";
     g_regexPatterns[g_regexCount] = "";
     g_regexUnitGroups[g_regexCount] = -1;
     g_regexDefaultUnits[g_regexCount] = "章";
+    g_regexMaxLens[g_regexCount] = 0;
 }
 
 function normalizeSeparators(s) {
@@ -630,6 +645,7 @@ function SelectRegexPattern() {
     g_selUnitGroups = [];
     g_selDefaultUnits = [];
     g_selOrigIndices = [];
+    g_selMaxLens = [];
     g_selCount = 0;
     var nameParts = [];
 
@@ -639,6 +655,7 @@ function SelectRegexPattern() {
         g_selUnitGroups[g_selCount] = g_regexUnitGroups[idx];
         g_selDefaultUnits[g_selCount] = g_regexDefaultUnits[idx];
         g_selOrigIndices[g_selCount] = idx;
+        g_selMaxLens[g_selCount] = g_regexMaxLens[idx];
         nameParts[g_selCount] = g_regexNames[idx];
 
         try {
@@ -914,6 +931,8 @@ function ScanChaptersV3(lines) {
 
         // 再检查章节级正则
         for (r = 0; r < g_selCount; r++) {
+            // v3.6：行长度限制检查（超宽泛正则等有限制的，超长行跳过，防止误匹配正文）
+            if (g_selMaxLens[r] > 0 && normLine.length > g_selMaxLens[r]) continue;
             if (regs[r].test(normLine)) {
                 matched = true;
                 matchRegIdx = r;
@@ -2725,6 +2744,7 @@ function 自动TXTv3() {
     g_selUnitGroups = [];
     g_selDefaultUnits = [];
     g_selOrigIndices = [];
+    g_selMaxLens = [];
     g_selCount = 0;
     for (var p = 0; p < autoParts.length; p++) {
         var idx = parseInt(autoParts[p], 10);
@@ -2732,9 +2752,10 @@ function 自动TXTv3() {
         g_selUnitGroups[g_selCount] = g_regexUnitGroups[idx];
         g_selDefaultUnits[g_selCount] = g_regexDefaultUnits[idx];
         g_selOrigIndices[g_selCount] = idx;
+        g_selMaxLens[g_selCount] = g_regexMaxLens[idx];
         g_selCount++;
     }
-    g_regexName = "标准中文 + 序章/楔子";
+    g_regexName = "标准中文 + 无第字中文 + 无号特殊章节";
 
     t0 = Timer();
     ScanChaptersV3(lines);

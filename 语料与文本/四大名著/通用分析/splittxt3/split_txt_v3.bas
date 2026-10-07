@@ -166,7 +166,7 @@ Private Sub InitRegexPatterns()
     g_regexPatterns(g_regexCount) = "^[ \t　]*([0-9０-９]{3,4})(?:[ \t　：:]+(.*))?$"
     g_regexUnitGroups(g_regexCount) = -1
     g_regexDefaultUnits(g_regexCount) = "章"
-    g_regexMaxLens(g_regexCount) = 0
+    g_regexMaxLens(g_regexCount) = 60
 
     ' 6. 宽泛通配（第N + 任意内容 + 单位词，处理特殊格式）
     g_regexCount = g_regexCount + 1
@@ -174,7 +174,7 @@ Private Sub InitRegexPatterns()
     g_regexPatterns(g_regexCount) = "^[ \t　]*第([0-9０-９一二三四五六七八九十百千万亿億零〇○两兩壹貳贰叁參肆伍陸陆柒捌玖拾佰仟廿卅卌皕萬]+).*?(章|回|节|卷).*$"
     g_regexUnitGroups(g_regexCount) = 1
     g_regexDefaultUnits(g_regexCount) = "章"
-    g_regexMaxLens(g_regexCount) = 0
+    g_regexMaxLens(g_regexCount) = 100
 
     ' 7. 超宽泛（可选第字 + 可选单位词 + 行长度限制，防止误匹配正文）
     g_regexCount = g_regexCount + 1
@@ -2739,6 +2739,39 @@ Public Sub SplitByChapterV3(ByVal InputPath As String, _
     charWidth = Len(CStr(maxChars))
     If charWidth < 1 Then charWidth = 1
     charFmt = String(charWidth, "0")
+
+    ' v3.6 方案四：按卷分目录的卷标题映射 + 卷宽度 + 卷内计数器
+    Dim volTitleMap As Object, volWrittenCount As Object
+    Dim maxVolNum As Long, volWidth As Long, volWidthFmt As String
+    Set volTitleMap = CreateObject("Scripting.Dictionary")
+    Set volWrittenCount = CreateObject("Scripting.Dictionary")
+    maxVolNum = 0
+    If byVolFlag Then
+        Dim regVol2 As Object
+        Set regVol2 = CreateObject("VBScript.RegExp")
+        regVol2.Pattern = GetVolumePattern()
+        regVol2.IgnoreCase = True
+        Dim vi As Long, volSub As String, mVol As Object
+        For vi = 0 To ch_count - 1
+            If ch_levels(vi) = "volume" And ch_vols(vi) > 0 Then
+                If ch_vols(vi) > maxVolNum Then maxVolNum = ch_vols(vi)
+                volSub = ""
+                If regVol2.Test(ch_titles(vi)) Then
+                    Set mVol = regVol2.Execute(ch_titles(vi))
+                    If mVol(0).SubMatches.Count >= 3 Then
+                        volSub = Trim(mVol(0).SubMatches(2))
+                    End If
+                End If
+                If Len(volSub) > 0 Then
+                    volTitleMap(ch_vols(vi)) = volSub
+                End If
+            End If
+        Next vi
+        Set regVol2 = Nothing
+    End If
+    volWidth = 2
+    If Len(CStr(maxVolNum)) > 2 Then volWidth = Len(CStr(maxVolNum))
+    volWidthFmt = String(volWidth, "0")
 
     ' 8. 写文件
     Dim titleOnlyCount As Long, writtenCount As Long, skippedCount As Long

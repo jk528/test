@@ -196,19 +196,22 @@ VOLUME_PATTERNS = [
 ]
 
 # 章节级标题正则（按优先级排列，与VBA/JS版顺序对齐）
+# 格式：(编译后正则, 类型标识, 最大行长度限制 0=不限制)
 CHAPTER_PATTERNS = [
     # 1. 标准中文：第N章/回/节/卷 + 标题（全数字字符类）
-    (re.compile(r'^[ \t\u3000]*第(' + _NUM + r'+)(章|回|节|卷)(?:[ \t\u3000：:]+(.*))?$'), 'standard'),
+    (re.compile(r'^[ \t\u3000]*第(' + _NUM + r'+)(章|回|节|卷)(?:[ \t\u3000：:]+(.*))?$'), 'standard', 0),
     # 2. 无第字中文：N章/回/节/卷 + 标题（全数字字符类，含中文数字）
-    (re.compile(r'^[ \t\u3000]*(' + _NUM + r'+)(章|回|节|卷)(?:[ \t\u3000：:]+(.*))?$'), 'no_di'),
+    (re.compile(r'^[ \t\u3000]*(' + _NUM + r'+)(章|回|节|卷)(?:[ \t\u3000：:]+(.*))?$'), 'no_di', 0),
     # 3. 英文 Chapter
-    (re.compile(r'^[ \t\u3000]*[Cc]hapter\s+([0-9０-９]+)(?:[ \t\u3000：:\.\-]+(.*))?$'), 'english'),
+    (re.compile(r'^[ \t\u3000]*[Cc]hapter\s+([0-9０-９]+)(?:[ \t\u3000：:\.\-]+(.*))?$'), 'english', 0),
     # 4. 无号特殊章节：序章/楔子/番外/尾声/引子/后记/终章/序言/前言/跋
-    (re.compile(r'^[ \t\u3000]*(序章|楔子|尾声|番外|引子|后记|终章|序言|前言|跋)(?:[ \t\u3000：:]+(.*))?$'), 'no_num'),
+    (re.compile(r'^[ \t\u3000]*(序章|楔子|尾声|番外|引子|后记|终章|序言|前言|跋)(?:[ \t\u3000：:]+(.*))?$'), 'no_num', 0),
     # 5. 纯数字起始（3-4位数字开头）
-    (re.compile(r'^[ \t\u3000]*([0-9０-９]{3,4})(?:[ \t\u3000：:]+(.*))?$'), 'pure_num'),
+    (re.compile(r'^[ \t\u3000]*([0-9０-９]{3,4})(?:[ \t\u3000：:]+(.*))?$'), 'pure_num', 60),
     # 6. 宽泛通配：第N + 任意内容 + 章/回/节/卷（处理特殊格式）
-    (re.compile(r'^[ \t\u3000]*第(' + _NUM + r'+).*?(章|回|节|卷).*$'), 'loose'),
+    (re.compile(r'^[ \t\u3000]*第(' + _NUM + r'+).*?(章|回|节|卷).*$'), 'loose', 100),
+    # 7. 超宽泛：可选第字 + 可选单位词 + 行长度限制（80字），防止误匹配正文
+    (re.compile(r'^[ \t\u3000]*(?:第)?(' + _NUM + r'+)[章回节卷篇集话部季册]?.*$'), 'super_loose', 80),
 ]
 
 
@@ -473,7 +476,7 @@ def scan_structures(lines, extra_patterns=None):
         for pat_str in extra_patterns:
             try:
                 pat = re.compile(pat_str)
-                chapter_patterns.append((pat, 'custom'))
+                chapter_patterns.append((pat, 'custom', 0))
             except re.error:
                 print(f"[警告] 自定义正则无效，已跳过: {pat_str}")
 
@@ -537,7 +540,10 @@ def scan_structures(lines, extra_patterns=None):
             continue
 
         # 最后尝试章节级标题（按优先级）
-        for pat, ptype in chapter_patterns:
+        for pat, ptype, max_len in chapter_patterns:
+            # v3.6：行长度限制检查（超宽泛正则等有限制的，超长行跳过，防止误匹配正文）
+            if max_len > 0 and len(line_stripped) > max_len:
+                continue
             m = pat.match(line_stripped)
             if m:
                 if ptype == 'standard':
@@ -564,6 +570,11 @@ def scan_structures(lines, extra_patterns=None):
                     # 宽泛通配：捕获组1=章号，捕获组2=单位词
                     ch_num = cn_to_int(m.group(1))
                     ch_unit = m.group(2) if m.lastindex and m.lastindex >= 2 else '章'
+                    sub = ''
+                elif ptype == 'super_loose':
+                    # 超宽泛：捕获组1=章号，单位词可选
+                    ch_num = cn_to_int(m.group(1))
+                    ch_unit = '章'
                     sub = ''
                 elif ptype == 'custom':
                     # v3.6：自定义正则，捕获组1作为章号
@@ -1386,6 +1397,21 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
     max_chars = max(char_counts) if char_counts else 0
     char_width = max(1, len(str(max_chars)))
 
+    # v3.6 方案四：按卷分目录的卷标题映射 + 卷宽度 + 卷内计数器
+    by_vol = (volume_mode == 'by_volume' and actual_vol_mode == 'volume')
+    vol_title_map = {}
+    vol_width = 2
+    vol_written_count = {}
+    if by_vol:
+        max_vol_num = 0
+        for v in volumes:
+            vn = v.get('vol_num') or 0
+            if vn > 0:
+                vol_title_map[vn] = v.get('sub_title', '').strip()
+                if vn > max_vol_num:
+                    max_vol_num = vn
+        vol_width = max(2, len(str(max_vol_num)))
+
     # 8. 写文件
     title_only_count = 0
     short_body_count = 0
@@ -1429,19 +1455,33 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
         serial = str(written_count + 1).zfill(serial_width)
         char_cnt = str(char_counts[idx]).zfill(char_width)
 
-        # 确定文件路径（by_volume模式下分子目录）
-        if volume_mode == 'by_volume' and actual_vol_mode == 'volume' and ch.get('vol_num'):
-            vol_dir = f"第{ch['vol_num']}{ch.get('vol_unit', '卷')}"
+        # v3.6 方案四：按卷分目录 — 卷号零填充+卷标题+卷内重编号+V前缀
+        vn = ch.get('vol_num') or 0
+        if by_vol and vn > 0:
+            vu = ch.get('vol_unit', '卷')
+            vt = vol_title_map.get(vn, '')
+            vol_dir = f"第{str(vn).zfill(vol_width)}{vu}"
+            if vt:
+                vol_dir += f"_{vt}"
             vol_dir = sanitize_filename(vol_dir)
             file_dir = os.path.join(out_dir, vol_dir)
             os.makedirs(file_dir, exist_ok=True)
+            # 卷内序号
+            vol_written_count[vn] = vol_written_count.get(vn, 0) + 1
+            vol_serial = str(vol_written_count[vn]).zfill(serial_width)
+            vol_tag_str = f"V{str(vn).zfill(vol_width)}"
+            if prefix:
+                fname = f"{prefix}_{vol_tag_str}_{vol_serial}_{char_cnt}_{safe_title}.txt"
+            else:
+                fname = f"{vol_tag_str}_{vol_serial}_{char_cnt}_{safe_title}.txt"
+            display_serial = f"{vol_tag_str}-{vol_serial}"
         else:
             file_dir = out_dir
-
-        if prefix:
-            fname = f"{prefix}_{serial}_{char_cnt}_{safe_title}.txt"
-        else:
-            fname = f"{serial}_{char_cnt}_{safe_title}.txt"
+            if prefix:
+                fname = f"{prefix}_{serial}_{char_cnt}_{safe_title}.txt"
+            else:
+                fname = f"{serial}_{char_cnt}_{safe_title}.txt"
+            display_serial = serial
 
         write_text_utf8_nobom(os.path.join(file_dir, fname), body)
         if merge_flag is not None:
@@ -1454,8 +1494,8 @@ def split_by_chapter(src, out_dir="", prefix="", serial_width=3, encoding=None,
                 tag = f"  ({n_lines}行,正文{body_len}字)"
             else:
                 tag = f"  ({n_lines}行)"
-            vol_tag = f"[卷{ch['vol_num']}] " if ch.get('vol_num') else ""
-            print(f"  [{serial}] {vol_tag}{fname}{tag}")
+            vol_tag = f"[卷{str(vn).zfill(vol_width)}] " if vn > 0 else ""
+            print(f"  [{display_serial}] {vol_tag}{fname}{tag}")
         elif written_count == 3:
             print("  ...")
 
