@@ -78,7 +78,7 @@ if ($task) {
 # ============================================================
 Write-Step "目标报告检查"
 
-$archiveRoot = Join-Path $ProjectRoot "..\..\归档"
+$archiveRoot = Join-Path $ProjectRoot "..\..\..\归档"
 $archiveRoot = [System.IO.Path]::GetFullPath($archiveRoot)
 
 $yesterday = (Get-Date).AddDays(-1)
