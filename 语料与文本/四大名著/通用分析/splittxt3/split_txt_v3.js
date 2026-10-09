@@ -118,6 +118,8 @@ var g_actualVolMode = "flat";
 var g_skipTitleOnly = 0;
 var g_skipShortBody = 0;
 
+var g_batchMode = false;      // v3.5：批量处理标志（抑制完成弹窗）
+
 
 // =============================================================================
 // 工具函数（ES3 安全）
@@ -1741,7 +1743,12 @@ function ShowCompleteReportV3(title, fileCount, outDir, tRead, tScan, tDedup, tW
         msg += "\n" + extraInfo;
     }
 
-    Application.MsgBox(msg, vbInformation, "完成");
+    // v3.5：批量模式抑制弹窗
+    if (g_batchMode) {
+        debugLog("完成：" + title + "（" + fileCount + " 文件）");
+    } else {
+        Application.MsgBox(msg, vbInformation, "完成");
+    }
 }
 
 
@@ -2168,30 +2175,21 @@ function DeepAnalyzeFile(filePath, outputDir) {
     var rpt = [];
     var i, k, kk;
 
-    rpt.push(repeatStr("=", 70));
-    rpt.push("  深度分析报告: " + fso.GetFileName(filePath));
-    rpt.push(repeatStr("=", 70));
-    rpt.push("总行数: " + fmtThousands(lineCount));
-    rpt.push("总字符: " + fmtThousands(content.length));
-    rpt.push("编码: " + g_detectedEnc);
-
-    // 统计卷和章
+    // 统计卷和章（供概述和详细分析共用）
     var volCnt = 0, chapCnt = 0;
     for (i = 0; i < ch_count; i++) {
         if (ch_levels[i] === "volume") volCnt++;
         if (ch_levels[i] === "chapter" || ch_levels[i] === "special") chapCnt++;
     }
-    var structLine = "识别结构: 卷级 " + volCnt + " 个, 章节级 " + chapCnt + " 个";
-    if (g_tocChapterCount > 0) {
-        structLine += "\n              其中目录区 " + g_tocChapterCount + " 章（已跳过）";
-    }
-    rpt.push(structLine);
-    rpt.push("使用正则: " + g_regexName);
+
+    // 【三、详细分析】
+    rpt.push(repeatStr("-", 50));
+    rpt.push("【三、详细分析】");
     rpt.push("");
 
-    // 一、卷结构分析
+    // 卷结构分析
     rpt.push(repeatStr("-", 50));
-    rpt.push("【一、卷/部结构分析】");
+    rpt.push("卷/部结构分析");
     if (volCnt > 0) {
         var volSet = mapNew();
         var volUnitSet = mapNew();
@@ -2271,7 +2269,7 @@ function DeepAnalyzeFile(filePath, outputDir) {
 
     // 二、重复分析
     rpt.push(repeatStr("-", 50));
-    rpt.push("【二、重复章节分析】");
+    rpt.push("重复章节分析");
     rpt.push("  扁平视角（忽略卷）:");
 
     var flatMap = mapNew();
@@ -2395,7 +2393,7 @@ function DeepAnalyzeFile(filePath, outputDir) {
 
     // 三、乱序分析
     rpt.push(repeatStr("-", 50));
-    rpt.push("【三、乱序分析】");
+    rpt.push("乱序分析");
     rpt.push("  扁平视角（忽略卷）:");
 
     var oooCnt = 0, maxDrop = 0, prevNum = 0;
@@ -2424,7 +2422,7 @@ function DeepAnalyzeFile(filePath, outputDir) {
 
     // 四、多轨目录检测
     rpt.push(repeatStr("-", 50));
-    rpt.push("【四、多轨目录检测】");
+    rpt.push("多轨目录检测");
 
     if (g_tocChapterCount > 0) {
         rpt.push("  ⚠ 检测到目录区（已自动跳过，不参与去重/排序）");
@@ -2478,7 +2476,7 @@ function DeepAnalyzeFile(filePath, outputDir) {
 
     // 五、格式多样性
     rpt.push(repeatStr("-", 50));
-    rpt.push("【五、格式多样性分析】");
+    rpt.push("格式多样性分析");
     var patCnt = mapNew(), unitCnt = mapNew();
     for (i = 0; i < ch_count; i++) {
         if (ch_levels[i] === "chapter" || ch_levels[i] === "special") {
@@ -2500,7 +2498,7 @@ function DeepAnalyzeFile(filePath, outputDir) {
 
     // 六、章号连续性
     rpt.push(repeatStr("-", 50));
-    rpt.push("【六、章号连续性分析】");
+    rpt.push("章号连续性分析");
     var numSet = mapNew();
     var minNum = 999999, maxNum = 0;
     for (i = 0; i < ch_count; i++) {
@@ -2542,7 +2540,7 @@ function DeepAnalyzeFile(filePath, outputDir) {
 
     // 七、各策略效果预览
     rpt.push(repeatStr("-", 50));
-    rpt.push("【七、各策略组合效果预览（扁平模式）】");
+    rpt.push("各策略组合效果预览（扁平模式）");
 
     var comboLabels = ["none+none", "none+sort", "first+none", "first+sort", "longest+none", "longest+sort"];
     var comboDedup = ["none", "none", "first", "first", "longest", "longest"];
@@ -2565,23 +2563,7 @@ function DeepAnalyzeFile(filePath, outputDir) {
     }
     rpt.push("");
 
-    // 处理建议
-    rpt.push(repeatStr("=", 70));
-    rpt.push("  处理建议：");
-    if (oooCnt > 10) {
-        rpt.push("  • 乱序严重，推荐 sort 策略（最彻底）或 lis 策略（智能）");
-    } else if (dupCnt > 0) {
-        rpt.push("  • 有重复但乱序轻微，推荐 longest 策略（保留内容最长的）");
-    }
-    if (adjRatio > 0.3) {
-        rpt.push("  • 每章双标题明显，用组合3 保留最长+不排序 即可");
-    }
-    if (volCnt > 1) {
-        rpt.push("  • 检测到多卷结构，注意选择正确的卷模式");
-    }
-    rpt.push(repeatStr("=", 70));
-
-    // v3.4：【总】结论与建议
+    // v3.5：推荐组合决策（供总结引用）
     var recCombo;
     if (dupCnt === 0 && oooCnt === 0) {
         recCombo = "none+none（干净型：不去重不排序）";
@@ -2599,19 +2581,77 @@ function DeepAnalyzeFile(filePath, outputDir) {
     var volStructDesc = (volCnt > 0) ? ("有卷（卷级标题 " + volCnt + " 个）") : "无卷";
     var tocDesc = (g_tocChapterCount > 0) ? ("有（" + g_tocChapterCount + " 章，已跳过）") : "无";
 
-    var summary = "【总】结论与建议\n" +
+    // 整体评估
+    var issueCount = 0;
+    if (dupCnt > 0) issueCount++;
+    if (oooCnt > 0) issueCount++;
+    if (g_titleDiffCount > 0) issueCount++;
+    var healthDesc;
+    if (issueCount === 0) {
+        healthDesc = "✅ 文件质量良好，无重复无乱序";
+    } else if (issueCount <= 2) {
+        healthDesc = "⚠ 存在 " + issueCount + " 类问题，建议处理后再使用";
+    } else {
+        healthDesc = "⚠ 严重问题（" + issueCount + " 类），强烈建议处理";
+    }
+
+    // 生成处理建议（在总结中输出）
+    var suggestions = [];
+    if (oooCnt > 10 && dupCnt > 0) {
+        suggestions.push("重复+乱序都严重，推荐 --dedup longest --sort sort（最彻底）");
+    } else if (oooCnt > 10) {
+        suggestions.push("乱序严重，推荐 --dedup none --sort sort（按章号重排）");
+    } else if (dupCnt > 0) {
+        suggestions.push("有重复但乱序轻微，推荐 --dedup longest --sort none（保留最长且不改顺序）");
+    }
+    if (adjRatio > 0.3) {
+        suggestions.push("每章双标题明显，推荐 --dedup longest --sort none");
+    }
+    if (volCnt > 1) {
+        suggestions.push("检测到多卷结构，注意选择正确的卷模式");
+    }
+    if (suggestions.length === 0) {
+        suggestions.push("文件质量较好，可根据需要选择组合");
+    }
+    suggestions.push("一键处理：--auto / 自动TXTv3 自动完成分析+决策+清洁输出");
+
+    // ========== 【一、概述】+【二、总结】 ==========
+    var summary = repeatStr("=", 70) + "\n" +
+                  "  深度分析报告: " + fso.GetFileName(filePath) + "\n" +
+                  repeatStr("=", 70) + "\n" +
+                  "\n" +
+                  "【一、概述】\n" +
+                  "  文件信息：\n" +
+                  "    总行数: " + fmtThousands(lineCount) + "\n" +
+                  "    总字符: " + fmtThousands(content.length) + "\n" +
+                  "    编码: " + g_detectedEnc + "\n" +
+                  "  结构识别：\n" +
+                  "    卷级 " + volCnt + " 个, 章节级 " + chapCnt + " 个" +
+                  (g_tocChapterCount > 0 ? "（其中目录区 " + g_tocChapterCount + " 章，已跳过）" : "") + "\n" +
+                  "    使用正则: " + g_regexName + "\n" +
+                  "  整体评估：" + healthDesc + "\n" +
+                  "\n" +
+                  repeatStr("-", 50) + "\n" +
+                  "【二、总结】\n" +
                   "  问题计数：\n" +
                   "    重复章号数：" + dupCnt + "\n" +
                   "    乱序处数：" + oooCnt + "\n" +
                   "    卷结构：" + volStructDesc + "\n" +
                   "    同章异题数：" + g_titleDiffCount + "\n" +
                   "    目录区：" + tocDesc + "\n" +
-                  "  推荐组合：" + recCombo + "\n" +
-                  "  建议清洁N值：" + autoN + "\n" +
-                  repeatStr("-", 50) + "\n" +
-                  "【分】各维度明细\n";
+                  (adjDup > 0 ? ("    相邻双标题占比：" + fmtPct1(adjRatio) + "\n") : "") +
+                  (g_adRemovedCount > 0 ? ("    广告清理: 已移除 " + g_adRemovedCount + " 行\n") : "") +
+                  "\n" +
+                  "  推荐方案：\n" +
+                  "    去重策略: " + recCombo + "\n" +
+                  "    清洁N值: " + autoN + "\n" +
+                  "\n" +
+                  "  处理建议：\n" +
+                  suggestions.map(function(s) { return "    • " + s; }).join("\n") + "\n" +
+                  "\n" +
+                  repeatStr("-", 50) + "\n";
 
-    // 输出报告（总-分结构）
+    // 输出报告（概述-总结-详细 三结构）
     var report = summary + rpt.join("\r\n");
     debugLog(report);
 
@@ -2624,7 +2664,7 @@ function DeepAnalyzeFile(filePath, outputDir) {
     writeTextUTF8NoBOM(outPath, report);
 
     if (outputDir.length === 0) {
-        Application.MsgBox("【总】分析完成\n" +
+        Application.MsgBox("【分析完成】\n" +
                            "  重复章号 " + dupCnt + "｜乱序 " + oooCnt + " 处｜同章异题 " + g_titleDiffCount + "\n" +
                            "  推荐组合：" + recCombo + "\n" +
                            "  建议清洁N值：" + autoN + "\n\n" +
@@ -2914,4 +2954,253 @@ function 自动TXTv3() {
             fso.MoveFile(mvPaths[mi], autoDir + "\\");
         }
     } catch (e) {}
+}
+
+
+// =============================================================================
+// 第十四部分：批量处理（v3.5 新增）
+//   选择文件夹 → 路径快照 → 逐文件自动拆分 → 汇总报告
+//   不穿透子文件夹（避免处理输出目录中的已拆分文件）
+// =============================================================================
+
+function selectTxtFolder(title) {
+    try {
+        var fd = Application.FileDialog(4); // msoFileDialogFolderPicker
+        if (fd) {
+            fd.Title = title;
+            if (fd.Show() === -1) {
+                return fd.SelectedItems(1);
+            }
+            return "";
+        }
+    } catch (e) {}
+
+    // 兜底：InputBox
+    var input = Application.InputBox("请输入文件夹完整路径：", title, "", 100, 100, "", 0, 2);
+    if (input === false) return "";
+    return String(input);
+}
+
+function 批量自动TXTv3() {
+    var fso = CreateCOM("Scripting.FileSystemObject");
+    var tBatch0 = Timer();
+
+    // 弹窗1：选择文件夹
+    var folderPath = selectTxtFolder("选择包含TXT文件的文件夹（批量自动拆分）");
+    if (folderPath.length === 0) return;
+
+    // 读取设置
+    LoadSettings();
+
+    // 平铺扫描 *.txt（路径快照：Collection 固定后不再变）
+    var folder = fso.GetFolder(folderPath);
+    var en = new Enumerator(folder.Files);
+    var txtFiles = [];
+    for (; !en.atEnd(); en.moveNext()) {
+        var f = en.item();
+        if (fso.GetExtensionName(f.Name).toLowerCase() === "txt") {
+            txtFiles.push(String(f.Path));
+        }
+    }
+
+    var fileCount = txtFiles.length;
+    if (fileCount === 0) {
+        Application.MsgBox("所选文件夹中未找到任何 .txt 文件。", vbExclamation, "提示");
+        return;
+    }
+
+    // 弹窗2：确认
+    var fileList = "";
+    for (var i = 0; i < fileCount; i++) {
+        fileList += "  " + (i + 1) + ". " + fso.GetFileName(txtFiles[i]) + "\n";
+        if (i >= 14 && fileCount > 15) {
+            fileList += "  ...（共 " + fileCount + " 个文件）\n";
+            break;
+        }
+    }
+
+    var confirmMsg = "【批量自动拆分】\n" +
+                     "文件夹：" + folderPath + "\n" +
+                     "TXT文件数：" + fileCount + "\n\n" +
+                     "文件列表：\n" + fileList + "\n" +
+                     "处理模式：自动（每文件独立决策去重/排序/N）\n" +
+                     "正则：标准中文 + 无第字中文 + 无号特殊章节\n" +
+                     "设置：广告清理=" + (g_cleanAds ? "是" : "否") +
+                     "  标题去重=" + (g_titleDedup ? "是" : "否") +
+                     "  卷模式=" + g_volumeMode + "\n\n" +
+                     "注意：不穿透子文件夹，仅处理根目录的 .txt\n\n" +
+                     "[确定]开始   [取消]退出";
+    if (Application.MsgBox(confirmMsg, vbOKCancel + vbQuestion, "批量自动TXTv3 - 确认") !== vbOK) return;
+
+    // 逐文件处理（路径快照已固定）
+    var summaryLines = [];
+    var successCnt = 0, failCnt = 0;
+    g_batchMode = true;
+
+    for (var i = 0; i < fileCount; i++) {
+        Application.StatusBar = "批量处理 (" + (i + 1) + "/" + fileCount + ")：" + fso.GetFileName(txtFiles[i]);
+        DoEvents();
+
+        var result = processFileAuto(txtFiles[i]);
+        summaryLines.push(result);
+
+        if (containsCI(result, "成功")) {
+            successCnt++;
+        } else {
+            failCnt++;
+        }
+    }
+
+    g_batchMode = false;
+    Application.StatusBar = false;
+
+    // 汇总报告
+    var tTotal = Timer() - tBatch0;
+    var batchReport = "【批量自动拆分完成】\n" +
+                      "总计：" + fileCount + " 个文件\n" +
+                      "成功：" + successCnt + "  失败：" + failCnt + "\n" +
+                      "总耗时：" + tTotal.toFixed(1) + " 秒\n" +
+                      repeatStr("-", 30) + "\n";
+
+    for (var i = 0; i < fileCount; i++) {
+        batchReport += "  " + summaryLines[i] + "\n";
+    }
+
+    var reportPath = folderPath + "\\批量处理报告.txt";
+    writeTextUTF8NoBOM(reportPath, batchReport);
+    batchReport += "\n报告已保存：" + reportPath;
+
+    Application.MsgBox(batchReport, vbInformation, "批量自动TXTv3 - 完成");
+}
+
+function processFileAuto(filePath) {
+    var fso = CreateCOM("Scripting.FileSystemObject");
+    var fileBase = fso.GetBaseName(filePath);
+    var tFile = Timer();
+
+    // 重置全局状态
+    g_tTotal0 = Timer();
+    g_tSelect = 0;
+    g_regexName = "";
+    g_selCount = 0;
+    g_adRemovedCount = 0;
+    g_dedupRemoved = 0;
+    g_oooFixed = 0;
+    g_skipTitleOnly = 0;
+    g_skipShortBody = 0;
+    g_tocStartIdx = -1;
+    g_tocEndIdx = -1;
+    g_tocChapterCount = 0;
+
+    try {
+        // 1. 读取文件
+        g_detectedEnc = detectEncodingFile(filePath);
+        var content = readTextAuto(filePath);
+        content = repAll(repAll(content, "\r\n", "\n"), "\r", "\n");
+        var lines = content.split("\n");
+        var lineCount = lines.length;
+
+        // 2. 自动正则（固定 1,2,4）
+        InitRegexPatterns();
+        var autoParts = ["1", "2", "4"];
+        g_selPatterns = [];
+        g_selUnitGroups = [];
+        g_selDefaultUnits = [];
+        g_selOrigIndices = [];
+        g_selMaxLens = [];
+        g_selCount = 0;
+        for (var p = 0; p < autoParts.length; p++) {
+            var idx = parseInt(autoParts[p], 10);
+            g_selPatterns[g_selCount] = g_regexPatterns[idx];
+            g_selUnitGroups[g_selCount] = g_regexUnitGroups[idx];
+            g_selDefaultUnits[g_selCount] = g_regexDefaultUnits[idx];
+            g_selOrigIndices[g_selCount] = idx;
+            g_selMaxLens[g_selCount] = g_regexMaxLens[idx];
+            g_selCount++;
+        }
+        g_regexName = "标准中文+无第字中文+无号特殊章节";
+
+        // 3. 扫描 + 目录区检测
+        ScanChaptersV3(lines);
+        DetectTOC();
+
+        if (ch_count === 0) {
+            return fileBase + " | 失败（未识别到章节） | " + (Timer() - tFile).toFixed(1) + "s";
+        }
+
+        // 4. 自动决策
+        var chapCnt = 0, dupCnt = 0, oooCnt = 0, adjDup = 0, prevChIdx = -1, prevNum = 0;
+        var flatMap = mapNew();
+        for (var i = 0; i < ch_count; i++) {
+            if (ch_levels[i] === "chapter" && ch_nums[i] > 0 && !ch_isTOC[i]) {
+                chapCnt++;
+                var numKey = String(ch_nums[i]);
+                if (!mapHas(flatMap, numKey)) mapSet(flatMap, numKey, 0);
+                mapSet(flatMap, numKey, mapGet(flatMap, numKey) + 1);
+                if (prevNum > 0 && ch_nums[i] < prevNum) oooCnt++;
+                prevNum = ch_nums[i];
+                if (prevChIdx >= 0) {
+                    if (ch_nums[i] === ch_nums[prevChIdx] && ch_starts[i] - ch_starts[prevChIdx] <= 2) {
+                        adjDup++;
+                    }
+                }
+                prevChIdx = i;
+            }
+        }
+        for (var k = 0; k < flatMap.ks.length; k++) {
+            if (mapGet(flatMap, flatMap.ks[k]) > 1) dupCnt++;
+        }
+        var adjRatio = 0;
+        if (chapCnt > 0) adjRatio = adjDup / chapCnt;
+
+        var recDedup, recSort;
+        if (dupCnt === 0 && oooCnt === 0) {
+            recDedup = "none"; recSort = "none";
+        } else if (adjRatio >= 0.3 && oooCnt < 10) {
+            recDedup = "longest"; recSort = "none";
+        } else if (oooCnt >= 10) {
+            recDedup = "longest"; recSort = "sort";
+        } else if (dupCnt > 0) {
+            recDedup = "longest"; recSort = "none";
+        } else {
+            recDedup = "longest"; recSort = "sort";
+        }
+
+        var autoN = AutoNFromBodies();
+
+        // 5. 执行
+        g_dedupStrategy = recDedup;
+        g_sortStrategy = recSort;
+
+        var autoDir = fso.GetParentFolderName(filePath) + "\\" + fileBase + "_自动";
+        var autoSubDir = autoDir + "\\拆分文档";
+        if (!fso.FolderExists(autoDir)) fso.CreateFolder(autoDir);
+        if (!fso.FolderExists(autoSubDir)) fso.CreateFolder(autoSubDir);
+
+        DeepAnalyzeFile(filePath, autoDir);
+        SplitByChapterV3(filePath, autoSubDir, "", 3, false, autoN, 2);
+
+        // 移动合并文件到 autoDir
+        try {
+            var mvPaths = [];
+            var en2 = new Enumerator(fso.GetFolder(autoSubDir).Files);
+            for (; !en2.atEnd(); en2.moveNext()) {
+                var mvFile = en2.item();
+                if (mvFile.Name.indexOf("保留大于等于") >= 0 || mvFile.Name.indexOf("清理小于") >= 0) {
+                    mvPaths.push(String(mvFile.Path));
+                }
+            }
+            for (var mi = 0; mi < mvPaths.length; mi++) {
+                fso.MoveFile(mvPaths[mi], autoDir + "\\");
+            }
+        } catch (e2) {}
+
+        // 6. 返回摘要
+        var tElapsed = Timer() - tFile;
+        return fileBase + " | 成功（" + ch_count + "章→" + dedup_count + "章 " +
+               recDedup + "+" + recSort + " N=" + autoN + ") | " + tElapsed.toFixed(1) + "s";
+
+    } catch (e) {
+        return fileBase + " | 失败（" + e.message + ") | " + (Timer() - tFile).toFixed(1) + "s";
+    }
 }

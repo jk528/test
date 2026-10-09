@@ -883,7 +883,7 @@ def load_and_scan(file_path, encoding=None, ad_clean=True, extra_patterns=None):
 
 
 def deep_analyze(file_path, encoding=None, ad_clean=False, extra_patterns=None):
-    """深度分析：全面诊断所有问题。返回报告文本（总-分结构）"""
+    """深度分析：全面诊断所有问题。返回报告文本（概述-总结-详细 三结构）"""
     out = []
     p = out.append
 
@@ -936,30 +936,101 @@ def deep_analyze(file_path, encoding=None, ad_clean=False, extra_patterns=None):
     rec_dedup, rec_sort, rec_reason = auto_decide(chapters)
     rec_n, rec_n_reason = auto_decide_n(chapters, lines)
 
-    # ========== 【总】结论与建议 ==========
+    # 预计算卷间章号重复（供总结引用，原在详细卷结构分析中计算）
+    common = set()
+    if len(vol_nums) > 1:
+        vol_chs_pre = defaultdict(set)
+        current_vol_pre = None
+        for s in structures:
+            if s['level'] == 'volume':
+                current_vol_pre = s['vol_num']
+            elif s['level'] == 'chapter' and s['ch_num'] > 0:
+                vol_chs_pre[current_vol_pre].add(s['ch_num'])
+        vol_list_pre = sorted(vol_chs_pre.keys(), key=lambda x: (x is None, x or 0))
+        if len(vol_list_pre) >= 2:
+            common = vol_chs_pre[vol_list_pre[0]] & vol_chs_pre[vol_list_pre[1]]
+
+    # 生成处理建议（在总结中输出，原在报告末尾）
+    suggestions = []
+    if volumes and len(vol_nums) > 1 and common:
+        suggestions.append("检测到多卷结构且卷间章号重复，建议启用卷感知模式（--volume-mode auto 或 by_volume）")
+    if ooo_count > 10 and dup_flat:
+        suggestions.append("重复+乱序都严重，推荐 --dedup longest --sort sort（最彻底）")
+    elif ooo_count > 10:
+        suggestions.append("乱序严重，推荐 --dedup none --sort sort（按章号重排）")
+    elif dup_flat:
+        suggestions.append("有重复但乱序轻微，推荐 --dedup longest --sort none（保留最长且不改顺序）")
+    if adj_ratio > 0.3:
+        suggestions.append("每章双标题明显，推荐 --dedup longest --sort none")
+    if not suggestions:
+        suggestions.append("文件质量较好，可根据需要选择组合")
+    suggestions.append(f"一键处理：--auto 自动完成分析+决策+清洁输出")
+
+    # 整体评估
+    issue_count = sum([1 for x in [dup_num_count, ooo_count, title_diff_count] if x > 0])
+    if issue_count == 0:
+        health_desc = "✅ 文件质量良好，无重复无乱序"
+    elif issue_count <= 2:
+        health_desc = f"⚠ 存在 {issue_count} 类问题，建议处理后再使用"
+    else:
+        health_desc = f"⚠ 严重问题（{issue_count} 类），强烈建议处理"
+
+    # ========== 【一、概述】 ==========
     p("=" * 70)
     p(f"  深度分析报告: {os.path.basename(file_path)}")
     p("=" * 70)
-    p("【总】结论与建议")
-    p(f"  问题计数: 卷结构{len(vol_nums)}个 / 重复章号{dup_num_count}个(共{dup_copies}份) / "
-      f"乱序{ooo_count}处(最大跌{max_drop}) / 同章异题{title_diff_count}个 / "
-      f"目录区{toc_count}章 / 相邻双标题占比{adj_ratio:.1%}")
-    p(f"  推荐组合: --dedup {rec_dedup} --sort {rec_sort}  （{rec_reason}）")
-    p(f"  建议清洁N值: {rec_n}  （{rec_n_reason}）")
-    if ad_removed > 0:
-        p(f"  广告清理: 已移除垃圾行 {ad_removed} 行（--no-ad-clean 可关闭）")
+    p("")
+    p("【一、概述】")
+    p("  文件信息：")
+    p(f"    总行数: {len(lines):,}")
+    p(f"    总字符: {content_len:,}")
+    p(f"    编码: {enc}")
+    p("  结构识别：")
+    struct_info = f"卷级 {len(volumes)} 个, 章节级 {len(chapters_all)} 个"
+    if toc_count > 0:
+        struct_info += f"（其中目录区 {toc_count} 章，已跳过）"
+    p(f"    {struct_info}")
+    regex_name = "标准中文+无第字中文+无号特殊章节" if not extra_patterns else f"标准中文+无第字中文+无号特殊章节+自定义({len(extra_patterns)}条)"
+    p(f"    使用正则: {regex_name}")
+    p(f"  整体评估：{health_desc}")
     p("")
 
-    # ========== 【分】详细分析 ==========
-    p("【分】详细分析")
-    p(f"总行数: {len(lines):,}   总字符: {content_len:,}   编码: {enc}")
-    p(f"识别结构: 卷级 {len(volumes)} 个, 章节级 {len(chapters_all)} 个"
-      + (f"（其中目录区 {toc_count} 章，已跳过）" if toc_count > 0 else ""))
+    # ========== 【二、总结】 ==========
+    p("-" * 50)
+    p("【二、总结】")
+    p("  问题计数：")
+    p(f"    重复章号数: {dup_num_count}" + (f"（重复份数: {dup_copies}）" if dup_copies > dup_num_count else ""))
+    p(f"    乱序处数: {ooo_count}" + (f"（最大跌幅: {max_drop}）" if max_drop > 0 else ""))
+    vol_desc = f"有卷（卷级标题 {len(volumes)} 个）" if volumes else "无卷"
+    p(f"    卷结构: {vol_desc}")
+    p(f"    同章异题数: {title_diff_count}")
+    toc_desc = f"有（{toc_count} 章，已跳过）" if toc_count > 0 else "无"
+    p(f"    目录区: {toc_desc}")
+    if adj_dup > 0:
+        p(f"    相邻双标题占比: {adj_ratio:.1%}")
+    if ad_removed > 0:
+        p(f"    广告清理: 已移除 {ad_removed} 行")
+    p("")
+    p("  推荐方案：")
+    p(f"    去重策略: {rec_dedup}")
+    p(f"    排序策略: {rec_sort}")
+    p(f"    判定理由: {rec_reason}")
+    p(f"    清洁N值: {rec_n}")
+    p(f"    判定理由: {rec_n_reason}")
+    p("")
+    p("  处理建议：")
+    for s in suggestions:
+        p(f"    • {s}")
+    p("")
+
+    # ========== 【三、详细分析】 ==========
+    p("-" * 50)
+    p("【三、详细分析】")
     p("")
 
     # ---------- 1. 卷结构分析 ----------
     p("-" * 50)
-    p("【一、卷/部结构分析】")
+    p("卷/部结构分析")
     if volumes:
         p(f"  卷级标题数: {len(volumes)}")
         vol_units = set(v['vol_unit'] for v in volumes if v['vol_unit'])
@@ -980,30 +1051,19 @@ def deep_analyze(file_path, encoding=None, ad_clean=False, extra_patterns=None):
             vol_label = f"第{vol_num}卷" if vol_num else "无卷"
             p(f"    {vol_label}: {vol_chapter_counts[vol_num]} 章")
 
-        # 卷间章号重复检测
-        common = set()
+        # 卷间章号重复检测（使用预计算的 common）
         if len(vol_nums) > 1:
-            vol_chs = defaultdict(set)
-            current_vol = None
-            for s in structures:
-                if s['level'] == 'volume':
-                    current_vol = s['vol_num']
-                elif s['level'] == 'chapter' and s['ch_num'] > 0:
-                    vol_chs[current_vol].add(s['ch_num'])
-
-            vol_list = sorted(vol_chs.keys(), key=lambda x: (x is None, x or 0))
-            if len(vol_list) >= 2:
-                common = vol_chs[vol_list[0]] & vol_chs[vol_list[1]]
-                if common:
-                    p(f"\n  ⚠ 卷间章号重复: 第{vol_list[0]}卷 和 第{vol_list[1]}卷 共享 {len(common)} 个章号")
-                    p(f"    示例重复章号: {sorted(list(common))[:10]}...")
+            vol_list_pre2 = sorted(vol_chs_pre.keys(), key=lambda x: (x is None, x or 0))
+            if len(vol_list_pre2) >= 2 and common:
+                p(f"\n  ⚠ 卷间章号重复: 第{vol_list_pre2[0]}卷 和 第{vol_list_pre2[1]}卷 共享 {len(common)} 个章号")
+                p(f"    示例重复章号: {sorted(list(common))[:10]}...")
     else:
         p("  未检测到卷/部/册级结构")
 
     # ---------- 2. 重复分析 ----------
     p("")
     p("-" * 50)
-    p("【二、重复章节分析】")
+    p("重复章节分析")
 
     unique_flat = len(flat_map)
     p(f"  扁平视角（忽略卷）:")
@@ -1052,7 +1112,7 @@ def deep_analyze(file_path, encoding=None, ad_clean=False, extra_patterns=None):
     # ---------- 3. 乱序分析 ----------
     p("")
     p("-" * 50)
-    p("【三、乱序分析】")
+    p("乱序分析")
 
     p(f"  扁平视角（忽略卷）:")
     p(f"    乱序次数: {ooo_count}")
@@ -1085,7 +1145,7 @@ def deep_analyze(file_path, encoding=None, ad_clean=False, extra_patterns=None):
     # ---------- 4. 多轨目录检测 ----------
     p("")
     p("-" * 50)
-    p("【四、多轨目录检测】")
+    p("多轨目录检测")
 
     if toc_count > 0:
         toc_chs = [c for c in chapters_all if c.get('is_toc')]
@@ -1113,7 +1173,7 @@ def deep_analyze(file_path, encoding=None, ad_clean=False, extra_patterns=None):
     # ---------- 5. 格式多样性分析 ----------
     p("")
     p("-" * 50)
-    p("【五、格式多样性分析】")
+    p("格式多样性分析")
 
     pattern_counts = defaultdict(int)
     unit_counts = defaultdict(int)
@@ -1141,7 +1201,7 @@ def deep_analyze(file_path, encoding=None, ad_clean=False, extra_patterns=None):
     # ---------- 6. 连续性分析 ----------
     p("")
     p("-" * 50)
-    p("【六、章号连续性分析】")
+    p("章号连续性分析")
 
     def _format_missing_list(missing_list, per_line=20, indent="    "):
         """格式化缺失章号列表，每行per_line个，全部枚举不省略"""
@@ -1202,7 +1262,7 @@ def deep_analyze(file_path, encoding=None, ad_clean=False, extra_patterns=None):
     # ---------- 7. 各组合效果预览 ----------
     p("")
     p("-" * 50)
-    p("【七、6组合效果预览（扁平模式）】")
+    p("各策略组合效果预览（扁平模式）")
 
     title_dedup = True
     combos = [
@@ -1250,35 +1310,6 @@ def deep_analyze(file_path, encoding=None, ad_clean=False, extra_patterns=None):
             except Exception as e:
                 p(f"  {label:14s}: 错误 - {e}")
 
-    # ---------- 8. 建议 ----------
-    p("")
-    p("=" * 70)
-    p("  处理建议：")
-
-    suggestions = []
-    if volumes and len(vol_nums) > 1 and common:
-        suggestions.append("• 检测到多卷结构且卷间章号重复，建议启用卷感知模式")
-        suggestions.append("  （--volume-mode auto 或 by_volume）")
-
-    if ooo_count > 10 and dup_flat:
-        suggestions.append("• 重复+乱序都严重，推荐 --dedup longest --sort sort（最彻底）")
-    elif ooo_count > 10:
-        suggestions.append("• 乱序严重，推荐 --dedup none --sort sort（按章号重排）")
-    elif dup_flat:
-        suggestions.append("• 有重复但乱序轻微，推荐 --dedup longest --sort none（保留最长且不改顺序）")
-
-    if adj_ratio > 0.3:
-        suggestions.append("• 每章双标题明显，推荐 --dedup longest --sort none")
-
-    if not suggestions:
-        suggestions.append("• 文件质量较好，可根据需要选择组合")
-
-    suggestions.append(f"• 一键处理：--auto 自动完成分析+决策+清洁输出")
-
-    for s in suggestions:
-        p(f"  {s}")
-
-    p("=" * 70)
     return '\n'.join(out)
 
 
@@ -1759,24 +1790,28 @@ def clean_output_dir(out_dir):
 #   读取+清理+扫描+目录区检测 → 深度分析 → 自动决策 → 执行清洁模式输出
 # ===========================================================================
 def auto_process(src, encoding=None, volume_mode='auto', title_dedup=True,
-                 ad_clean=False, extra_patterns=None):
-    """全自动模式：一键完成分析、决策与清洁输出"""
+                 ad_clean=False, extra_patterns=None, silent=False):
+    """全自动模式：一键完成分析、决策与清洁输出
+    silent=True 时抑制 stdout 输出（供批量模式调用）
+    """
     src_name = os.path.splitext(os.path.basename(src))[0]
     auto_dir = os.path.join(os.path.dirname(os.path.abspath(src)),
                             src_name + '_自动')
     clean_output_dir(auto_dir)
-    print(f"输出目录: {auto_dir}")
-    print()
+    if not silent:
+        print(f"输出目录: {auto_dir}")
+        print()
 
     # 1. 深度分析（总-分报告）
     report = deep_analyze(src, encoding=encoding, ad_clean=ad_clean,
                           extra_patterns=extra_patterns)
     report_path = os.path.join(auto_dir, '分析报告.txt')
     write_text_utf8_nobom(report_path, report)
-    print(report)
-    print()
-    print(f"分析报告已保存: {report_path}")
-    print()
+    if not silent:
+        print(report)
+        print()
+        print(f"分析报告已保存: {report_path}")
+        print()
 
     # 2. 自动决策（仅用 ch_num>0 且非目录区章节）
     lines, structures, chapters_all, volumes, toc_count, ad_removed, enc = \
@@ -1784,14 +1819,15 @@ def auto_process(src, encoding=None, volume_mode='auto', title_dedup=True,
     dedup_strategy, sort_strategy, reason = auto_decide(chapters_all)
     n_value, n_reason = auto_decide_n(chapters_all, lines)
 
-    print("=" * 60)
-    print("  自动方案：")
-    print(f"  • 去重策略: {dedup_strategy}  排序策略: {sort_strategy}")
-    print(f"    判定理由: {reason}")
-    print(f"  • 清洁N值: {n_value}")
-    print(f"    判定理由: {n_reason}")
-    print("=" * 60)
-    print()
+    if not silent:
+        print("=" * 60)
+        print("  自动方案：")
+        print(f"  • 去重策略: {dedup_strategy}  排序策略: {sort_strategy}")
+        print(f"    判定理由: {reason}")
+        print(f"  • 清洁N值: {n_value}")
+        print(f"    判定理由: {n_reason}")
+        print("=" * 60)
+        print()
 
     # 3. 执行清洁模式输出（拆分文档子目录 + 双合并文件）
     split_dir = os.path.join(auto_dir, '拆分文档')
@@ -1800,6 +1836,77 @@ def auto_process(src, encoding=None, volume_mode='auto', title_dedup=True,
                      volume_mode=volume_mode, min_body_len=n_value, merge_flag=1,
                      title_dedup=title_dedup, ad_clean=ad_clean,
                      merge_dir=auto_dir, extra_patterns=extra_patterns)
+
+    return dedup_strategy, sort_strategy, n_value, len(chapters_all)
+
+
+# ===========================================================================
+# v3.5 新增：批量自动模式
+#   选择文件夹 → 路径快照 → 逐文件 auto_process → 汇总报告
+#   不穿透子文件夹（避免处理输出目录中的已拆分文件）
+# ===========================================================================
+def batch_auto_process(folder_path, encoding=None, volume_mode='auto',
+                       title_dedup=True, ad_clean=False, extra_patterns=None):
+    """批量自动模式：扫描文件夹中的 .txt，逐文件自动拆分
+
+    路径快照：扫描时将文件列表固定，处理中生成的输出文件不会进入列表
+    不穿透子文件夹
+    """
+    import glob
+    t_batch0 = time.time()
+
+    # 路径快照：扫描后固定
+    txt_files = sorted(glob.glob(os.path.join(folder_path, "*.txt")))
+    file_count = len(txt_files)
+    if file_count == 0:
+        print("所选文件夹中未找到任何 .txt 文件。")
+        return
+
+    print(f"文件夹：{folder_path}")
+    print(f"TXT文件数：{file_count}")
+    print("-" * 60)
+    for i, f in enumerate(txt_files, 1):
+        print(f"  {i}. {os.path.basename(f)}")
+    print("-" * 60)
+    print("开始批量自动拆分...")
+    print()
+
+    # 逐文件处理（路径快照已固定）
+    success_cnt = 0
+    fail_cnt = 0
+    summary_lines = []
+
+    for i, f in enumerate(txt_files, 1):
+        print(f"[{i}/{file_count}] {os.path.basename(f)}")
+        try:
+            dedup_s, sort_s, n_val, ch_total = auto_process(
+                f, encoding=encoding, volume_mode=volume_mode,
+                title_dedup=title_dedup, ad_clean=ad_clean,
+                extra_patterns=extra_patterns, silent=True)
+            line = f"{os.path.splitext(os.path.basename(f))[0]} | 成功（{ch_total}章 {dedup_s}+{sort_s} N={n_val}）"
+            success_cnt += 1
+        except Exception as e:
+            line = f"{os.path.splitext(os.path.basename(f))[0]} | 失败（{e}）"
+            fail_cnt += 1
+        summary_lines.append(line)
+        print(f"  → {line}")
+        print()
+
+    # 汇总报告
+    t_total = time.time() - t_batch0
+    report = "【批量自动拆分完成】\n"
+    report += f"总计：{file_count} 个文件\n"
+    report += f"成功：{success_cnt}  失败：{fail_cnt}\n"
+    report += f"总耗时：{t_total:.1f} 秒\n"
+    report += "-" * 30 + "\n"
+    for line in summary_lines:
+        report += f"  {line}\n"
+
+    report_path = os.path.join(folder_path, "批量处理报告.txt")
+    write_text_utf8_nobom(report_path, report)
+    report += f"\n报告已保存：{report_path}"
+
+    print(report)
 
 
 # ===========================================================================
@@ -1823,13 +1930,16 @@ def main():
   python split_txt_v3.py --src 小说.txt --auto          # 全自动（推荐）
   python split_txt_v3.py --src 小说.txt --analyze       # 深度分析
   python split_txt_v3.py --src 小说.txt --clean 100     # 清洁模式(双合并文件)
+  python split_txt_v3.py --batch 小说文件夹              # 批量自动拆分（v3.5）
   python split_txt_v3.py --src 小说.txt --dedup first --sort none
 """
     parser = argparse.ArgumentParser(
-        description="TXT章节拆分工具 v3.4（去重+乱序修复+卷级感知+目录区检测+广告清理+全自动模式）",
+        description="TXT章节拆分工具 v3.5（去重+乱序修复+卷级感知+目录区检测+广告清理+全自动+批量模式）",
         epilog=epilog,
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--src", default=None, help="源TXT路径")
+    parser.add_argument("--batch", default=None,
+                        help="批量自动模式：传入文件夹路径，扫描根目录所有 .txt 逐文件自动拆分")
     parser.add_argument("--mode", choices=["chapter", "groups"], default="chapter",
                         help="拆分模式: chapter=每章一文件(默认), groups=聚合拆分")
     parser.add_argument("--out", default="", help="输出目录(空=自动派生)")
@@ -1879,6 +1989,16 @@ def main():
     extra_patterns = None
     if args.custom_regex:
         extra_patterns = [p.strip() for p in args.custom_regex.split('|') if p.strip()]
+
+    # v3.5：批量自动模式
+    if args.batch:
+        if not os.path.isdir(args.batch):
+            parser.error("--batch 需要一个有效的文件夹路径")
+        batch_auto_process(args.batch, encoding=args.encoding,
+                           volume_mode=args.volume_mode,
+                           title_dedup=args.title_dedup, ad_clean=args.ad_clean,
+                           extra_patterns=extra_patterns)
+        return
 
     if args.analyze:
         if not args.src:

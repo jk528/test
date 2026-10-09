@@ -26,6 +26,8 @@ Option Explicit
 '
 ' v3.5 变更摘要：
 '   - 新增批量入口 批量自动TXTv3（选择文件夹→平铺扫描*.txt→逐文件自动拆分→汇总报告）
+'   - 路径快照机制：扫描时将 .txt 路径存入 Collection，此后固定不变
+'     → 处理中生成的输出文件不会进入列表，不会被误当作输入
 '   - 不穿透子文件夹（避免处理输出目录中的已拆分文件）
 '   - g_batchMode 标志：批量时抑制 ShowCompleteReportV3 弹窗，改为 Debug.Print
 '
@@ -1742,29 +1744,21 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String, Optional ByVal outputDir A
     ReDim lines_arr(0 To 200)
     rptIdx = 0
 
-    AddRptLine lines_arr, rptIdx, String(70, "=")
-    AddRptLine lines_arr, rptIdx, "  深度分析报告: " & fso.GetFileName(filePath)
-    AddRptLine lines_arr, rptIdx, String(70, "=")
-    AddRptLine lines_arr, rptIdx, "总行数: " & Format(lineCount, "#,##0")
-    AddRptLine lines_arr, rptIdx, "总字符: " & Format(Len(content), "#,##0")
-    AddRptLine lines_arr, rptIdx, "编码: " & g_detectedEnc
-
-    ' 统计卷和章
+    ' 统计卷和章（供概述和详细分析共用）
     volCnt = 0: chapCnt = 0
     For i = 0 To ch_count - 1
         If ch_levels(i) = "volume" Then volCnt = volCnt + 1
         If ch_levels(i) = "chapter" Or ch_levels(i) = "special" Then chapCnt = chapCnt + 1
     Next i
-    AddRptLine lines_arr, rptIdx, "识别结构: 卷级 " & volCnt & " 个, 章节级 " & chapCnt & " 个"
-    If g_tocChapterCount > 0 Then
-        AddRptLine lines_arr, rptIdx, "              其中目录区 " & g_tocChapterCount & " 章（已跳过）"
-    End If
-    AddRptLine lines_arr, rptIdx, "使用正则: " & g_regexName
+
+    ' 【三、详细分析】
+    AddRptLine lines_arr, rptIdx, String(50, "-")
+    AddRptLine lines_arr, rptIdx, "【三、详细分析】"
     AddRptLine lines_arr, rptIdx, ""
 
-    ' 一、卷结构分析
+    ' 卷结构分析
     AddRptLine lines_arr, rptIdx, String(50, "-")
-    AddRptLine lines_arr, rptIdx, "【一、卷/部结构分析】"
+    AddRptLine lines_arr, rptIdx, "卷/部结构分析"
     If volCnt > 0 Then
         Set volSet = CreateObject("Scripting.Dictionary")
         Set volUnitSet = CreateObject("Scripting.Dictionary")
@@ -1862,7 +1856,7 @@ Private Sub DeepAnalyzeFile(ByVal filePath As String, Optional ByVal outputDir A
 
     ' 二、重复分析
     AddRptLine lines_arr, rptIdx, String(50, "-")
-    AddRptLine lines_arr, rptIdx, "【二、重复章节分析】"
+    AddRptLine lines_arr, rptIdx, "重复章节分析"
     AddRptLine lines_arr, rptIdx, "  扁平视角（忽略卷）:"
 
     Set flatMap = CreateObject("Scripting.Dictionary")
@@ -2019,7 +2013,7 @@ NextNumKey:
 
     ' 三、乱序分析
     AddRptLine lines_arr, rptIdx, String(50, "-")
-    AddRptLine lines_arr, rptIdx, "【三、乱序分析】"
+    AddRptLine lines_arr, rptIdx, "乱序分析"
     AddRptLine lines_arr, rptIdx, "  扁平视角（忽略卷）:"
 
     oooCnt = 0: maxDrop = 0: prevNum = 0
@@ -2049,7 +2043,7 @@ NextNumKey:
 
     ' 四、多轨目录检测
     AddRptLine lines_arr, rptIdx, String(50, "-")
-    AddRptLine lines_arr, rptIdx, "【四、多轨目录检测】"
+    AddRptLine lines_arr, rptIdx, "多轨目录检测"
     
     ' v3.2 新增：目录区自动检测结果
     If g_tocChapterCount > 0 Then
@@ -2105,7 +2099,7 @@ NextNumKey:
 
     ' 五、格式多样性
     AddRptLine lines_arr, rptIdx, String(50, "-")
-    AddRptLine lines_arr, rptIdx, "【五、格式多样性分析】"
+    AddRptLine lines_arr, rptIdx, "格式多样性分析"
     Set patCnt = CreateObject("Scripting.Dictionary")
     Set unitCnt = CreateObject("Scripting.Dictionary")
     For i = 0 To ch_count - 1
@@ -2133,7 +2127,7 @@ NextNumKey:
 
     ' 六、章号连续性
     AddRptLine lines_arr, rptIdx, String(50, "-")
-    AddRptLine lines_arr, rptIdx, "【六、章号连续性分析】"
+    AddRptLine lines_arr, rptIdx, "章号连续性分析"
     Set numSet = CreateObject("Scripting.Dictionary")
     minNum = 999999: maxNum = 0
     For i = 0 To ch_count - 1
@@ -2177,7 +2171,7 @@ NextNumKey:
 
     ' 七、各策略效果预览
     AddRptLine lines_arr, rptIdx, String(50, "-")
-    AddRptLine lines_arr, rptIdx, "【七、各策略组合效果预览（扁平模式）】"
+    AddRptLine lines_arr, rptIdx, "各策略组合效果预览（扁平模式）"
     
     ' v3.2 修复：原代码将 lis/sort 作为去重策略传入导致溢出
     ' 正确做法：6种组合（去重策略 + 排序策略配对），与Python版一致
@@ -2216,29 +2210,13 @@ NextNumKey:
 
     AddRptLine lines_arr, rptIdx, ""
 
-    ' 处理建议
-    AddRptLine lines_arr, rptIdx, String(70, "=")
-    AddRptLine lines_arr, rptIdx, "  处理建议："
-
-    If oooCnt > 10 Then
-        AddRptLine lines_arr, rptIdx, "  • 乱序严重，推荐 sort 策略（最彻底）或 lis 策略（智能）"
-    ElseIf dupCnt > 0 Then
-        AddRptLine lines_arr, rptIdx, "  • 有重复但乱序轻微，推荐 longest 策略（保留内容最长的）"
-    End If
-    If adjRatio > 0.3 Then
-        AddRptLine lines_arr, rptIdx, "  • 每章双标题明显，组合3（保留最长+不排序）即可解决大部分问题"
-    End If
-    If volCnt > 1 Then
-        AddRptLine lines_arr, rptIdx, "  • 检测到多卷结构，注意选择正确的卷模式"
-    End If
-
-    AddRptLine lines_arr, rptIdx, String(70, "=")
-
-    ' v3.4：构建【总】结论与建议（置于报告开头，明细保留在【分】之后）
+    ' v3.5：推荐组合决策（供总结引用）
     Dim summary As String
     Dim recCombo As String
     Dim autoN As Long
     Dim volStructDesc As String, tocDesc As String
+    Dim healthDesc As String, issueCount As Long
+    Dim sugList As String
 
     ' 推荐组合（与自动TXTv3相同的自动决策规则）
     If dupCnt = 0 And oooCnt = 0 Then
@@ -2267,19 +2245,84 @@ NextNumKey:
         tocDesc = "无"
     End If
 
-    summary = "【总】结论与建议" & vbCrLf & _
+    ' 整体评估
+    issueCount = 0
+    If dupCnt > 0 Then issueCount = issueCount + 1
+    If oooCnt > 0 Then issueCount = issueCount + 1
+    If g_titleDiffCount > 0 Then issueCount = issueCount + 1
+    If issueCount = 0 Then
+        healthDesc = "✅ 文件质量良好，无重复无乱序"
+    ElseIf issueCount <= 2 Then
+        healthDesc = "⚠ 存在 " & issueCount & " 类问题，建议处理后再使用"
+    Else
+        healthDesc = "⚠ 严重问题（" & issueCount & " 类），强烈建议处理"
+    End If
+
+    ' 生成处理建议
+    sugList = ""
+    If oooCnt > 10 And dupCnt > 0 Then
+        sugList = sugList & "    • 重复+乱序都严重，推荐 --dedup longest --sort sort（最彻底）" & vbCrLf
+    ElseIf oooCnt > 10 Then
+        sugList = sugList & "    • 乱序严重，推荐 --dedup none --sort sort（按章号重排）" & vbCrLf
+    ElseIf dupCnt > 0 Then
+        sugList = sugList & "    • 有重复但乱序轻微，推荐 --dedup longest --sort none（保留最长且不改顺序）" & vbCrLf
+    End If
+    If adjRatio > 0.3 Then
+        sugList = sugList & "    • 每章双标题明显，推荐 --dedup longest --sort none" & vbCrLf
+    End If
+    If volCnt > 1 Then
+        sugList = sugList & "    • 检测到多卷结构，注意选择正确的卷模式" & vbCrLf
+    End If
+    If Len(sugList) = 0 Then
+        sugList = "    • 文件质量较好，可根据需要选择组合" & vbCrLf
+    End If
+    sugList = sugList & "    • 一键处理：--auto / 自动TXTv3 自动完成分析+决策+清洁输出" & vbCrLf
+
+    ' ========== 【一、概述】+【二、总结】 ==========
+    Dim structInfo As String
+    structInfo = "卷级 " & volCnt & " 个, 章节级 " & chapCnt & " 个"
+    If g_tocChapterCount > 0 Then
+        structInfo = structInfo & "（其中目录区 " & g_tocChapterCount & " 章，已跳过）"
+    End If
+
+    summary = String(70, "=") & vbCrLf & _
+              "  深度分析报告: " & fso.GetFileName(filePath) & vbCrLf & _
+              String(70, "=") & vbCrLf & _
+              vbCrLf & _
+              "【一、概述】" & vbCrLf & _
+              "  文件信息：" & vbCrLf & _
+              "    总行数: " & Format(lineCount, "#,##0") & vbCrLf & _
+              "    总字符: " & Format(Len(content), "#,##0") & vbCrLf & _
+              "    编码: " & g_detectedEnc & vbCrLf & _
+              "  结构识别：" & vbCrLf & _
+              "    " & structInfo & vbCrLf & _
+              "    使用正则: " & g_regexName & vbCrLf & _
+              "  整体评估：" & healthDesc & vbCrLf & _
+              vbCrLf & _
+              String(50, "-") & vbCrLf & _
+              "【二、总结】" & vbCrLf & _
               "  问题计数：" & vbCrLf & _
               "    重复章号数：" & dupCnt & vbCrLf & _
               "    乱序处数：" & oooCnt & vbCrLf & _
               "    卷结构：" & volStructDesc & vbCrLf & _
               "    同章异题数：" & g_titleDiffCount & vbCrLf & _
-              "    目录区：" & tocDesc & vbCrLf & _
-              "  推荐组合：" & recCombo & vbCrLf & _
-              "  建议清洁N值：" & autoN & vbCrLf & _
-              String(50, "-") & vbCrLf & _
-              "【分】各维度明细" & vbCrLf
+              "    目录区：" & tocDesc & vbCrLf
+    If adjDup > 0 Then
+        summary = summary & "    相邻双标题占比：" & Format(adjRatio, "0.0%") & vbCrLf
+    End If
+    If g_adRemovedCount > 0 Then
+        summary = summary & "    广告清理: 已移除 " & g_adRemovedCount & " 行" & vbCrLf
+    End If
+    summary = summary & vbCrLf & _
+              "  推荐方案：" & vbCrLf & _
+              "    去重策略: " & recCombo & vbCrLf & _
+              "    清洁N值: " & autoN & vbCrLf & _
+              vbCrLf & _
+              "  处理建议：" & vbCrLf & _
+              sugList & vbCrLf & _
+              String(50, "-") & vbCrLf
 
-    ' 输出报告（总-分结构）
+    ' 输出报告（概述-总结-详细 三结构）
     report = summary & JoinArr(lines_arr, rptIdx)
     Debug.Print report
 
@@ -2291,7 +2334,7 @@ NextNumKey:
     End If
     WriteTextUTF8NoBOM outPath, report
     If Len(outputDir) = 0 Then
-        MsgBox "【总】分析完成" & vbCrLf & _
+        MsgBox "【分析完成】" & vbCrLf & _
                "  重复章号 " & dupCnt & "｜乱序 " & oooCnt & " 处｜同章异题 " & g_titleDiffCount & vbCrLf & _
                "  推荐组合：" & recCombo & vbCrLf & _
                "  建议清洁N值：" & autoN & vbCrLf & vbCrLf & _
@@ -3774,11 +3817,11 @@ Private Function SelectTxtFolder(ByVal title As String) As String
 End Function
 
 '------------------------------------------------------------------------------
-' 批量自动入口：选择文件夹 → 确认 → 预读全部文件 → 逐文件自动拆分 → 汇总报告
+' 批量自动入口：选择文件夹 → 确认 → 逐文件自动拆分 → 汇总报告
 '   弹窗1：选择文件夹
 '   弹窗2：确认文件列表与设置
-'   阶段1 预读：将所有TXT文件内容读入内存（此后生成输出文件不会被误当作输入）
-'   阶段2 处理：每文件独立决策（正则固定1,2,4 / 去重排序自动 / N自动）
+'   文件路径快照：扫描时将所有 .txt 路径存入 Collection，此后固定不变
+'     → 处理过程中生成的输出文件不会进入列表，不会被误当作输入
 '   不穿透子文件夹：仅扫描所选文件夹根目录的 *.txt
 '------------------------------------------------------------------------------
 Public Sub 批量自动TXTv3()
@@ -3796,10 +3839,6 @@ Public Sub 批量自动TXTv3()
     Dim batchReport As String
     Dim reportPath As String
 
-    ' 预读阶段：内容与编码数组
-    Dim arrContent() As String, arrEnc() As String
-    Dim tPreRead As Double
-
     ' 初始化
     Set fso = CreateObject("Scripting.FileSystemObject")
     tBatch0 = Timer
@@ -3812,6 +3851,7 @@ Public Sub 批量自动TXTv3()
     LoadSettings
 
     ' 平铺扫描 *.txt（不穿透子文件夹）
+    ' 路径快照：扫描后 Collection 固定，处理中生成的输出文件不会进入列表
     Set folder = fso.GetFolder(folderPath)
     Set txtFiles = New Collection
     For Each f In folder.Files
@@ -3849,28 +3889,7 @@ Public Sub 批量自动TXTv3()
                  "[确定]开始   [取消]退出"
     If MsgBox(confirmMsg, vbOKCancel + vbQuestion, "批量自动TXTv3 - 确认") <> vbOK Then Exit Sub
 
-    ' ============================================================
-    ' 阶段1 预读：将所有TXT文件内容读入内存
-    '   此阶段完成后，后续生成的输出文件不会被误当作输入
-    ' ============================================================
-    ReDim arrContent(1 To fileCount)
-    ReDim arrEnc(1 To fileCount)
-    tPreRead = Timer
-
-    For i = 1 To fileCount
-        Application.StatusBar = "预读文件 (" & i & "/" & fileCount & ")：" & fso.GetFileName(txtFiles(i))
-        DoEvents
-        arrEnc(i) = DetectEncodingFile(txtFiles(i))
-        arrContent(i) = ReadTextAuto(txtFiles(i))
-    Next i
-
-    tPreRead = Timer - tPreRead
-    Application.StatusBar = "预读完成，开始拆分..."
-    DoEvents
-
-    ' ============================================================
-    ' 阶段2 处理：逐文件自动拆分（使用预读内容，不再访问磁盘源文件）
-    ' ============================================================
+    ' 逐文件处理（路径快照已固定，输出文件不会进入列表）
     ReDim summaryLines(1 To fileCount)
     successCnt = 0
     failCnt = 0
@@ -3880,7 +3899,7 @@ Public Sub 批量自动TXTv3()
         Application.StatusBar = "批量处理 (" & i & "/" & fileCount & ")：" & fso.GetFileName(txtFiles(i))
         DoEvents
 
-        result = ProcessFileAuto(txtFiles(i), arrContent(i), arrEnc(i))
+        result = ProcessFileAuto(txtFiles(i))
         summaryLines(i) = result
 
         If InStr(result, "成功") > 0 Then
@@ -3898,7 +3917,6 @@ Public Sub 批量自动TXTv3()
     batchReport = "【批量自动拆分完成】" & vbCrLf & _
                   "总计：" & fileCount & " 个文件" & vbCrLf & _
                   "成功：" & successCnt & "  失败：" & failCnt & vbCrLf & _
-                  "预读耗时：" & Format(tPreRead, "0.0") & " 秒" & vbCrLf & _
                   "总耗时：" & Format(tTotal, "0.0") & " 秒" & vbCrLf & _
                   String(30, "-") & vbCrLf
 
@@ -3918,11 +3936,9 @@ End Sub
 '------------------------------------------------------------------------------
 ' 处理单个文件（自动模式，无文件选择/确认弹窗）
 '   逻辑与 自动TXTv3 完全一致，仅去除弹窗交互
-'   预读阶段已将文件内容读入内存，此处直接使用，不再访问磁盘
 '   返回格式："文件名 | 结果 | 耗时"
 '------------------------------------------------------------------------------
-Private Function ProcessFileAuto(ByVal filePath As String, _
-    ByRef preContent As String, ByVal preEnc As String) As String
+Private Function ProcessFileAuto(ByVal filePath As String) As String
     Dim fso As Object
     Dim content As String, lines() As String, lineCount As Long
     Dim t0 As Double, tFile As Double
@@ -3957,10 +3973,10 @@ Private Function ProcessFileAuto(ByVal filePath As String, _
 
     On Error GoTo ProcError
 
-    ' 1. 使用预读内容（不再从磁盘读取，确保输出文件不会被当作输入）
+    ' 1. 读取文件
     t0 = Timer
-    g_detectedEnc = preEnc
-    content = preContent
+    g_detectedEnc = DetectEncodingFile(filePath)
+    content = ReadTextAuto(filePath)
     content = Replace(Replace(content, vbCrLf, vbLf), vbCr, vbLf)
     lines = Split(content, vbLf)
     lineCount = UBound(lines) + 1
