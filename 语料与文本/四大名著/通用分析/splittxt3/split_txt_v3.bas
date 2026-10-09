@@ -1,7 +1,7 @@
 Option Explicit
 
 '==============================================================================
-' TXT章节拆分工具 v3.4（去重+乱序修复+卷级感知增强版）
+' TXT章节拆分工具 v3.5（去重+乱序修复+卷级感知+批量处理增强版）
 '   以 splittxt2 多正则版为底本，增加：
 '     - 中文数字转阿拉伯数字（支持万/亿/大写/繁体/俗写）
 '     - 卷/部/册/篇 级别识别与卷感知去重
@@ -24,9 +24,15 @@ Option Explicit
 '   - 删除旧的"按章节一一拆分"模式（清洁模式本身即输出每章单文件）
 '   - 删除 adjacent 相邻重复去重策略（双标题场景由目录区检测+清洁模式覆盖）
 '
+' v3.5 变更摘要：
+'   - 新增批量入口 批量自动TXTv3（选择文件夹→平铺扫描*.txt→逐文件自动拆分→汇总报告）
+'   - 不穿透子文件夹（避免处理输出目录中的已拆分文件）
+'   - g_batchMode 标志：批量时抑制 ShowCompleteReportV3 弹窗，改为 Debug.Print
+'
 ' 入口：运行 拆分TXTv3（选择文件 → 选择正则 → 选择组合 → 输出模式 → 生成）
 '       运行 分析TXTv3（仅分析不拆分，输出总-分结构详细报告）
 '       运行 自动TXTv3（全自动决策，一次确认即完成拆分）
+'       运行 批量自动TXTv3（选择文件夹，平铺扫描*.txt，逐文件自动拆分）
 '       运行 设置TXTv3（查看/修改默认设置）
 '
 ' 去重×排序 6组合（弹窗3六选一）：
@@ -116,6 +122,9 @@ Private g_oooFixed As Long         ' 排序修复的乱序处数（排序前后�
 Private g_actualVolMode As String  ' 实际使用的卷模式（flat/volume）
 Private g_skipTitleOnly As Long    ' 跳过章节中仅标题的数量
 Private g_skipShortBody As Long    ' 跳过章节中正文不足的数量
+
+' v3.5 新增：批量模式标志
+Private g_batchMode As Boolean       ' True=批量处理（抑制完成弹窗，改为Debug.Print）
 
 
 '==============================================================================
@@ -3356,7 +3365,12 @@ Private Sub ShowCompleteReportV3(ByVal title As String, ByVal fileCount As Long,
         Debug.Print "完成报告：" & ReportPath
     End If
 
-    MsgBox msg, vbInformation, "完成"
+    ' v3.5：批量模式抑制弹窗，仅输出到即时窗口
+    If g_batchMode Then
+        Debug.Print "完成：" & title & "（" & fileCount & " 文件）"
+    Else
+        MsgBox msg, vbInformation, "完成"
+    End If
 End Sub
 
 ' 聚合格式解析
@@ -3733,4 +3747,328 @@ Private Function IsDigits(ByVal s As String) As Boolean
         If c < "0" Or c > "9" Then Exit Function
     Next i
     IsDigits = True
+End Function
+
+
+'==============================================================================
+' 第十部分：批量处理（v3.5 新增）
+'   选择文件夹 → 平铺扫描 *.txt → 逐文件自动拆分 → 汇总报告
+'   不穿透子文件夹（避免处理输出目录中的已拆分文件）
+'==============================================================================
+
+'------------------------------------------------------------------------------
+' 选择文件夹（返回文件夹路径，空串=取消）
+'------------------------------------------------------------------------------
+Private Function SelectTxtFolder(ByVal title As String) As String
+    Dim fd As Object
+    On Error Resume Next
+    Set fd = Application.FileDialog(4)  ' msoFileDialogFolderPicker
+    On Error GoTo 0
+    If fd Is Nothing Then
+        MsgBox "当前环境不支持文件夹选择对话框。", vbExclamation, "提示"
+        Exit Function
+    End If
+    fd.Title = title
+    If fd.Show <> -1 Then Exit Function
+    SelectTxtFolder = fd.SelectedItems(1)
+End Function
+
+'------------------------------------------------------------------------------
+' 批量自动入口：选择文件夹 → 确认 → 预读全部文件 → 逐文件自动拆分 → 汇总报告
+'   弹窗1：选择文件夹
+'   弹窗2：确认文件列表与设置
+'   阶段1 预读：将所有TXT文件内容读入内存（此后生成输出文件不会被误当作输入）
+'   阶段2 处理：每文件独立决策（正则固定1,2,4 / 去重排序自动 / N自动）
+'   不穿透子文件夹：仅扫描所选文件夹根目录的 *.txt
+'------------------------------------------------------------------------------
+Public Sub 批量自动TXTv3()
+    Dim folderPath As String
+    Dim fso As Object, folder As Object, f As Object
+    Dim txtFiles As Collection
+    Dim i As Long, fileCount As Long
+    Dim tBatch0 As Double
+    Dim successCnt As Long, failCnt As Long
+    Dim summaryLines() As String
+    Dim result As String
+    Dim fileList As String
+    Dim confirmMsg As String
+    Dim tTotal As Double
+    Dim batchReport As String
+    Dim reportPath As String
+
+    ' 预读阶段：内容与编码数组
+    Dim arrContent() As String, arrEnc() As String
+    Dim tPreRead As Double
+
+    ' 初始化
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    tBatch0 = Timer
+
+    ' 弹窗1：选择文件夹
+    folderPath = SelectTxtFolder("选择包含TXT文件的文件夹（批量自动拆分）")
+    If Len(folderPath) = 0 Then Exit Sub
+
+    ' 读取设置（一次性，适用于所有文件）
+    LoadSettings
+
+    ' 平铺扫描 *.txt（不穿透子文件夹）
+    Set folder = fso.GetFolder(folderPath)
+    Set txtFiles = New Collection
+    For Each f In folder.Files
+        If StrComp(fso.GetExtensionName(f.Name), "txt", vbTextCompare) = 0 Then
+            txtFiles.Add f.Path
+        End If
+    Next f
+
+    fileCount = txtFiles.Count
+    If fileCount = 0 Then
+        MsgBox "所选文件夹中未找到任何 .txt 文件。", vbExclamation, "提示"
+        Exit Sub
+    End If
+
+    ' 弹窗2：确认文件列表与设置
+    fileList = ""
+    For i = 1 To fileCount
+        fileList = fileList & "  " & i & ". " & fso.GetFileName(txtFiles(i)) & vbCrLf
+        If i >= 15 And fileCount > 15 Then
+            fileList = fileList & "  ...（共 " & fileCount & " 个文件）" & vbCrLf
+            Exit For
+        End If
+    Next i
+
+    confirmMsg = "【批量自动拆分】" & vbCrLf & _
+                 "文件夹：" & folderPath & vbCrLf & _
+                 "TXT文件数：" & fileCount & vbCrLf & vbCrLf & _
+                 "文件列表：" & vbCrLf & fileList & vbCrLf & _
+                 "处理模式：自动（每文件独立决策去重/排序/N）" & vbCrLf & _
+                 "正则：标准中文 + 无第字中文 + 无号特殊章节" & vbCrLf & _
+                 "设置：广告清理=" & IIf(g_cleanAds, "是", "否") & _
+                 "  标题去重=" & IIf(g_titleDedup, "是", "否") & _
+                 "  卷模式=" & g_volumeMode & vbCrLf & vbCrLf & _
+                 "注意：不穿透子文件夹，仅处理根目录的 .txt" & vbCrLf & vbCrLf & _
+                 "[确定]开始   [取消]退出"
+    If MsgBox(confirmMsg, vbOKCancel + vbQuestion, "批量自动TXTv3 - 确认") <> vbOK Then Exit Sub
+
+    ' ============================================================
+    ' 阶段1 预读：将所有TXT文件内容读入内存
+    '   此阶段完成后，后续生成的输出文件不会被误当作输入
+    ' ============================================================
+    ReDim arrContent(1 To fileCount)
+    ReDim arrEnc(1 To fileCount)
+    tPreRead = Timer
+
+    For i = 1 To fileCount
+        Application.StatusBar = "预读文件 (" & i & "/" & fileCount & ")：" & fso.GetFileName(txtFiles(i))
+        DoEvents
+        arrEnc(i) = DetectEncodingFile(txtFiles(i))
+        arrContent(i) = ReadTextAuto(txtFiles(i))
+    Next i
+
+    tPreRead = Timer - tPreRead
+    Application.StatusBar = "预读完成，开始拆分..."
+    DoEvents
+
+    ' ============================================================
+    ' 阶段2 处理：逐文件自动拆分（使用预读内容，不再访问磁盘源文件）
+    ' ============================================================
+    ReDim summaryLines(1 To fileCount)
+    successCnt = 0
+    failCnt = 0
+    g_batchMode = True
+
+    For i = 1 To fileCount
+        Application.StatusBar = "批量处理 (" & i & "/" & fileCount & ")：" & fso.GetFileName(txtFiles(i))
+        DoEvents
+
+        result = ProcessFileAuto(txtFiles(i), arrContent(i), arrEnc(i))
+        summaryLines(i) = result
+
+        If InStr(result, "成功") > 0 Then
+            successCnt = successCnt + 1
+        Else
+            failCnt = failCnt + 1
+        End If
+    Next i
+
+    g_batchMode = False
+    Application.StatusBar = False
+
+    ' 汇总报告
+    tTotal = Timer - tBatch0
+    batchReport = "【批量自动拆分完成】" & vbCrLf & _
+                  "总计：" & fileCount & " 个文件" & vbCrLf & _
+                  "成功：" & successCnt & "  失败：" & failCnt & vbCrLf & _
+                  "预读耗时：" & Format(tPreRead, "0.0") & " 秒" & vbCrLf & _
+                  "总耗时：" & Format(tTotal, "0.0") & " 秒" & vbCrLf & _
+                  String(30, "-") & vbCrLf
+
+    For i = 1 To fileCount
+        batchReport = batchReport & "  " & summaryLines(i) & vbCrLf
+    Next i
+
+    ' 写入报告文件
+    reportPath = folderPath & "\批量处理报告.txt"
+    WriteTextUTF8NoBOM reportPath, batchReport
+
+    batchReport = batchReport & vbCrLf & "报告已保存：" & reportPath
+
+    MsgBox batchReport, vbInformation, "批量自动TXTv3 - 完成"
+End Sub
+
+'------------------------------------------------------------------------------
+' 处理单个文件（自动模式，无文件选择/确认弹窗）
+'   逻辑与 自动TXTv3 完全一致，仅去除弹窗交互
+'   预读阶段已将文件内容读入内存，此处直接使用，不再访问磁盘
+'   返回格式："文件名 | 结果 | 耗时"
+'------------------------------------------------------------------------------
+Private Function ProcessFileAuto(ByVal filePath As String, _
+    ByRef preContent As String, ByVal preEnc As String) As String
+    Dim fso As Object
+    Dim content As String, lines() As String, lineCount As Long
+    Dim t0 As Double, tFile As Double
+    Dim autoDir As String, autoSubDir As String
+    Dim dupCnt As Long, oooCnt As Long, adjRatio As Double
+    Dim recDedup As String, recSort As String
+    Dim autoN As Long, volCnt As Long, i As Long
+    Dim chapCnt As Long, adjDup As Long, prevChIdx As Long
+    Dim prevNum As Long
+    Dim flatMap As Object, numKey As Variant
+    Dim fileBase As String
+    Dim parts() As String, p As Long, idx As Long
+    Dim tElapsed As Double
+
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    fileBase = fso.GetBaseName(filePath)
+    tFile = Timer
+
+    ' 重置全局状态（与 自动TXTv3 初始化一致）
+    g_tTotal0 = Timer
+    g_tSelect = 0
+    g_regexName = ""
+    g_selCount = 0
+    g_adRemovedCount = 0
+    g_dedupRemoved = 0
+    g_oooFixed = 0
+    g_skipTitleOnly = 0
+    g_skipShortBody = 0
+    g_tocStartIdx = -1
+    g_tocEndIdx = -1
+    g_tocChapterCount = 0
+
+    On Error GoTo ProcError
+
+    ' 1. 使用预读内容（不再从磁盘读取，确保输出文件不会被当作输入）
+    t0 = Timer
+    g_detectedEnc = preEnc
+    content = preContent
+    content = Replace(Replace(content, vbCrLf, vbLf), vbCr, vbLf)
+    lines = Split(content, vbLf)
+    lineCount = UBound(lines) + 1
+
+    ' 2. 自动正则（固定 1,2,4：标准中文 + 无第字中文 + 无号特殊章节）
+    InitRegexPatterns
+    parts = Split("1,2,4", ",")
+    ReDim g_selPatterns(0 To UBound(parts))
+    ReDim g_selUnitGroups(0 To UBound(parts))
+    ReDim g_selDefaultUnits(0 To UBound(parts))
+    ReDim g_selOrigIndices(0 To UBound(parts))
+    ReDim g_selMaxLens(0 To UBound(parts))
+    g_selCount = 0
+    For p = 0 To UBound(parts)
+        idx = CLng(Trim(parts(p)))
+        g_selPatterns(g_selCount) = g_regexPatterns(idx)
+        g_selUnitGroups(g_selCount) = g_regexUnitGroups(idx)
+        g_selDefaultUnits(g_selCount) = g_regexDefaultUnits(idx)
+        g_selOrigIndices(g_selCount) = idx
+        g_selMaxLens(g_selCount) = g_regexMaxLens(idx)
+        g_selCount = g_selCount + 1
+    Next p
+    g_regexName = "标准中文+无第字中文+无号特殊章节"
+
+    ' 3. 扫描 + 目录区检测
+    ScanChaptersV3 lines, lineCount
+    DetectTOC
+
+    If ch_count = 0 Then
+        ProcessFileAuto = fileBase & " | 失败（未识别到章节） | " & _
+                         Format(Timer - tFile, "0.0") & "s"
+        Exit Function
+    End If
+
+    ' 4. 自动决策（与 自动TXTv3 逻辑一致）
+    chapCnt = 0: dupCnt = 0: oooCnt = 0: adjDup = 0
+    prevChIdx = -1: prevNum = 0
+    Set flatMap = CreateObject("Scripting.Dictionary")
+    For i = 0 To ch_count - 1
+        If ch_levels(i) = "chapter" And ch_nums(i) > 0 And Not ch_isTOC(i) Then
+            chapCnt = chapCnt + 1
+            numKey = CStr(ch_nums(i))
+            If Not flatMap.Exists(numKey) Then flatMap.Add numKey, 0
+            flatMap(numKey) = flatMap(numKey) + 1
+            If prevNum > 0 And ch_nums(i) < prevNum Then oooCnt = oooCnt + 1
+            prevNum = ch_nums(i)
+            If prevChIdx >= 0 Then
+                If ch_nums(i) = ch_nums(prevChIdx) And _
+                   ch_starts(i) - ch_starts(prevChIdx) <= 2 Then
+                    adjDup = adjDup + 1
+                End If
+            End If
+            prevChIdx = i
+        End If
+    Next i
+    For Each numKey In flatMap.Keys
+        If flatMap(numKey) > 1 Then dupCnt = dupCnt + 1
+    Next numKey
+    Set flatMap = Nothing
+    If chapCnt > 0 Then adjRatio = adjDup / chapCnt
+
+    ' 决策规则（与 自动TXTv3 一致）
+    If dupCnt = 0 And oooCnt = 0 Then
+        recDedup = "none": recSort = "none"
+    ElseIf adjRatio >= 0.3 And oooCnt < 10 Then
+        recDedup = "longest": recSort = "none"
+    ElseIf oooCnt >= 10 Then
+        recDedup = "longest": recSort = "sort"
+    ElseIf dupCnt > 0 Then
+        recDedup = "longest": recSort = "none"
+    Else
+        recDedup = "longest": recSort = "sort"
+    End If
+
+    ' 自动判定N
+    autoN = AutoNFromBodies()
+
+    ' 卷结构统计
+    volCnt = 0
+    For i = 0 To ch_count - 1
+        If ch_levels(i) = "volume" Then volCnt = volCnt + 1
+    Next i
+
+    ' 5. 执行
+    g_dedupStrategy = recDedup
+    g_sortStrategy = recSort
+
+    autoDir = fso.GetParentFolderName(filePath) & "\" & fileBase & "_自动"
+    autoSubDir = autoDir & "\拆分文档"
+    If Dir(autoDir, vbDirectory) = "" Then MkDir autoDir
+    If Dir(autoSubDir, vbDirectory) = "" Then MkDir autoSubDir
+
+    ' 生成分析报告（outputDir 非空 → 不弹MsgBox）
+    DeepAnalyzeFile filePath, autoDir
+
+    ' 拆分（g_batchMode=True → ShowCompleteReportV3 不弹MsgBox）
+    SplitByChapterV3 InputPath:=filePath, OutputDir:=autoSubDir, _
+                     GenerateTitleOnly:=False, MinBodyLen:=autoN, _
+                     MergeFlag:=2, MergeOutputDir:=autoDir
+
+    ' 6. 返回摘要
+    tElapsed = Timer - tFile
+    ProcessFileAuto = fileBase & " | 成功（" & ch_count & "章→" & dedup_count & _
+                     "章 " & recDedup & "+" & recSort & " N=" & autoN & ") | " & _
+                     Format(tElapsed, "0.0") & "s"
+    Exit Function
+
+ProcError:
+    ProcessFileAuto = fileBase & " | 失败（" & Err.Description & ") | " & _
+                     Format(Timer - tFile, "0.0") & "s"
 End Function
