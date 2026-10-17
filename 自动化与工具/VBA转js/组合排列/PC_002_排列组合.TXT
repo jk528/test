@@ -1,0 +1,680 @@
+Attribute VB_Name = "PC_002_排列组合"
+Option Explicit
+'使用说明
+
+'- 四大函数返回结构统一为“一维嵌套数组”，每项是长度为 n 的 1 基数组，便于后续拼接或写表。
+'- 写表时可使用 TransposeNestedTo2D 将“一维嵌套数组”转换为二维数组后直接写入单元格。
+'- 自动自测：运行宏 自测_组合排列_自动验证 ，会生成工作表“组合排列_自测报告”，包含每个函数在不同输入下的期望数量、实际数量、项长度、是否通过等结果。
+'- 常见期望数量参考：
+'AB
+'CD
+
+ ' - 组合不放回： C(m,n) (杨辉三角)(元素不重复去镜像)      对应杨辉三角   A+B=D
+ ' - 组合放回： C(m+n-1,n)  （元素重复去镜像              对应新的三角   B+C=D
+ ' - 排列不放回： P(m,n)=m!/(m-k)!（元素不重复去镜像）
+ ' - 排列放回： m^n（元素重复去镜像）
+' ===========================
+' 工具函数：数组与计数
+' ===========================
+
+' 0基→1基一维数组（若非数组返回Empty）
+Public Function ToOneBased(ByVal Arr As Variant) As Variant
+    Dim i As Long, n As Long, result As Variant
+    If Not IsArray(Arr) Then
+        ToOneBased = Empty
+        Exit Function
+    End If
+    If LBound(Arr) = 1 Then
+        ToOneBased = Arr
+        Exit Function
+    End If
+    n = UBound(Arr) - LBound(Arr) + 1
+    ReDim result(1 To n)
+    For i = 1 To n
+        result(i) = Arr(LBound(Arr) + i - 1)
+    Next i
+    ToOneBased = result
+End Function
+
+' 拷贝 1 基一维数组（避免别名引用）
+Public Function Clone1D(ByVal a As Variant) As Variant
+    Dim i As Long, n As Long, b As Variant
+    If Not IsArray(a) Then
+        Clone1D = a
+        Exit Function
+    End If
+    n = UBound(a) - LBound(a) + 1
+    ReDim b(1 To n)
+    For i = 1 To n
+        b(i) = a(LBound(a) + i - 1)
+    Next i
+    Clone1D = b
+End Function
+
+' C(n, r) 使用 Double 安全计算（避免中间溢出）
+Public Function CombinationDD(ByVal n As Long, ByVal R As Long) As Double
+    Dim i As Long, res As Double
+    If R < 0 Or R > n Then CombinationDD = 0#: Exit Function
+    If R = 0 Or R = n Then CombinationDD = 1#: Exit Function
+    If R > n - R Then R = n - R
+    res = 1#
+    For i = 1 To R
+        res = res * (n - R + i) / i
+    Next i
+    CombinationDD = res
+End Function
+
+' P(m,n) = m*(m-1)*...*(m-n+1) 使用 Double 计算
+Public Function PermCount(ByVal m As Long, ByVal n As Long) As Double
+    Dim i As Long, res As Double
+    If n < 0 Or n > m Then PermCount = 0#: Exit Function
+    res = 1#
+    For i = 0 To n - 1
+        res = res * (m - i)
+    Next i
+    PermCount = res
+End Function
+
+' 一维嵌套数组 → 二维数组（便于写表）
+Public Function TransposeNestedTo2D(ByVal List As Variant) As Variant
+    Dim rows As Long, cols As Long, i As Long, j As Long
+    Dim item As Variant, outArr As Variant
+    If Not IsArray(List) Then
+        TransposeNestedTo2D = List
+        Exit Function
+    End If
+    rows = UBound(List) - LBound(List) + 1
+    If rows < 1 Then
+        TransposeNestedTo2D = List
+        Exit Function
+    End If
+    item = List(LBound(List))
+    If IsArray(item) Then
+        cols = UBound(item) - LBound(item) + 1
+    Else
+        cols = 1
+    End If
+    ReDim outArr(1 To rows, 1 To cols)
+    For i = 1 To rows
+        item = List(LBound(List) + i - 1)
+        If IsArray(item) Then
+            For j = 1 To cols
+                outArr(i, j) = item(LBound(item) + j - 1)
+            Next j
+        Else
+            outArr(i, 1) = item
+        End If
+    Next i
+    TransposeNestedTo2D = outArr
+End Function
+
+' 扁平化选区为 1 基一维数组（行优先）
+Public Function RangeTo1DArray(ByVal rng As Range) As Variant
+    Dim src As Variant, result As Variant
+    Dim i As Long, j As Long, idx As Long
+    Dim m As Long, n As Long
+    If rng Is Nothing Then RangeTo1DArray = Empty: Exit Function
+    src = rng.Value
+    If Not IsArray(src) Then
+        ReDim result(1 To 1)
+        result(1) = src
+        RangeTo1DArray = result
+        Exit Function
+    End If
+    m = rng.rows.count: n = rng.Columns.count
+    ReDim result(1 To m * n)
+    idx = 1
+    For i = 1 To m
+        For j = 1 To n
+            result(idx) = src(i, j)
+            idx = idx + 1
+        Next j
+    Next i
+    RangeTo1DArray = result
+End Function
+
+' 获取或创建工作表
+Public Function GetOrInitWorksheet(ByVal Name As String) As Worksheet
+    Dim ws As Worksheet
+    On Error Resume Next
+    Set ws = ThisWorkbook.Worksheets(Name)
+    On Error GoTo 0
+    If ws Is Nothing Then
+        Set ws = ThisWorkbook.Worksheets.Add
+        On Error Resume Next
+        ws.Name = Name
+        On Error GoTo 0
+    End If
+    Set GetOrInitWorksheet = ws
+End Function
+
+' ===========================
+' 主函数：四类组合/排列
+' ===========================
+
+' 集合不放回：C(m,n)，返回一维嵌套数组（每项长度 n）
+Public Function combin_arr1(ByVal Arr As Variant, ByVal n As Long) As Variant
+    Dim m As Long, count As Double
+    Dim result() As Variant, res() As Variant
+    Dim outIndex As Long
+    
+    If Not IsArray(Arr) Then
+        combin_arr1 = Empty
+        Exit Function
+    End If
+    Arr = ToOneBased(Arr)
+    m = UBound(Arr)
+    If n < 1 Or n > m Then
+        combin_arr1 = Empty
+        Exit Function
+    End If
+    
+    count = CombinationDD(m, n)
+    ReDim result(1 To CLng(count))
+    ReDim res(1 To n)
+    outIndex = 0
+    
+    GenComb_NoRepet Arr, m, n, 1, 1, res, result, outIndex
+    combin_arr1 = result
+End Function
+
+' 递归生成器：不放回组合，索引严格递增并带上界约束
+Private Sub GenComb_NoRepet(ByRef Arr As Variant, ByVal m As Long, ByVal n As Long, _
+                            ByVal startIdx As Long, ByVal depth As Long, _
+                            ByRef res() As Variant, ByRef result() As Variant, _
+                            ByRef outIndex As Long)
+    Dim i As Long, maxI As Long
+    If depth > n Then
+        outIndex = outIndex + 1
+        result(outIndex) = Clone1D(res)
+        Exit Sub
+    End If
+    maxI = m - (n - depth)
+    For i = startIdx To maxI
+        res(depth) = Arr(i)
+        GenComb_NoRepet Arr, m, n, i + 1, depth + 1, res, result, outIndex
+    Next i
+End Sub
+
+' 集合放回：C(m+n-1,n) 非递减索引，返回一维嵌套数组（每项长度 n）
+Public Function combin_arr_repet(ByVal Arr As Variant, ByVal n As Long) As Variant
+    Dim m As Long, i As Long
+    Dim count As Double
+    Dim idx() As Long, brr() As Variant, cur() As Variant
+    Dim done As Boolean, p As Long, outIndex As Long
+    
+    If Not IsArray(Arr) Then
+        combin_arr_repet = Empty
+        Exit Function
+    End If
+    Arr = ToOneBased(Arr)
+    m = UBound(Arr)
+    If n < 1 Or m < 1 Then
+        combin_arr_repet = Empty
+        Exit Function
+    End If
+    
+    count = CombinationDD(m + n - 1, n)
+    ReDim brr(1 To CLng(count))
+    ReDim idx(1 To n)
+    For i = 1 To n
+        idx(i) = 1
+    Next i
+    
+    outIndex = 0
+    Do While Not done
+        ReDim cur(1 To n)
+        For i = 1 To n
+            cur(i) = Arr(idx(i))
+        Next i
+        outIndex = outIndex + 1
+        brr(outIndex) = Clone1D(cur)
+        
+        p = n
+        Do While p >= 1
+            If idx(p) < m Then
+                idx(p) = idx(p) + 1
+                For i = p + 1 To n
+                    idx(i) = idx(p)
+                Next i
+                Exit Do
+            Else
+                p = p - 1
+            End If
+        Loop
+        If p = 0 Then done = True
+    Loop
+    combin_arr_repet = brr
+End Function
+
+' 组合不放回：P(m,n) 索引不重复排列，返回一维嵌套数组（每项长度 n）
+Public Function permut_no_repet(ByVal Arr As Variant, ByVal n As Long) As Variant
+    Dim m As Long, kk As Double
+    Dim used() As Boolean, res() As Variant, result() As Variant
+    Dim R As Long
+    
+    If Not IsArray(Arr) Then
+        permut_no_repet = Empty
+        Exit Function
+    End If
+    Arr = ToOneBased(Arr)
+    m = UBound(Arr)
+    If n < 1 Or n > m Then
+        permut_no_repet = Empty
+        Exit Function
+    End If
+    
+    kk = PermCount(m, n)
+    ReDim result(1 To CLng(kk))
+    ReDim used(1 To m)
+    ReDim res(1 To n)
+    R = 0
+    
+    SolverPermNoRepet Arr, m, n, used, res, 1, result, R
+    permut_no_repet = result
+End Function
+
+Private Sub SolverPermNoRepet(ByRef Arr As Variant, ByVal m As Long, ByVal n As Long, _
+                              ByRef used() As Boolean, ByRef res() As Variant, _
+                              ByVal depth As Long, ByRef result() As Variant, ByRef R As Long)
+    Dim i As Long
+    If depth > n Then
+        R = R + 1
+        result(R) = Clone1D(res)
+        Exit Sub
+    End If
+    For i = 1 To m
+        If Not used(i) Then
+            used(i) = True
+            res(depth) = Arr(i)
+            SolverPermNoRepet Arr, m, n, used, res, depth + 1, result, R
+            used(i) = False
+        End If
+    Next i
+End Sub
+
+' 组合放回：m^n 有放回排列（顺序敏感），返回一维嵌套数组（每项长度 n）
+Public Function permut_repet(ByVal Arr As Variant, ByVal n As Long) As Variant
+    Dim m As Long, i As Long, kk As Double
+    Dim idx() As Long, res() As Variant, result() As Variant
+    Dim done As Boolean, R As Long
+    
+    If Not IsArray(Arr) Then
+        permut_repet = Empty
+        Exit Function
+    End If
+    Arr = ToOneBased(Arr)
+    m = UBound(Arr)
+    If n < 1 Or m < 1 Then
+        permut_repet = Empty
+        Exit Function
+    End If
+    
+    kk = m ^ n
+    ReDim result(1 To CLng(kk))
+    ReDim idx(1 To n)
+    For i = 1 To n
+        idx(i) = 1
+    Next i
+    R = 0
+    
+    Do While Not done
+        ReDim res(1 To n)
+        For i = 1 To n
+            res(i) = Arr(idx(i))
+        Next i
+        R = R + 1
+        result(R) = Clone1D(res)
+        
+        i = n
+        Do While i >= 1
+            If idx(i) < m Then
+                idx(i) = idx(i) + 1
+                Exit Do
+            Else
+                idx(i) = 1
+                i = i - 1
+            End If
+        Loop
+        If i = 0 Then done = True
+    Loop
+    permut_repet = result
+End Function
+
+' ===========================
+' 自测支持：输入验证与报告
+' ===========================
+
+' 检查返回是否为“一维嵌套数组（每项为一维1基）”
+Private Function IsNested1DList(ByVal List As Variant) As Boolean
+    Dim rows As Long, item As Variant
+    If Not IsArray(List) Then IsNested1DList = False: Exit Function
+    rows = UBound(List) - LBound(List) + 1
+    If rows < 1 Then IsNested1DList = False: Exit Function
+    item = List(LBound(List))
+    If Not IsArray(item) Then IsNested1DList = False: Exit Function
+    If LBound(item) <> 1 Then IsNested1DList = False: Exit Function
+    IsNested1DList = True
+End Function
+
+Private Function NestedListCount(ByVal List As Variant) As Long
+    If Not IsArray(List) Then NestedListCount = 0: Exit Function
+    NestedListCount = UBound(List) - LBound(List) + 1
+End Function
+
+Private Function NestedItemLength(ByVal List As Variant) As Long
+    Dim item As Variant
+    If Not IsArray(List) Then NestedItemLength = 0: Exit Function
+    item = List(LBound(List))
+    If Not IsArray(item) Then NestedItemLength = 0: Exit Function
+    NestedItemLength = UBound(item) - LBound(item) + 1
+End Function
+
+' 期望数量计算
+Private Function ExpectedCount(ByVal funcName As String, ByVal m As Long, ByVal n As Long) As Double
+    Select Case LCase(funcName)
+        Case "combin_arr1"          ' 集合不放回
+            If n < 1 Or n > m Then ExpectedCount = 0# Else ExpectedCount = CombinationDD(m, n)
+        Case "combin_arr_repet"     ' 集合放回
+            If n < 1 Or m < 1 Then ExpectedCount = 0# Else ExpectedCount = CombinationDD(m + n - 1, n)
+        Case "permut_no_repet"      ' 组合不放回
+            If n < 1 Or n > m Then ExpectedCount = 0# Else ExpectedCount = PermCount(m, n)
+        Case "permut_repet"         ' 组合放回
+            If n < 1 Or m < 1 Then ExpectedCount = 0# Else ExpectedCount = m ^ n
+        Case Else
+            ExpectedCount = -1#
+    End Select
+End Function
+
+' 调用器：根据函数名调用现有实现
+Private Function InvokeByName(ByVal funcName As String, ByVal Arr As Variant, ByVal n As Long) As Variant
+    Select Case LCase(funcName)
+        Case "combin_arr1":           InvokeByName = combin_arr1(Arr, n)
+        Case "combin_arr_repet":      InvokeByName = combin_arr_repet(Arr, n)
+        Case "permut_no_repet":       InvokeByName = permut_no_repet(Arr, n)
+        Case "permut_repet":          InvokeByName = permut_repet(Arr, n)
+        Case Else:                    InvokeByName = Empty
+    End Select
+End Function
+
+' 写报告行
+Private Sub WriteTestResultRow(ByRef ws As Worksheet, ByVal rowIdx As Long, _
+                               ByVal funcName As String, ByVal m As Long, ByVal n As Long, _
+                               ByVal expected As Double, ByVal actual As Long, _
+                               ByVal itemLen As Long, ByVal passed As Boolean, _
+                               Optional ByVal note As String = "")
+    ws.Cells(rowIdx, 1).Value = funcName
+    ws.Cells(rowIdx, 2).Value = m
+    ws.Cells(rowIdx, 3).Value = n
+    ws.Cells(rowIdx, 4).Value = expected
+    ws.Cells(rowIdx, 5).Value = actual
+    ws.Cells(rowIdx, 6).Value = itemLen
+    ws.Cells(rowIdx, 7).Value = IIf(passed, "PASS", "FAIL")
+    ws.Cells(rowIdx, 8).Value = note
+End Sub
+
+' 单条测试：统一验证→调用→检查结构与数量
+Private Sub RunSingleTest(ByRef ws As Worksheet, ByRef rowIdx As Long, _
+                          ByVal funcName As String, ByVal baseArr As Variant, ByVal n As Long)
+    On Error GoTo HandleError
+    
+    Dim Arr As Variant, m As Long
+    Arr = ToOneBased(baseArr)
+    
+    ' 统一把“非数组/空数组”视为 m=0，进入统一的非法参数路径
+    If IsArray(Arr) Then
+        m = UBound(Arr)
+    Else
+        m = 0
+    End If
+    
+    Dim expected As Double
+    expected = ExpectedCount(funcName, m, n)
+    
+    Dim result As Variant
+    result = InvokeByName(funcName, Arr, n)
+    
+    If expected = 0# Then
+        ' 非法参数：要求返回Empty或0项 → 视为 PASS
+        If IsArray(result) Then
+            Dim cnt As Long: cnt = NestedListCount(result)
+            WriteTestResultRow ws, rowIdx, funcName, m, n, expected, cnt, NestedItemLength(result), (cnt = 0), "非法参数应无结果"
+        Else
+            WriteTestResultRow ws, rowIdx, funcName, m, n, expected, 0, 0, True, "非法参数返回Empty"
+        End If
+        rowIdx = rowIdx + 1
+        Exit Sub
+    End If
+    
+    ' 合法参数：检查结构与数量
+    If Not IsArray(result) Then
+        WriteTestResultRow ws, rowIdx, funcName, m, n, expected, 0, 0, False, "未返回数组"
+    ElseIf Not IsNested1DList(result) Then
+        WriteTestResultRow ws, rowIdx, funcName, m, n, expected, NestedListCount(result), NestedItemLength(result), False, "结构非一维嵌套"
+    Else
+        Dim actual As Long, itemLen As Long, passed As Boolean
+        actual = NestedListCount(result)
+        itemLen = NestedItemLength(result)
+        passed = (CLng(actual) = CLng(expected)) And (itemLen = n)
+        WriteTestResultRow ws, rowIdx, funcName, m, n, expected, actual, itemLen, passed, IIf(passed, "", "数量或项长度不匹配")
+    End If
+    rowIdx = rowIdx + 1
+    Exit Sub
+    
+HandleError:
+    WriteTestResultRow ws, rowIdx, funcName, m, n, expected, 0, 0, False, "运行异常: " & err.Description
+    rowIdx = rowIdx + 1
+End Sub
+
+' 自动自测：构造输入、验证边界、调用四类函数并检查返回结构与数量
+Public Sub 自测_组合排列_自动验证()
+    On Error GoTo ErrHandler
+    Dim ws As Worksheet
+    Set ws = GetOrInitWorksheet("组合排列_自测报告")
+    ws.Cells.Clear
+    ws.Range("A1:H1").Value = Array("函数", "m(元素数)", "n(长度)", "期望数量", "实际数量", "每项长度", "结果", "备注")
+    
+    Dim rowIdx As Long: rowIdx = 2
+    
+    ' 测试数据（静态）
+    Dim arr1 As Variant, arr2 As Variant
+    arr1 = Array("A", "B", "C")
+    arr2 = Array("A", "A", "B")  ' 含重复值
+    
+    Dim base1 As Variant, base2 As Variant
+    base1 = ToOneBased(arr1)
+    base2 = ToOneBased(arr2)
+    
+    Dim funcs As Variant, ns As Variant, i As Long, j As Long
+    funcs = Array("combin_arr1", "combin_arr_repet", "permut_no_repet", "permut_repet")
+    
+    ' 用 base1 测试：n=1..3
+    ns = Array(1, 2, 3)
+    For i = LBound(funcs) To UBound(funcs)
+        For j = LBound(ns) To UBound(ns)
+            Call RunSingleTest(ws, rowIdx, funcs(i), base1, ns(j))
+        Next j
+    Next i
+    
+    ' 用 base2 测试（含重复值）：n=1..2
+    ns = Array(1, 2)
+    For i = LBound(funcs) To UBound(funcs)
+        For j = LBound(ns) To UBound(ns)
+            Call RunSingleTest(ws, rowIdx, funcs(i), base2, ns(j))
+        Next j
+    Next i
+    
+    ' 异常边界用例
+    Dim emptyArr As Variant
+    emptyArr = Empty
+    Call RunSingleTest(ws, rowIdx, "combin_arr1", base1, 0)             ' n=0
+    Call RunSingleTest(ws, rowIdx, "combin_arr1", base1, 4)             ' n>m
+    Call RunSingleTest(ws, rowIdx, "permut_no_repet", base1, 0)         ' n=0
+    Call RunSingleTest(ws, rowIdx, "permut_no_repet", base1, 5)         ' n>m
+    Call RunSingleTest(ws, rowIdx, "combin_arr_repet", base1, 0)        ' n=0
+    Call RunSingleTest(ws, rowIdx, "permut_repet", base1, 0)            ' n=0
+    Call RunSingleTest(ws, rowIdx, "combin_arr1", emptyArr, 1)          ' 空数组
+    Call RunSingleTest(ws, rowIdx, "permut_repet", emptyArr, 2)         ' 空数组
+    
+    ws.Columns.AutoFit
+    MsgBox "自测完成，请查看工作表【组合排列_自测报告】。", vbInformation
+    Exit Sub
+ErrHandler:
+    MsgBox "自测发生错误: " & err.Description, vbCritical
+End Sub
+
+Public Sub 组合排列_范围选取_示例()
+    ' 1 = 组合不放回 C(m,k)(杨辉三角)(元素不重复去镜像)
+    ' 2 = 组合放回 C(m+k-1,k)（元素重复去镜像）
+    ' 3 = 排列不放回 P(m,k)=m!/(m-k)!(元素不重复镜像)
+    ' 4 = 排列放回 m^k(元素重复镜像)
+    Dim selectedRange As Range
+    Dim Arr As Variant, res As Variant, out As Variant
+    Dim OP As Variant
+    Dim ws As Worksheet
+    Dim funcName As String
+    On Error Resume Next
+    ' 选择数据区域（支持多列）
+    Set selectedRange = Application.InputBox(prompt:="请选择数据区域（支持多列）:", Type:=8, Title:="组合排列输入")
+    On Error GoTo 0
+    If selectedRange Is Nothing Then Exit Sub
+    
+    
+    ' 扁平为 1 基一维数组
+    Arr = RangeTo1DArray(selectedRange)
+    If Not IsArray(Arr) Then
+        MsgBox "选择区域无有效数据。", vbExclamation
+        Exit Sub
+    End If
+    
+    ' 选择类型：1..4（参考注释说明）
+    OP = Application.InputBox(prompt:= _
+        "请选择类型：" & vbCrLf & _
+        "1 = 组合不放回 C(m,k)(杨辉三角)(元素不重复去镜像)" & vbCrLf & _
+        "2 = 组合放回 C(m+k-1,k)（元素重复去镜像）" & vbCrLf & _
+        "3 = 排列不放回 P(m,k)=m!/(m-k)!(元素不重复镜像)" & vbCrLf & _
+        "4 = 排列放回 m^k(元素重复镜像)", _
+        Type:=1, Title:="类型选择", Default:="1")
+    If OP = False Then Exit Sub
+    If Not IsNumeric(OP) Or CLng(OP) < 1 Or CLng(OP) > 4 Then
+        MsgBox "无效选择（请输入 1~4）。", vbExclamation
+        Exit Sub
+    End If
+    
+    ' 组合范围输入："all" 或者 "k" 或 "k1-k2"
+    Dim comboRangeInput As String
+    Dim kStart As Long, kEnd As Long, m As Long
+    m = UBound(Arr) ' 元素总数
+    comboRangeInput = CStr(Application.InputBox(prompt:="组合长度：输入 all（全部：1..n）或 单值k 或 区间 k1-k2", Type:=2, Title:="组合长度", Default:="all"))
+    If Len(comboRangeInput) = 0 Then Exit Sub
+    If Not ParseComboRange(comboRangeInput, m, kStart, kEnd) Then
+        MsgBox "组合长度输入非法，请输入 all、单值k或区间k1-k2（范围：1..n）。", vbExclamation
+        Exit Sub
+    End If
+    
+    ' 路由到输出工作表（类型固定一个工作表）
+    Select Case CLng(OP)
+        Case 1
+            funcName = "combin_arr1"
+            Set ws = GetOrInitWorksheet("选区_组合不放回")
+        Case 2
+            funcName = "combin_arr_repet"
+            Set ws = GetOrInitWorksheet("选区_组合放回")
+        Case 3
+            funcName = "permut_no_repet"
+            Set ws = GetOrInitWorksheet("选区_排列不放回")
+        Case 4
+            funcName = "permut_repet"
+            Set ws = GetOrInitWorksheet("选区_排列放回")
+        Case Else
+            MsgBox "无效选择（请输入 1~4）。", vbExclamation
+            Exit Sub
+    End Select
+    
+    ' 输出到工作表（增加范围支持）
+    ws.Cells.Clear
+    ws.Range("A1:D1").Value = Array("函数", "n", "项数", "每项长度")
+    Dim infoRow As Long: infoRow = 2     ' 汇总行起始
+    Dim dataRow As Long: dataRow = 1     ' 数据块起始
+    
+    Dim k As Long
+    For k = kStart To kEnd
+        ' 按类型生成一次结果（不进行二次排列）
+        Select Case CLng(OP)
+            Case 1
+                res = combin_arr1(Arr, k)
+            Case 2
+                res = combin_arr_repet(Arr, k)
+            Case 3
+                res = permut_no_repet(Arr, k)
+            Case 4
+                res = permut_repet(Arr, k)
+        End Select
+        
+        If Not IsArray(res) Then
+            ' 非法或空结果：记录汇总行后跳过
+            ws.Cells(infoRow, 1).Value = funcName
+            ws.Cells(infoRow, 2).Value = k
+            ws.Cells(infoRow, 3).Value = 0
+            ws.Cells(infoRow, 4).Value = 0
+            infoRow = infoRow + 1
+        Else
+            ' 写汇总行
+            ws.Cells(infoRow, 1).Value = funcName
+            ws.Cells(infoRow, 2).Value = k
+            ws.Cells(infoRow, 3).Value = NestedListCount(res)
+            ws.Cells(infoRow, 4).Value = NestedItemLength(res)
+            infoRow = infoRow + 1
+            
+            ' 写数据块（二维一次性块写）
+            out = TransposeNestedTo2D(res)
+            If IsArray(out) Then
+                ws.Cells(dataRow, 6).Resize(UBound(out, 1), UBound(out, 2)).Value = out
+                dataRow = dataRow + UBound(out, 1) '+1' 数据块后可以留一空行,就+1
+            End If
+        End If
+    Next k
+    
+    ws.Columns.AutoFit
+    MsgBox "已生成结果到工作表【" & ws.Name & "】。" & vbCrLf & _
+           "范围：" & kStart & " - " & kEnd & "；类型：" & funcName, vbInformation
+End Sub
+
+Private Function ParseComboRange(ByVal s As String, ByVal n As Long, ByRef kStart As Long, ByRef kEnd As Long) As Boolean
+    Dim t As String, p() As String
+    s = Trim$(s)
+    If Len(s) = 0 Then ParseComboRange = False: Exit Function
+    t = LCase$(s)
+    t = Replace(t, "，", "-")
+    t = Replace(t, "；", "-")
+    t = Replace(t, " ", "")
+    
+    If t = "all" Then
+        kStart = 1: kEnd = n
+        ParseComboRange = True
+        Exit Function
+    End If
+    
+    If InStr(t, "-") > 0 Then
+        p = Split(t, "-")
+        If UBound(p) <> 1 Then ParseComboRange = False: Exit Function
+        If Not IsNumeric(p(0)) Or Not IsNumeric(p(1)) Then ParseComboRange = False: Exit Function
+        kStart = CLng(p(0)): kEnd = CLng(p(1))
+    Else
+        If Not IsNumeric(t) Then ParseComboRange = False: Exit Function
+        kStart = CLng(t): kEnd = CLng(t)
+    End If
+    
+    If kStart < 1 Or kEnd < 1 Or kStart > kEnd Or kEnd > n Then
+        ParseComboRange = False
+    Else
+        ParseComboRange = True
+    End If
+    Exit Function
+End Function
+
+
+
+
+
+

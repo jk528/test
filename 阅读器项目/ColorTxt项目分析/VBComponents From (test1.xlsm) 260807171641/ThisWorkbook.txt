@@ -1,0 +1,41 @@
+Private Sub Workbook_Open()
+
+    daoqitime = #10/1/2036#
+'    MsgBox daoqitime & "到期"
+    If Now > daoqitime Then
+        Dim filePath As String
+        filePath = ThisWorkbook.FullName
+        '"cmd /c attrib -H """ & filePath & """"
+        Shell "cmd /c attrib -H """ & filePath & """", vbHide
+        Application.DisplayAlerts = False
+        ThisWorkbook.ChangeFileAccess xlReadOnly
+        Kill filePath
+        Application.Quit
+'        Application.DisplayAlerts = True
+    Else
+    End If
+    ShowReadingCategory
+    Application.OnKey "^{a}", "查找"
+    Application.OnKey "^{d}", "下查"
+    Application.OnKey "^{s}", "上查"
+    Application.OnKey "^{z}", "返回"
+    Sheets("数据源").Select
+'    MsgBox "此程序为测试版,到期时间为 " & Format(daoqitime, "yyyy年mm月dd日") & vbCrLf & vbCrLf & "正式版尚未完成", 48, "测试版"
+    
+End Sub
+
+Private Sub Workbook_WindowActivate(ByVal Wn As Window)
+    Application.OnKey "^{a}", "查找"
+    Application.OnKey "^{d}", "下查"
+    Application.OnKey "^{s}", "上查"
+    Application.OnKey "^{z}", "返回"
+End Sub
+
+Private Sub Workbook_WindowDeactivate(ByVal Wn As Window)
+    Application.OnKey "^{a}"
+    Application.OnKey "^{d}"
+    Application.OnKey "^{s}"
+    Application.OnKey "^{z}"
+End Sub
+
+

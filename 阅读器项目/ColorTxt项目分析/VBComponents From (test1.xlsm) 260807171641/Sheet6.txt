@@ -1,0 +1,163 @@
+' 优化后的点击查询函数 - 支持两种调用方式
+Function OptimizedSearch(ParamArray args() As Variant) As Integer
+    Dim ML As String, CT As String
+    Dim i As Long, h As Long
+    Dim irow As Long, irow2 As Long
+    Dim ar As Variant, br() As Variant
+    Dim wsData As Worksheet, wsResult As Worksheet
+    
+    ' 设置工作表对象
+    Set wsData = Sheets("数据源")
+    Set wsResult = Sheets("目录2")
+    
+    ' 根据参数数量确定查询类型
+    Select Case UBound(args) + 1
+        Case 1 ' 单参数调用：只有CT，用于词条查询（条件1）
+            CT = args(0)
+            ML = "" ' 空字符串表示不按ML过滤
+        Case 2 ' 双参数调用：ML和CT，用于原始查询（条件2）
+            ML = args(0)
+            CT = args(1)
+        Case Else
+            OptimizedSearch = 0
+            Exit Function
+    End Select
+    
+    ' 获取数据源行数并读取数据
+    irow = wsData.Cells(wsData.rows.count, "A").End(xlUp).row
+    If irow < 2 Then
+        OptimizedSearch = 0
+        Exit Function
+    End If
+    
+    ar = wsData.Range("A2:B" & irow).Value
+    
+    ' 初始化结果数组
+    ReDim br(1 To UBound(ar, 1), 1 To UBound(ar, 2))
+    h = 0
+    
+    ' 根据ML是否为空决定查询条件
+    If ML = "" Then ' 单参数查询：条件1的逻辑
+        ' 优化查询逻辑：直接遍历数据，避免不必要的嵌套循环
+        For i = 1 To UBound(ar, 1)
+            If ar(i, 1) Like "*" & CT & "*" Then ' 模糊搜索，不区分大小写
+                h = h + 1
+                br(h, 1) = ar(i, 1)
+                br(h, 2) = ar(i, 2)
+            End If
+        Next i
+    Else ' 双参数查询：条件2的逻辑
+        For i = 1 To UBound(ar, 1)
+            If ar(i, 2) = ML Then
+                If ar(i, 1) Like "*" & CT & "*" Then ' 模糊搜索，不区分大小写
+                    h = h + 1
+                    br(h, 1) = ar(i, 1)
+                    br(h, 2) = ar(i, 2)
+                End If
+            End If
+        Next i
+    End If
+    
+    ' 如果没有找到匹配结果，直接返回
+    If h = 0 Then
+        OptimizedSearch = 0
+        Exit Function
+    End If
+    
+    ' 写入结果到目录2
+    With wsResult
+        irow2 = .Cells(.rows.count, "C").End(xlUp).row
+        .Cells(irow2 + 1, 1).Value = CT
+        .Range(.Cells(irow2 + 1, 2), .Cells(irow2 + h, 3)).Value = br
+    End With
+    
+    ' 调用上色函数
+    ColorizeMatches wsResult, CT, irow2 + 1, h
+    
+    ' 返回匹配数量
+    OptimizedSearch = h
+End Function
+
+' 上色函数：为匹配的文本添加颜色 - 支持模糊匹配
+Sub ColorizeMatches(ws As Worksheet, searchText As String, startRow As Long, matchCount As Long)
+    Dim cell As Range
+    Dim rng As Range
+    Dim pos As Long
+    Dim matchNumber As Integer
+    Dim txt As String
+    Dim i As Long
+    Dim subStr As String
+    Dim matchFound As Boolean
+    
+    ' 定义颜色数组，方便维护和扩展
+    Dim colors(1 To 4) As Long
+    colors(1) = RGB(255, 0, 0)       ' 红色
+    colors(2) = RGB(0, 255, 0)       ' 绿色
+    colors(3) = RGB(0, 0, 255)       ' 蓝色
+    colors(4) = RGB(0, 255, 255)     ' 青色
+    
+    Set rng = ws.Range("B" & startRow, "B" & startRow + matchCount - 1)
+    
+    For Each cell In rng
+        txt = cell.Value
+        pos = 1
+        matchNumber = 0
+        
+        ' 重置单元格字体颜色
+        cell.Font.Color = RGB(0, 0, 0)
+        
+        ' 检查searchText是否包含通配符
+        If InStr(searchText, "?") > 0 Or InStr(searchText, "*") > 0 Then
+            ' 处理通配符匹配
+            If Len(txt) >= Len(searchText) Then
+                For i = 1 To Len(txt) - Len(searchText) + 1
+                    subStr = Mid(txt, i, Len(searchText))
+                    If subStr Like searchText Then
+                        matchNumber = matchNumber + 1
+                        cell.Characters(i, Len(searchText)).Font.Color = colors((matchNumber - 1) Mod 4 + 1)
+                    End If
+                Next i
+            End If
+        Else
+            ' 原有精确匹配逻辑
+            Do While InStr(pos, txt, searchText, vbTextCompare) > 0
+                pos = InStr(pos, txt, searchText, vbTextCompare)
+                matchNumber = matchNumber + 1
+                cell.Characters(pos, Len(searchText)).Font.Color = colors((matchNumber - 1) Mod 4 + 1)
+                pos = pos + Len(searchText)
+            Loop
+        End If
+    Next cell
+End Sub
+
+Private Sub Worksheet_SelectionChange(ByVal Target As Range)
+     Dim CT As String, ML As String
+     Dim matchCount As Integer
+     
+     If htcz = True Then
+         If Target.Cells.count = 1 Then ' 确保只处理单个单元格
+             ' 分开处理不同条件的逻辑
+             If Target.Column > 1 Then
+                 ' 条件1：行号等于2且列号大于1
+                 If Target.row = 2 Then
+                     If Target.Value <> "" Then
+                         CT = Cells(2, Target.Column).Value
+                         matchCount = OptimizedSearch(CT) ' 只传递CT参数
+                     End If
+                 ' 条件2：行号大于4且列号大于1
+                 ElseIf Target.row > 4 Then
+                     If Target.Value <> "" Then
+                         ML = Cells(Target.row, 1).Value
+                         CT = Cells(2, Target.Column).Value
+                         matchCount = OptimizedSearch(ML, CT) ' 传递ML和CT参数
+                     End If
+                 End If
+             ' 新增条件：A列（Target.Column = 1）且行号>=5且数值不为零
+             ElseIf Target.Column = 1 And Target.row >= 5 Then
+                 If Target.Value <> "" And Target.Value <> 0 Then
+                     InitializeCatalogJump ' 调用目录点击跳转宏
+                 End If
+             End If
+         End If
+     End If
+ End Sub

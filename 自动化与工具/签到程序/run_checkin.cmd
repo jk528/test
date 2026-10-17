@@ -1,0 +1,71 @@
+@echo off
+setlocal
+
+:: ============================================
+:: Daily check-in entry.
+::
+:: Runs checkin_all.js, which performs every platform in one pass:
+::   Trae / TeleAgent / WorkBuddy / CodeArts / Qoder / OfficeAce
+::   (TraeWork/TraeCN merged into one client - single Trae platform since 2026-10-16)
+::
+:: Auto-detects the Node.js runtime; no hardcoded paths.
+:: Log redirection is done by the scheduled task, so a manual run
+:: prints straight to the console.
+::
+:: Schedule it ONCE, after 10:30 - Qoder's daily campaign resets at
+:: 10:00 and cannot be claimed before that. OfficeAce additionally
+:: needs its desktop client running.
+::
+:: IMPORTANT: keep this file pure ASCII - cmd.exe re-reads the
+::   batch file after "chcp 65001", and non-ASCII bytes shift
+::   its read offset, making it execute comment fragments.
+:: ============================================
+
+:: Force UTF-8 codepage so cmd's own messages and Node output share
+:: one encoding - prevents mixed-encoding log files.
+chcp 65001 >nul
+
+set "SCRIPT_DIR=%~dp0"
+set "SCRIPT=checkin_all.js"
+set "NODE_EXE="
+
+:: 1) Node from PATH (most robust for scheduled tasks too).
+where node >nul 2>nul
+if %ERRORLEVEL%==0 set "NODE_EXE=node"
+
+:: 2) Common Node.js install locations.
+if not defined NODE_EXE if exist "C:\Program Files\nodejs\node.exe" set "NODE_EXE=C:\Program Files\nodejs\node.exe"
+
+:: 3) TeleAgent bundled Node (some setups rely on it).
+if not defined NODE_EXE if exist "%USERPROFILE%\.local\share\TeleAgent\runtimes\node\node.exe" set "NODE_EXE=%USERPROFILE%\.local\share\TeleAgent\runtimes\node\node.exe"
+
+:: "goto :run" instead of an if-block: %ERRORLEVEL% is expanded at parse
+:: time inside parentheses, which would return a stale exit code.
+if defined NODE_EXE goto :run
+
+:: 4) Fall back to the Trae CN EXE as Node runtime (ELECTRON_RUN_AS_NODE=1).
+::    Install location is auto-detected from the registry; never hardcoded.
+set "TRAE_INSTALL="
+for /f "tokens=2*" %%a in ('reg query "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall" /s /f "Trae" /d 2^>nul ^| findstr /i "InstallLocation"') do set "TRAE_INSTALL=%%b"
+set "TRAE_EXE="
+if defined TRAE_INSTALL if exist "%TRAE_INSTALL%Trae CN.exe" set "TRAE_EXE=%TRAE_INSTALL%Trae CN.exe"
+if not defined TRAE_EXE if defined TRAE_INSTALL if exist "%TRAE_INSTALL%TRAE SOLO CN.exe" set "TRAE_EXE=%TRAE_INSTALL%TRAE SOLO CN.exe"
+if not defined TRAE_EXE if exist "%LOCALAPPDATA%\Programs\Trae CN\Trae CN.exe" set "TRAE_EXE=%LOCALAPPDATA%\Programs\Trae CN\Trae CN.exe"
+if not defined TRAE_EXE if exist "%LOCALAPPDATA%\Programs\TRAE SOLO CN\TRAE SOLO CN.exe" set "TRAE_EXE=%LOCALAPPDATA%\Programs\TRAE SOLO CN\TRAE SOLO CN.exe"
+
+if defined TRAE_EXE goto :trae
+
+echo ERROR: No Node.js runtime found. Install Node.js (18+) or the Trae CN client.
+exit /b 1
+
+:: Args are passed straight through to the script, so
+:: "run_checkin.cmd --no-delay" skips the random delay for testing.
+:run
+"%NODE_EXE%" "%SCRIPT_DIR%%SCRIPT%" %*
+exit /b %ERRORLEVEL%
+
+:trae
+set ELECTRON_RUN_AS_NODE=1
+set VSCODE_DEV=
+"%TRAE_EXE%" "%SCRIPT_DIR%%SCRIPT%" %*
+exit /b %ERRORLEVEL%

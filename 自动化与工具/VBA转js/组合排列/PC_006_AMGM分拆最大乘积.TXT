@@ -1,0 +1,394 @@
+Attribute VB_Name = "PC_006_AMGM分拆最大乘积"
+Option Explicit
+
+' ============================================================
+' PC_006_AMGM分拆最大乘积.TXT
+' 基于 AM-GM 不等式的离散均匀分拆最大乘积矩阵 - VBA 版本
+'
+' 问题：给定正整数 N，将其分拆为 k 个正整数之和 a1+a2+...+ak = N (ai>=1)
+'       求乘积 P = a1*a2*...*ak 的最大值。
+'
+' 原理（AM-GM 不等式）：当各份尽量相等时乘积最大。
+'   设 N = q*k + r  (0 <= r < k)
+'     - r = 0：所有份 = q，最大乘积 = q^k
+'     - r > 0：r 份 = (q+1)，(k-r) 份 = q，最大乘积 = (q+1)^r * q^(k-r)
+'
+' 使用方式：
+'   1. 打开 WPS/Excel → Alt+F11 进入 VBA 编辑器
+'   2. 插入 → 模块
+'   3. 把本文件全部内容粘贴到模块中
+'   4. 运行 生成_AMGM分拆最大乘积矩阵() 或 生成_AMGM最优分析报告()
+'
+' 提供 API：
+'   MaxProductPartition(N, k)            单值：将 N 拆成 k 份时的最大乘积
+'   PartitionPlan(N, k)                  方案：返回长度为 k 的一维数组（每份值）
+'   BestKOfN(N, ByRef maxProd)           最优：给定 N 时使乘积最大的 k（含并列）
+'   构建_AMGM分拆最大乘积_矩阵(n)        矩阵：N=0..n, k=0..n 的二维数组
+'   生成_AMGM分拆最大乘积矩阵()          入口：写入工作表
+'   生成_AMGM最优分析报告()              入口：每行最优 k + 方案
+' ============================================================
+
+' —— 入口 1：生成 AM-GM 分拆最大乘积矩阵到工作表
+Public Sub 生成_AMGM分拆最大乘积矩阵()
+    Dim NInput As Variant, n As Long
+    Dim ws As Worksheet, outArr As Variant
+    Dim sheetName As String
+
+    ' 输入总数最大值 N
+    NInput = Application.InputBox(prompt:= _
+        "请输入总数最大值 N（>=0）：" & vbCrLf & _
+        "矩阵将列出 N=0..N, k=0..N 各组合的最大乘积。" & vbCrLf & vbCrLf & _
+        "AM-GM 不等式原理：" & vbCrLf & _
+        "  N = q*k + r (0 <= r < k)" & vbCrLf & _
+        "  r = 0 时  P = q^k" & vbCrLf & _
+        "  r > 0 时  P = (q+1)^r * q^(k-r)", _
+        Type:=1, Title:="AM-GM 分拆最大乘积矩阵 - N 设置")
+    If NInput = False Then Exit Sub
+    If Not IsNumeric(NInput) Or CLng(NInput) < 0 Then
+        MsgBox "N 必须为 >= 0 的整数。", vbExclamation
+        Exit Sub
+    End If
+    n = CLng(NInput)
+
+    ' 大数预警：Double 精确范围约 2^53 ≈ 9e15
+    If n > 60 Then
+        If MsgBox("N=" & n & " 时部分乘积可能超出 2^53 (约 9e15) 精确表示范围，" & vbCrLf & _
+                  "结果将出现浮点精度损失。" & vbCrLf & vbCrLf & _
+                  "是否继续？", vbYesNo + vbExclamation, "大数精度预警") <> vbYes Then Exit Sub
+    End If
+
+    sheetName = "AMGM分拆最大乘积矩阵"
+    outArr = 构建_AMGM分拆最大乘积_矩阵(n)
+
+    Set ws = GetOrInitWorksheet(sheetName)
+    ws.Cells.Clear
+    ws.Range(ws.Cells(1, 1), ws.Cells(UBound(outArr, 1), UBound(outArr, 2))).Value = outArr
+    ws.Columns.AutoFit
+
+    MsgBox "已生成：" & sheetName & "（行 N=0.." & n & "，列 k=0.." & n & "）。", vbInformation
+End Sub
+
+' —— 入口 2：生成最优 k 分析报告到工作表
+' 列：N | 最优k | 并列k | 最大乘积 | 拆分方案 | 乘积位数
+Public Sub 生成_AMGM最优分析报告()
+    Dim NInput As Variant, nMax As Long
+    Dim ws As Worksheet
+    Dim N As Long, row As Long
+    Dim best As Variant, plan As Variant
+    Dim digits As Long
+
+    NInput = Application.InputBox(prompt:="请输入 N 上限（>=1）：", _
+        Type:=1, Title:="AM-GM 最优分析报告 - N 设置")
+    If NInput = False Then Exit Sub
+    If Not IsNumeric(NInput) Or CLng(NInput) < 1 Then
+        MsgBox "N 必须 >= 1。", vbExclamation
+        Exit Sub
+    End If
+    nMax = CLng(NInput)
+
+    Set ws = GetOrInitWorksheet("AMGM最优分析报告")
+    ws.Cells.Clear
+
+    ' 表头
+    ws.Range(ws.Cells(1, 1), ws.Cells(1, 6)).Value = _
+        Array("N", "最优k", "并列k", "最大乘积", "拆分方案", "乘积位数")
+
+    row = 2
+    For N = 1 To nMax
+        best = BestKOfN(N)              ' 返回 Array(k1, k2, ..., maxProd)
+        plan = PartitionPlan(N, CLng(best(0)))
+        digits = Len(CStr(best(UBound(best))))
+
+        ws.Cells(row, 1).Value = N
+        ws.Cells(row, 2).Value = best(0)
+        If UBound(best) > 1 Then
+            ws.Cells(row, 3).Value = JoinKs(best)
+        Else
+            ws.Cells(row, 3).Value = ""
+        End If
+        ws.Cells(row, 4).Value = best(UBound(best))
+        ws.Cells(row, 5).Value = JoinPlan(plan)
+        ws.Cells(row, 6).Value = digits
+        row = row + 1
+    Next N
+    ws.Columns.AutoFit
+
+    MsgBox "已生成 N=1.." & nMax & " 的最优分析到工作表【AMGM最优分析报告】。", vbInformation
+End Sub
+
+' —— 入口 3：单值查询演示
+Public Sub 演示_AMGM单值查询()
+    Dim N As Long, k As Long
+    Dim prod As Double, plan As Variant
+    Dim NInput As Variant, KInput As Variant
+
+    NInput = Application.InputBox(prompt:="请输入 N：", Type:=1, Title:="单值查询")
+    If NInput = False Then Exit Sub
+    KInput = Application.InputBox(prompt:="请输入 k：", Type:=1, Title:="单值查询")
+    If KInput = False Then Exit Sub
+
+    If Not IsNumeric(NInput) Or Not IsNumeric(KInput) Then
+        MsgBox "N 和 k 必须为整数。", vbExclamation
+        Exit Sub
+    End If
+    N = CLng(NInput): k = CLng(KInput)
+
+    If N < 0 Or k < 0 Then
+        MsgBox "N 和 k 必须 >= 0。", vbExclamation
+        Exit Sub
+    End If
+    If k > N Then
+        MsgBox "k 不能大于 N（每份至少为 1）。", vbExclamation
+        Exit Sub
+    End If
+
+    prod = MaxProductPartition(N, k)
+    plan = PartitionPlan(N, k)
+
+    MsgBox "N=" & N & " 拆成 " & k & " 份：" & vbCrLf & _
+           "最大乘积 = " & prod & vbCrLf & _
+           "拆分方案 = " & JoinPlan(plan) & " = " & N, vbInformation
+End Sub
+
+' —— 入口 4：最优 k 查询演示
+Public Sub 演示_AMGM最优k查询()
+    Dim N As Long
+    Dim best As Variant, plan As Variant
+    Dim NInput As Variant
+
+    NInput = Application.InputBox(prompt:="请输入 N（>=1）：", Type:=1, Title:="最优 k 查询")
+    If NInput = False Then Exit Sub
+    If Not IsNumeric(NInput) Or CLng(NInput) < 1 Then
+        MsgBox "N 必须 >= 1。", vbExclamation
+        Exit Sub
+    End If
+    N = CLng(NInput)
+
+    best = BestKOfN(N)
+    plan = PartitionPlan(N, CLng(best(0)))
+
+    MsgBox "N = " & N & vbCrLf & _
+           "最优 k = " & JoinKs(best) & vbCrLf & _
+           "最大乘积 = " & best(UBound(best)) & vbCrLf & _
+           "拆分方案 = " & JoinPlan(plan) & " = " & N, vbInformation
+End Sub
+
+' ============================================================
+' 核心算法函数
+' ============================================================
+
+' —— 单元最大乘积：将 N 分拆为 k 份正整数之和时的最大乘积
+' 由 AM-GM 不等式，各份尽量相等时乘积最大
+' 设 N = q*k + r (0 <= r < k)：
+'   r = 0：所有份 = q，乘积 = q^k
+'   r > 0：r 份 = (q+1)，(k-r) 份 = q，乘积 = (q+1)^r * q^(k-r)
+' 非法情形返回 0；N=0,k=0 返回 1（空积约定）
+Public Function MaxProductPartition(ByVal N As Long, ByVal k As Long) As Double
+    Dim q As Long, r As Long
+    Dim prod As Double, i As Long
+
+    If N = 0 And k = 0 Then
+        MaxProductPartition = 1#         ' 空积约定
+        Exit Function
+    End If
+    If N <= 0 Or k <= 0 Then
+        MaxProductPartition = 0#         ' 非法参数
+        Exit Function
+    End If
+    If k > N Then
+        MaxProductPartition = 0#         ' 每份至少 1，k 不能超 N
+        Exit Function
+    End If
+
+    q = N \ k
+    r = N Mod k
+    prod = 1#
+    ' (k-r) 份 q
+    For i = 1 To k - r
+        prod = prod * q
+    Next i
+    ' r 份 (q+1)
+    For i = 1 To r
+        prod = prod * (q + 1)
+    Next i
+
+    MaxProductPartition = prod
+End Function
+
+' —— 拆分方案：返回长度为 k 的一维数组（前 r 个为 q+1，后 k-r 个为 q）
+' 非法情形返回 Empty；空分拆 (N=0,k=0) 返回空数组
+Public Function PartitionPlan(ByVal N As Long, ByVal k As Long) As Variant
+    Dim q As Long, r As Long
+    Dim plan() As Long
+    Dim i As Long
+
+    If N = 0 And k = 0 Then
+        PartitionPlan = Array()          ' 空数组
+        Exit Function
+    End If
+    If N <= 0 Or k <= 0 Or k > N Then
+        PartitionPlan = Empty            ' 非法
+        Exit Function
+    End If
+
+    q = N \ k
+    r = N Mod k
+    ReDim plan(1 To k)
+    For i = 1 To r
+        plan(i) = q + 1
+    Next i
+    For i = r + 1 To k
+        plan(i) = q
+    Next i
+
+    PartitionPlan = plan
+End Function
+
+' —— 给定 N，返回所有使乘积最大的 k（含并列）
+' 返回一维数组：元素 0..UBound-1 为最优 k 列表，最后一个元素为最大乘积
+'   如 N=7 返回 Array(2, 3, 12)  表示 k=2 或 k=3 并列，最大乘积=12
+'   如 N=8 返回 Array(3, 18)     表示 k=3 唯一最优，最大乘积=18
+Public Function BestKOfN(ByVal N As Long) As Variant
+    Dim k As Long
+    Dim maxProd As Double, p As Double
+    Dim bestKs() As Long
+    Dim cnt As Long
+
+    If N <= 0 Then
+        BestKOfN = Array(0#)
+        Exit Function
+    End If
+
+    maxProd = -1
+    cnt = 0
+    ReDim bestKs(1 To N)
+
+    For k = 1 To N
+        p = MaxProductPartition(N, k)
+        If p > maxProd Then
+            maxProd = p
+            cnt = 0
+            cnt = cnt + 1
+            bestKs(cnt) = k
+        ElseIf p = maxProd Then
+            cnt = cnt + 1
+            bestKs(cnt) = k
+        End If
+    Next k
+
+    ' 收紧数组并附加最大乘积
+    Dim result() As Variant
+    ReDim result(0 To cnt)
+    For k = 1 To cnt
+        result(k - 1) = bestKs(k)
+    Next k
+    result(cnt) = maxProd
+
+    BestKOfN = result
+End Function
+
+' —— 构建 AM-GM 分拆最大乘积矩阵二维数组
+' 行：N = 0..n（被分拆总和）；列：k = 0..n（分拆份数）
+' 单元格 (N, k)：将 N 分拆为 k 份正整数之和时的最大乘积
+' 边界：m=0,k=0 → 1；m>0,k=0 → 空；k>m → 空
+Public Function 构建_AMGM分拆最大乘积_矩阵(ByVal n As Long) As Variant
+    Dim rowsTotal As Long, colsTotal As Long
+    Dim outArr() As Variant
+    Dim colStart As Long
+    Dim m As Long, k As Long, row As Long
+    Dim sumRow As Double, val As Double
+
+    rowsTotal = n + 2                   ' 1 表头 + (n+1) 数据行
+    colsTotal = n + 3                   ' 总和列 + 总数列 + (n+1) 个 k 列
+    colStart = 3
+    ReDim outArr(1 To rowsTotal, 1 To colsTotal)
+
+    ' 表头
+    outArr(1, 1) = "总和"
+    outArr(1, 2) = "总数"
+    For k = 0 To n
+        outArr(1, colStart + k) = "拆" & k & "份"
+    Next k
+
+    row = 2
+    For m = 0 To n
+        outArr(row, 2) = m
+        sumRow = 0#
+
+        If m = 0 Then
+            ' N=0 行：仅 k=0 处填 1（空积约定）
+            outArr(row, colStart + 0) = 1#
+            sumRow = 1#
+            For k = 1 To n
+                outArr(row, colStart + k) = vbNullString
+            Next k
+        Else
+            ' k=0：N>0 时无法分拆为 0 份，留空
+            outArr(row, colStart + 0) = vbNullString
+            ' k=1..m：最大乘积
+            For k = 1 To m
+                val = MaxProductPartition(m, k)
+                outArr(row, colStart + k) = val
+                sumRow = sumRow + val
+            Next k
+            ' k=m+1..n：k>N，无法分拆，留空
+            For k = m + 1 To n
+                outArr(row, colStart + k) = vbNullString
+            Next k
+        End If
+
+        outArr(row, 1) = sumRow         ' 行总和
+        row = row + 1
+    Next m
+
+    构建_AMGM分拆最大乘积_矩阵 = outArr
+End Function
+
+' ============================================================
+' 工具函数（私有）
+' ============================================================
+
+' —— 工具：获取或创建工作表
+Private Function GetOrInitWorksheet(ByVal Name As String) As Worksheet
+    Dim ws As Worksheet
+    On Error Resume Next
+    Set ws = ThisWorkbook.Worksheets(Name)
+    On Error GoTo 0
+    If ws Is Nothing Then
+        Set ws = ThisWorkbook.Worksheets.Add
+        ws.Name = Name
+    End If
+    Set GetOrInitWorksheet = ws
+End Function
+
+' —— 工具：把 BestKOfN 返回的 k 列表（不含末尾的 maxProd）拼成字符串
+Private Function JoinKs(ByVal best As Variant) As String
+    Dim i As Long, s As String
+    Dim ub As Long
+    ub = UBound(best)
+    s = ""
+    For i = 0 To ub - 1                  ' 跳过最后一位（maxProd）
+        If i > 0 Then s = s & " 或 "
+        s = s & CStr(best(i))
+    Next i
+    JoinKs = s
+End Function
+
+' —— 工具：把拆分方案数组拼成 "a+b+c" 字符串
+Private Function JoinPlan(ByVal plan As Variant) As String
+    Dim i As Long, s As String
+    If IsEmpty(plan) Then
+        JoinPlan = ""
+        Exit Function
+    End If
+    If Not IsArray(plan) Then
+        JoinPlan = ""
+        Exit Function
+    End If
+    s = ""
+    For i = LBound(plan) To UBound(plan)
+        If i > LBound(plan) Then s = s & "+"
+        s = s & CStr(plan(i))
+    Next i
+    JoinPlan = s
+End Function

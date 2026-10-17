@@ -1,0 +1,259 @@
+Attribute VB_Name = "PC_001_三角"
+Option Explicit
+
+' —— 入口：选择类型并生成到对应工作表
+Public Sub 生成_统合三角()
+    Dim typeChoice As Variant, NInput As Variant, n As Long
+    Dim sheetName As String
+    Dim ws As Worksheet, outArr As Variant
+
+    ' 选择类型：1 组合不放回，2 组合放回(XX版式)，3 排列不放回，4 排列放回(m^n)
+    typeChoice = Application.InputBox(prompt:= _
+        "请选择三角类型：" & vbCrLf & _
+        "1 = 组合不放回 C(m,k)(杨辉三角)(元素不重复去镜像)" & vbCrLf & _
+        "2 = 组合放回 C(m+k-1,k)（元素重复去镜像）" & vbCrLf & _
+        "3 = 排列不放回 P(m,k)=m!/(m-k)!(元素不重复镜像)" & vbCrLf & _
+        "4 = 排列放回 m^k(元素重复镜像)", _
+        Type:=1, Title:="统合三角类型选择")
+    If typeChoice = False Then Exit Sub
+    If Not IsNumeric(typeChoice) Or typeChoice < 1 Or typeChoice > 4 Then
+        MsgBox "类型必须是 1..4 的整数。", vbExclamation
+        Exit Sub
+    End If
+
+    ' 输入总数最大值 N（行 m 从 0..N）
+    NInput = Application.InputBox(prompt:="请输入总数最大值 N（>=0）：", Type:=1, Title:="统合三角 - N设置")
+    If NInput = False Then Exit Sub
+    If Not IsNumeric(NInput) Or CLng(NInput) < 0 Then
+        MsgBox "N 必须为 >= 0 的整数。", vbExclamation
+        Exit Sub
+    End If
+    n = CLng(NInput)
+
+    ' 根据类型生成二维数组与工作表名
+    Select Case CLng(typeChoice)
+        Case 1
+            outArr = 构建_组合不放回_C三角二维数组(n)
+            sheetName = "三角_组合不放回_杨辉三角"
+        Case 2
+            outArr = 构建_组合放回_C三角_XX二维数组(n)
+            sheetName = "三角_组合放回_重复元素"
+        Case 3
+            outArr = 构建_排列不放回_P三角二维数组(n)
+            sheetName = "三角_排列不放回_镜像"
+        Case 4
+            outArr = 构建_m次幂_三角二维数组(n)
+            sheetName = "三角_排列放回_m次幂_完备"
+    End Select
+
+    ' 写入到对应工作表
+    Set ws = GetOrInitWorksheet(sheetName)
+    ws.Cells.Clear
+    ws.Range(ws.Cells(1, 1), ws.Cells(UBound(outArr, 1), UBound(outArr, 2))).Value = outArr
+    ws.Columns.AutoFit
+
+    MsgBox "已生成：" & sheetName & "（行 m=0..N，列 k=0..N）。", vbInformation
+End Sub
+
+' —— 组合不放回：C(m,k)（杨辉风格）
+Public Function 构建_组合不放回_C三角二维数组(ByVal n As Long) As Variant
+    Dim rowsTotal As Long, colsTotal As Long
+    Dim outArr() As Variant
+    Dim colStart As Long
+    Dim m As Long, k As Long, row As Long
+    Dim sumRow As Double, val As Double
+
+    rowsTotal = n + 2
+    colsTotal = n + 3
+    colStart = 3
+    ReDim outArr(1 To rowsTotal, 1 To colsTotal)
+
+    outArr(1, 1) = "总和"
+    outArr(1, 2) = "总数"
+    For k = 0 To n
+        outArr(1, colStart + k) = "拿" & k & "个"
+    Next k
+
+    row = 2
+    For m = 0 To n
+        outArr(row, 2) = m
+        sumRow = 0#
+        For k = 0 To m
+            val = CombNum(m, k)           ' C(m,k)
+            outArr(row, colStart + k) = val
+            sumRow = sumRow + val
+        Next k
+        For k = m + 1 To n
+            outArr(row, colStart + k) = vbNullString
+        Next k
+        outArr(row, 1) = sumRow           ' 行总和 = Σ C(m,k) = 2^m
+        row = row + 1
+    Next m
+
+    构建_组合不放回_C三角二维数组 = outArr
+End Function
+
+' —— 组合放回：C(m+k-1,k)，按“XX三角”版式（拿m个=前缀和，总和=前缀和×2）
+Public Function 构建_组合放回_C三角_XX二维数组(ByVal n As Long) As Variant
+    Dim rowsTotal As Long, colsTotal As Long
+    Dim outArr() As Variant
+    Dim colStart As Long
+    Dim m As Long, k As Long, row As Long
+    Dim prefix As Double, val As Double
+
+    rowsTotal = n + 2
+    colsTotal = n + 3
+    colStart = 3
+    ReDim outArr(1 To rowsTotal, 1 To colsTotal)
+
+    outArr(1, 1) = "总和"
+    outArr(1, 2) = "总数"
+    For k = 0 To n
+        outArr(1, colStart + k) = "拿" & k & "个"
+    Next k
+
+    row = 2
+    For m = 0 To n
+        outArr(row, 2) = m
+        If m = 0 Then
+            outArr(row, colStart + 0) = 1#
+            outArr(row, 1) = 1#
+            For k = 1 To n
+                outArr(row, colStart + k) = vbNullString
+            Next k
+        Else
+            prefix = 0#
+            For k = 0 To m - 1
+                val = CombNum(m + k - 1, k)   ' C(m+k-1, k)
+                outArr(row, colStart + k) = val
+                prefix = prefix + val
+            Next k
+            outArr(row, colStart + m) = prefix         ' 拿m个=前缀和
+            outArr(row, 1) = prefix + prefix           ' 总和=整行合计
+            For k = m + 1 To n
+                outArr(row, colStart + k) = vbNullString
+            Next k
+        End If
+        row = row + 1
+    Next m
+
+    构建_组合放回_C三角_XX二维数组 = outArr
+End Function
+
+' —— 排列不放回：P(m,k)=m!/(m-k)!（直接乘积实现，避免递推依赖）
+Public Function 构建_排列不放回_P三角二维数组(ByVal n As Long) As Variant
+    Dim rowsTotal As Long, colsTotal As Long
+    Dim outArr() As Variant
+    Dim colStart As Long
+    Dim m As Long, k As Long, row As Long
+    Dim sumRow As Double, val As Double
+
+    rowsTotal = n + 2
+    colsTotal = n + 3
+    colStart = 3
+    ReDim outArr(1 To rowsTotal, 1 To colsTotal)
+
+    outArr(1, 1) = "总和"
+    outArr(1, 2) = "总数"
+    For k = 0 To n
+        outArr(1, colStart + k) = "拿" & k & "个"
+    Next k
+
+    row = 2
+    For m = 0 To n
+        outArr(row, 2) = m
+        sumRow = 0#
+
+        ' k=0..m：P(m,k)=m*(m-1)*...*(m-k+1)，k=0时为1
+        For k = 0 To m
+            If k = 0 Then
+                val = 1#
+            Else
+                val = 1#
+                Dim t As Long
+                For t = 0 To k - 1
+                    val = val * (m - t)
+                Next t
+            End If
+            outArr(row, colStart + k) = val
+            sumRow = sumRow + val
+        Next k
+
+        For k = m + 1 To n
+            outArr(row, colStart + k) = vbNullString
+        Next k
+
+        outArr(row, 1) = sumRow
+        row = row + 1
+    Next m
+
+    构建_排列不放回_P三角二维数组 = outArr
+End Function
+
+' —— 排列放回：m^k
+Public Function 构建_m次幂_三角二维数组(ByVal n As Long) As Variant
+    Dim rowsTotal As Long, colsTotal As Long
+    Dim outArr() As Variant
+    Dim colStart As Long
+    Dim m As Long, k As Long, row As Long
+    Dim sumRow As Double, val As Double
+
+    rowsTotal = n + 2
+    colsTotal = n + 3
+    colStart = 3
+    ReDim outArr(1 To rowsTotal, 1 To colsTotal)
+
+    outArr(1, 1) = "总和"
+    outArr(1, 2) = "总数"
+    For k = 0 To n
+        outArr(1, colStart + k) = "拿" & k & "个"
+    Next k
+
+    row = 2
+    For m = 0 To n
+        outArr(row, 2) = m
+        sumRow = 0#
+
+        For k = 0 To m
+            If k = 0 Then
+                val = 1#
+            Else
+                val = m ^ k
+            End If
+            outArr(row, colStart + k) = val
+            sumRow = sumRow + val
+        Next k
+
+        For k = m + 1 To n
+            outArr(row, colStart + k) = vbNullString
+        Next k
+
+        outArr(row, 1) = sumRow
+        row = row + 1
+    Next m
+
+    构建_m次幂_三角二维数组 = outArr
+End Function
+
+' —— 工具：组合数（使用Excel内置Combin，返回Double）
+Private Function CombNum(ByVal n As Long, ByVal k As Long) As Double
+    If k < 0 Or k > n Then
+        CombNum = 0#
+    Else
+        CombNum = Application.WorksheetFunction.Combin(n, k)
+    End If
+End Function
+
+' —— 工具：获取或创建工作表
+Private Function GetOrInitWorksheet(ByVal Name As String) As Worksheet
+    Dim ws As Worksheet
+    On Error Resume Next
+    Set ws = ThisWorkbook.Worksheets(Name)
+    On Error GoTo 0
+    If ws Is Nothing Then
+        Set ws = ThisWorkbook.Worksheets.Add
+        ws.Name = Name
+    End If
+    Set GetOrInitWorksheet = ws
+End Function
+

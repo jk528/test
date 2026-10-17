@@ -1,0 +1,82 @@
+# Python 字节码缓存（不生成、不提交）
+__pycache__/
+*.pyc
+*.pyo
+
+# Python 虚拟环境（本机相关、不可跨机同步，统一放同步/仓库目录外）
+.venv/
+venv/
+env/
+
+# Node / 前端依赖与构建产物
+node_modules/
+dist/
+*.local
+
+# ColorTxt 源码：内嵌的独立 Git 仓库（远程 GitHub），不作为 gitlink 纳入本仓库
+阅读器项目/彩读分析/.temp/ColorTxt/
+
+# Rust / Tauri 构建产物
+**/src-tauri/target/
+target/
+
+# 本机环境安装脚本产物（红楼梦范例）
+/阅读器项目/红楼梦范例/install_dev_env.log
+/阅读器项目/红楼梦范例/install_fix.log
+
+# 密钥与本地配置（严禁提交）
+.env
+.env.*
+!.env.example
+secrets.vault
+*.key
+
+# 系统 / 编辑器
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*~
+
+# 小说拆分产物（splittxt3 输出：单章小文件数千个，不进版本库）
+**/*_自动/
+**/拆分文档/
+保留大于等于*_*.txt
+清理小于*_*.txt
+# 云盘同步临时 / 锁 / 冲突文件（本项目位于云盘同步目录，这类产物不进版本库）
+# Office 打开时的临时锁文件（如 ~$test1.xlsm）
+~$*
+# 临时 / 锁 / 备份 / 未完成下载
+*.tmp
+*.lock
+*.bak
+*.orig
+*.crdownload
+*.partial
+# 云盘冲突副本（OneDrive / 坚果云 / Dropbox 命名差异，中英文统一兜底）
+*冲突副本*
+*-Conflict*
+*conflicted copy*
+*.conflict*
+# 同步客户端临时目录
+.tmp/
+**/.tmp/
+# traecode 工作产物（AI 工具共用本仓库时产生：历史重写临时目录 / merkle 快照 / 删除清单）
+.git-rewrite/
+.merkle-snapshot.json
+JK_del_list.txt
+
+# --- 大文件不进 git（2026-10-18 清理） ---
+Git-2.56.0.2-64-bit.exe
+语料与文本/小说/
+语料与文本/去重备份/
+小说/
+彩读分析/.temp/
+*.ecdl
+
+sync_gitee.log

@@ -1,0 +1,72 @@
+{
+  "task_name": "新闻联播每日总结",
+  "task_description": "每天自动生成新闻联播总结报告（不用积分版，Windows 任务计划程序）",
+  "schedule": {
+    "enabled": true,
+    "time": "05:00",
+    "timezone": "China Standard Time",
+    "run_if_missed": true
+  },
+  "mode": "oneshot",
+  "modes": {
+    "oneshot": {
+      "description": "一键生成模式（推荐，零成本）- 单一脚本完成抓取/分类/六要素/渲染/自检，零外部依赖、零人工干预、不消耗任何积分或API费用",
+      "enabled": true,
+      "self_check": true,
+      "skip_if_exists_kb": 10
+    },
+    "auto_v2": {
+      "description": "旧版全自动模式（v2正则版）",
+      "enabled": false
+    },
+    "semi_auto": {
+      "description": "半自动模式（分阶段版）- Phase1自动生成，Phase2人工填写后自动合并",
+      "enabled": false,
+      "merge_check_interval_minutes": 30,
+      "merge_check_max_hours": 24
+    },
+    "ai_api": {
+      "description": "AI API 模式 - 调用外部AI API填写六要素（不消耗TeleAgent积分，消耗外部API费用约0.01元/天）",
+      "enabled": false,
+      "api_provider": "deepseek",
+      "api_key": "",
+      "api_base_url": "https://api.deepseek.com/v1",
+      "api_model": "deepseek-chat",
+      "max_tokens": 4096,
+      "temperature": 0.3
+    }
+  },
+  "paths": {
+    "python_exe": "C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+    "python_fallbacks": [
+      "python",
+      "py"
+    ],
+    "script_dir": "../代码",
+    "oneshot_dir": "../代码",
+    "oneshot_script": "xwlb_report.py",
+    "gen_v2_script": "gen_report_v2.py",
+    "gen_final_script": "gen_report_final.py",
+    "fill_elements_script": "fill_elements_api.py",
+    "output_dir": "../../../归档",
+    "log_dir": "./logs"
+  },
+  "quality": {
+    "run_quality_check": true,
+    "quality_check_script": "check_md_quality.py",
+    "min_file_size_kb": 10
+  },
+  "sync": {
+    "enabled": false,
+    "sync_script": ""
+  },
+  "notification": {
+    "enabled": false,
+    "method": "none",
+    "webhook_url": ""
+  },
+  "retry": {
+    "max_retries": 3,
+    "retry_interval_seconds": 300
+  }
+}

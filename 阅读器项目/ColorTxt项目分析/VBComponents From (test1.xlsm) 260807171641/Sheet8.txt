@@ -1,0 +1,151 @@
+' 双筛选逻辑VBA代码
+' 数据源页面：A列文本，B列目录
+' 目录2页面：B列词条，C列目录
+' 点击目录2 B列时，执行双筛选：
+' 1. 获取选择单元格向右偏移一个单元格的目录值，限定数据源目录范围
+' 2. 在限定范围内查找A列文本包含所选词条的数据
+' 3. 单匹配时跳转到对应位置，多匹配时显示选择窗体
+' 注意：此版本需要手动创建匹配结果窗体
+
+Option Explicit
+
+
+
+' 全局变量，用于存储匹配结果
+
+
+' 双筛选主函数 - 返回匹配结果的数组
+' 第一次筛选：目录必须相等
+' 第二次筛选：词条包含在内即可
+Function DoubleFilterSearch(selectedCell As Range) As Variant
+    Dim wsData As Worksheet, wsDir2 As Worksheet
+    Dim irow As Long
+    Dim arData As Variant
+    Dim i As Long, j As Long
+    Dim selectedTerm As String
+    Dim targetDir As String
+    Dim matchCount As Long
+    Dim resultArray() As Variant
+    
+    ' 设置工作表对象
+    Set wsData = Sheets("数据源")
+    Set wsDir2 = selectedCell.Parent
+    
+    ' 获取选中的词条和右侧的目录值
+    selectedTerm = selectedCell.Value
+    targetDir = selectedCell.Offset(0, 1).Value ' 向右偏移一个单元格获取目录值
+    
+    ' 检查词条和目录是否为空
+    If selectedTerm = "" Or targetDir = "" Then
+        DoubleFilterSearch = Empty
+        Exit Function
+    End If
+    
+    ' 获取数据源数据
+    irow = wsData.Cells(wsData.rows.count, "A").End(xlUp).row
+    If irow < 2 Then
+        DoubleFilterSearch = Empty
+        Exit Function
+    End If
+    
+    arData = wsData.Range("A2:B" & irow).Value
+    
+    ' 第一步：双筛选统计匹配数量
+    matchCount = 0
+    For i = 1 To UBound(arData, 1)
+        ' 第一次筛选：目录必须与targetDir相等（限定范围）
+        ' 第二次筛选：文本中包含selectedTerm（使用Like模糊搜索）
+        If arData(i, 2) = targetDir And LCase(arData(i, 1)) Like "*" & LCase(selectedTerm) & "*" Then
+            matchCount = matchCount + 1
+        End If
+    Next i
+    
+    ' 第二步：创建结果数组
+    If matchCount = 0 Then
+        DoubleFilterSearch = Empty
+        Exit Function
+    End If
+    
+    ReDim resultArray(1 To matchCount, 1 To 3)
+    
+    ' 第三步：填充结果数组
+    j = 1
+    For i = 1 To UBound(arData, 1)
+        ' 再次应用双筛选条件
+        If arData(i, 2) = targetDir And LCase(arData(i, 1)) Like "*" & LCase(selectedTerm) & "*" Then
+            resultArray(j, 1) = arData(i, 1) ' Text
+            resultArray(j, 2) = arData(i, 2) ' Directory
+            resultArray(j, 3) = i + 1 ' RowIndex (实际行号)
+            j = j + 1
+        End If
+    Next i
+    
+    DoubleFilterSearch = resultArray
+End Function
+
+' 处理双筛选结果
+' 单匹配时跳转到对应位置，多匹配时显示选择窗体
+Sub ProcessDoubleFilterResult(matchArray As Variant)
+    Dim wsData As Worksheet
+    
+    Set wsData = Sheets("数据源")
+    
+    ' 根据匹配结果数量决定操作
+    Select Case UBound(matchArray, 1)
+        Case 1
+            ' 只有一个匹配结果，跳转到对应位置
+            wsData.Activate
+            wsData.Cells(matchArray(1, 3), 1).Select
+'            MsgBox "已跳转到匹配文本位置！", vbInformation, "跳转成功"
+        Case Else
+            ' 多个匹配结果，显示选择窗体
+            ' 存储匹配结果到全局变量
+            g_matchArray = matchArray
+            ' 显示匹配结果窗体
+            UserForm3.Show 0
+    End Select
+End Sub
+
+' 目录2工作表选择变更事件
+Private Sub Worksheet_SelectionChange(ByVal Target As Range)
+    Dim wsDir2 As Worksheet
+    Dim matchArray As Variant
+    
+    Set wsDir2 = Me
+    
+    ' 检查查询开关是否开启
+    If Not htcz Then Exit Sub
+    
+    ' 检查是否为单单元格选择且位于B列
+    If Target.Cells.count = 1 And Target.Column = 2 Then
+        ' 确保选择的是数据行（B2及以下）
+        If Target.row >= 2 And Target.Value <> "" Then
+            ' 执行双筛选搜索，直接传递Target单元格
+            matchArray = DoubleFilterSearch(Target)
+            
+            ' 根据匹配结果决定操作
+            If IsEmpty(matchArray) Then
+                ' 无匹配，显示提示
+                MsgBox "未找到匹配的文本！", vbInformation, "筛选结果"
+            Else
+                ' 处理双筛选结果
+                ProcessDoubleFilterResult matchArray
+            End If
+        End If
+    End If
+End Sub
+
+' 初始化宏
+Sub InitializeDoubleFilter()
+    ' 设置查询开关为开启状态
+    htcz = True
+    MsgBox "双筛选功能已启用！", vbInformation, "初始化完成"
+End Sub
+
+' 重置双筛选功能
+Sub ResetDoubleFilter()
+    ' 重置查询开关
+    htcz = False
+    MsgBox "双筛选功能已重置！", vbInformation, "操作完成"
+End Sub
+

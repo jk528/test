@@ -1,0 +1,36 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# 运行时数据（SQLite 主库 + 嵌入模型缓存）
+# 默认已落在同步目录外的 %USERPROFILE%\.honglou，此处仅为兜底：
+# 若用 HONGLOU_DATA_DIR / EMBED_CACHE_DIR 指回工程内，不要提交进来。
+.data
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+models/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# 临时脚本 / 探针 / 截图 / 日志（有长期价值的已移 app/tools/）
+.temp

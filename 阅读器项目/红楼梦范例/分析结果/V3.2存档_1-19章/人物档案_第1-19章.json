@@ -1,0 +1,1070 @@
+[
+  {
+    "name": "作者（虚构叙述者）",
+    "first_chapter": 1,
+    "role": "◇ 元叙事层叙述者，自序命名缘由",
+    "paragraph": "§2 E01-01、§4.4"
+  },
+  {
+    "name": "女娲",
+    "first_chapter": 1,
+    "role": "◇ 补天者",
+    "paragraph": "§2 E01-02"
+  },
+  {
+    "name": "封氏",
+    "first_chapter": 1,
+    "role": "◆ 甄士隐嫡妻",
+    "paragraph": "§2 E01-05、E01-13~14、§4.2、§6"
+  },
+  {
+    "name": "封肃",
+    "first_chapter": 1,
+    "role": "◇ 甄士隐岳丈，嫌贫爱富",
+    "paragraph": "§2 E01-15、E01-17、§4.2、§6"
+  },
+  {
+    "name": "曹雪芹",
+    "first_chapter": 1,
+    "role": "◇ 披阅十载增删五次者",
+    "paragraph": "§2 E01-04"
+  },
+  {
+    "name": "渺渺真人",
+    "first_chapter": 1,
+    "role": "◆ 道教真人，携石入世者之一",
+    "paragraph": "§2 E01-03、E01-06~07、§4.2、§6"
+  },
+  {
+    "name": "甄士隐",
+    "first_chapter": 1,
+    "role": "★ 葫芦庙旁乡宦，全书第一叙事锚点",
+    "paragraph": "§2 E01-05~E01-16、§3全表、§4.2、§6全表"
+  },
+  {
+    "name": "甄家丫鬟",
+    "first_chapter": 1,
+    "role": "◇ 后名\"娇杏\"（侥幸）",
+    "paragraph": "§2 E01-10、E01-17、§4.2、§6"
+  },
+  {
+    "name": "癞头和尚",
+    "first_chapter": 1,
+    "role": "◆ 预言英莲命运者",
+    "paragraph": "§2 E01-08、§4.2、§6"
+  },
+  {
+    "name": "神瑛侍者",
+    "first_chapter": 1,
+    "role": "◇ 绛珠灌溉者",
+    "paragraph": "§2 E01-06"
+  },
+  {
+    "name": "空空道人",
+    "first_chapter": 1,
+    "role": "◇ 抄录石头记者",
+    "paragraph": "§2 E01-04"
+  },
+  {
+    "name": "绛珠仙草",
+    "first_chapter": 1,
+    "role": "◇ 还泪者",
+    "paragraph": "§2 E01-06"
+  },
+  {
+    "name": "英莲",
+    "first_chapter": 1,
+    "role": "◆ 甄士隐之女，三岁",
+    "paragraph": "§2 E01-05、E01-08、E01-13、§4.2、§6"
+  },
+  {
+    "name": "茫茫大士",
+    "first_chapter": 1,
+    "role": "◆ 佛教僧人，携石入世者之一",
+    "paragraph": "§2 E01-03、E01-06~07、§4.2、§6"
+  },
+  {
+    "name": "贾雨村",
+    "first_chapter": 1,
+    "role": "★ 寄居穷儒，末世仕宦之族（后任\"新任太爷\"）",
+    "paragraph": "§2 E01-09~E01-12、E01-17、§3全表、§4.2、§6"
+  },
+  {
+    "name": "跛足道人",
+    "first_chapter": 1,
+    "role": "◆ 唱《好了歌》者",
+    "paragraph": "§2 E01-16、§4.2、§6"
+  },
+  {
+    "name": "霍启",
+    "first_chapter": 1,
+    "role": "◇ 甄家家人，失英莲者",
+    "paragraph": "§2 E01-13、§4.2、§6"
+  },
+  {
+    "name": "顽石（石头）",
+    "first_chapter": 1,
+    "role": "★ 女娲补天遗石，通灵宝玉，E01-04中称\"石头\"",
+    "paragraph": "§2 E01-02~04、§4.2、§6"
+  },
+  {
+    "name": "冷子兴",
+    "first_chapter": 2,
+    "role": "★ 古董行商，演说者",
+    "paragraph": "§2 E02-08~18、§3 E02-08~17、§4.2、§6"
+  },
+  {
+    "name": "史太君（贾母）",
+    "first_chapter": 2,
+    "role": "◆ 贾代善妻，爱孙女溺爱宝玉",
+    "paragraph": "§2 E02-12~13、§3 E02-12、§4.2、§6"
+  },
+  {
+    "name": "娇杏",
+    "first_chapter": 2,
+    "role": "◆ 雨村二房后扶正（后名\"侥幸\"）",
+    "paragraph": "§2 E02-01~03、§3 E02-01~02、§4.2、§6"
+  },
+  {
+    "name": "封氏（甄家娘子）",
+    "first_chapter": 2,
+    "role": "◇ 甄士隐妻，感伤",
+    "paragraph": "§2 E02-01、§4.2、§6"
+  },
+  {
+    "name": "林如海",
+    "first_chapter": 2,
+    "role": "◆ 钦点巡盐御史，前科探花",
+    "paragraph": "§2 E02-05~06、§3 E02-05、§4.2、§6"
+  },
+  {
+    "name": "林黛玉",
+    "first_chapter": 2,
+    "role": "◆ 五岁女学生，全书女主角",
+    "paragraph": "§2 E02-05~06、§3 E02-05~06、§4.2、§6"
+  },
+  {
+    "name": "王氏（王夫人）",
+    "first_chapter": 2,
+    "role": "◆ 贾政夫人，生珠元春宝玉",
+    "paragraph": "§2 E02-12、§3 E02-12、§4.2、§6"
+  },
+  {
+    "name": "王熙凤",
+    "first_chapter": 2,
+    "role": "◆ 贾琏妻，\"男人万不及一\"",
+    "paragraph": "§2 E02-17、§3 E02-17、§4.2、§6"
+  },
+  {
+    "name": "甄宝玉",
+    "first_chapter": 2,
+    "role": "◆ 甄家公子，宝玉镜像人物",
+    "paragraph": "§2 E02-15、§3 E02-15、§4.2、§6"
+  },
+  {
+    "name": "老僧",
+    "first_chapter": 2,
+    "role": "◇ 智通寺龙钟老僧，既聋且昏",
+    "paragraph": "§2 E02-07、§3 E02-07、§4.2"
+  },
+  {
+    "name": "贾代化",
+    "first_chapter": 2,
+    "role": "◆ 宁公长子，袭官，生贾敷贾敬",
+    "paragraph": "§2 E02-11、§3 E02-11、§4.2、§6"
+  },
+  {
+    "name": "贾代善",
+    "first_chapter": 2,
+    "role": "◆ 荣公长子，娶史侯小姐，生赦政",
+    "paragraph": "§2 E02-12、§3 E02-12、§4.2、§6"
+  },
+  {
+    "name": "贾元春",
+    "first_chapter": 2,
+    "role": "◆ 贾政长女，贤孝才德选入宫",
+    "paragraph": "§2 E02-16、§3 E02-16、§4.2、§6"
+  },
+  {
+    "name": "贾宝玉",
+    "first_chapter": 2,
+    "role": "★ 衔玉而生，话题中心，全书主角",
+    "paragraph": "§2 E02-12~13、§3 E02-12~13、§4.2、§6"
+  },
+  {
+    "name": "贾惜春",
+    "first_chapter": 2,
+    "role": "◇ 宁府贾珍胞妹",
+    "paragraph": "§2 E02-16、§3 E02-16、§4.2"
+  },
+  {
+    "name": "贾探春",
+    "first_chapter": 2,
+    "role": "◇ 贾政庶出",
+    "paragraph": "§2 E02-16、§3 E02-16、§4.2"
+  },
+  {
+    "name": "贾政",
+    "first_chapter": 2,
+    "role": "◆ 荣府次子，端方正直，员外郎",
+    "paragraph": "§2 E02-12~13、§3 E02-12、§4.2、§6"
+  },
+  {
+    "name": "贾敏（贾夫人）",
+    "first_chapter": 2,
+    "role": "◆ 林如海嫡妻，荣府赦政之妹，已亡",
+    "paragraph": "§2 E02-05~06、§3 E02-06、§4.2、§6"
+  },
+  {
+    "name": "贾敬",
+    "first_chapter": 2,
+    "role": "◆ 宁府，好道烧丹炼汞",
+    "paragraph": "§2 E02-11、§3 E02-11、§4.2、§6"
+  },
+  {
+    "name": "贾敷",
+    "first_chapter": 2,
+    "role": "◇ 贾代化长子，八九岁夭亡",
+    "paragraph": "§2 E02-11、§3 E02-11、§4.2"
+  },
+  {
+    "name": "贾珍",
+    "first_chapter": 2,
+    "role": "◆ 宁府袭官，一味高乐翻宁府",
+    "paragraph": "§2 E02-11、§3 E02-11、§4.2、§6"
+  },
+  {
+    "name": "贾珠",
+    "first_chapter": 2,
+    "role": "◆ 贾政长子，十四岁进学后早亡",
+    "paragraph": "§2 E02-12、§3 E02-12、§4.2、§6"
+  },
+  {
+    "name": "贾琏",
+    "first_chapter": 2,
+    "role": "◆ 贾赦之子，捐同知，帮理家务",
+    "paragraph": "§2 E02-17、§3 E02-17、§4.2、§6"
+  },
+  {
+    "name": "贾蓉",
+    "first_chapter": 2,
+    "role": "◆ 贾珍之子，十六岁",
+    "paragraph": "§2 E02-11、§3 E02-11、§4.2、§6"
+  },
+  {
+    "name": "贾赦",
+    "first_chapter": 2,
+    "role": "◆ 荣府长子，袭官，中平",
+    "paragraph": "§2 E02-12、§3 E02-12、§4.2、§6"
+  },
+  {
+    "name": "贾迎春",
+    "first_chapter": 2,
+    "role": "◇ 贾赦姨娘所出",
+    "paragraph": "§2 E02-16、§3 E02-16、§4.2"
+  },
+  {
+    "name": "贾雨村（贾化）",
+    "first_chapter": 2,
+    "role": "★ 革职穷儒→林府西席，贯穿线索人物",
+    "paragraph": "§2全表、§3全表、§4.2、§6全表"
+  },
+  {
+    "name": "张如圭",
+    "first_chapter": 3,
+    "role": "◆ 雨村同僚，报喜信",
+    "paragraph": "§2 E03-01、§3 E03-01、§4.2"
+  },
+  {
+    "name": "李嬷嬷",
+    "first_chapter": 3,
+    "role": "◇ 宝玉乳母",
+    "paragraph": "§2 E03-13、§4.2"
+  },
+  {
+    "name": "李纨",
+    "first_chapter": 3,
+    "role": "◆ 珠大嫂子，捧杯布让",
+    "paragraph": "§2 E03-05,11、§3 E03-05、§4.2"
+  },
+  {
+    "name": "王夫人",
+    "first_chapter": 3,
+    "role": "◆ 二舅母",
+    "paragraph": "§2 E03-05,08,10~14、§3 E03-05,08,10、§4.2、§6"
+  },
+  {
+    "name": "王嬷嬷",
+    "first_chapter": 3,
+    "role": "◇ 黛玉乳娘",
+    "paragraph": "§2 E03-13、§4.2"
+  },
+  {
+    "name": "薛蟠",
+    "first_chapter": 3,
+    "role": "◇ 打死人命（提及）",
+    "paragraph": "§2 E03-15、§4.2"
+  },
+  {
+    "name": "袭人",
+    "first_chapter": 3,
+    "role": "◆ 宝玉大丫鬟，本名蕊珠",
+    "paragraph": "§2 E03-13~14、§4.2、§6"
+  },
+  {
+    "name": "贾母（史太君）",
+    "first_chapter": 3,
+    "role": "◆ 荣府最高权威",
+    "paragraph": "§2 E03-05~13、§3 E03-05、§4.2、§6"
+  },
+  {
+    "name": "邢夫人",
+    "first_chapter": 3,
+    "role": "◆ 大舅母",
+    "paragraph": "§2 E03-05,09、§3 E03-05,09、§4.2、§6"
+  },
+  {
+    "name": "雪雁",
+    "first_chapter": 3,
+    "role": "◇ 黛玉十岁小丫头",
+    "paragraph": "§2 E03-13、§4.2"
+  },
+  {
+    "name": "鹦哥",
+    "first_chapter": 3,
+    "role": "◇ 贾母给黛玉的丫头",
+    "paragraph": "§2 E03-13~14、§4.2"
+  },
+  {
+    "name": "冯渊",
+    "first_chapter": 4,
+    "role": "◆ 薄命郎，买英莲被薛蟠打死",
+    "paragraph": "§2 E04-05、§3 E04-05、§4.2、§6"
+  },
+  {
+    "name": "拐子",
+    "first_chapter": 4,
+    "role": "◇ 一女二卖",
+    "paragraph": "§2 E04-02,05、§4.2、§6"
+  },
+  {
+    "name": "李守中",
+    "first_chapter": 4,
+    "role": "◇ 国子祭酒",
+    "paragraph": "§2 E04-01、§4.2"
+  },
+  {
+    "name": "王子腾",
+    "first_chapter": 4,
+    "role": "◇ 京营节度使→九省统制",
+    "paragraph": "§2 E04-04,11、§4.2、§6"
+  },
+  {
+    "name": "薛姨妈",
+    "first_chapter": 4,
+    "role": "◆ 薛家主母，投荣府",
+    "paragraph": "§2 E04-08~12、§3 E04-12、§4.2、§6"
+  },
+  {
+    "name": "薛宝钗",
+    "first_chapter": 4,
+    "role": "★ 肌骨莹润，全书女二首次介绍",
+    "paragraph": "§2 E04-08~09、§3 E04-09、§4.2"
+  },
+  {
+    "name": "贾兰",
+    "first_chapter": 4,
+    "role": "◇ 五岁入学攻书",
+    "paragraph": "§2 E04-01、§4.2"
+  },
+  {
+    "name": "贾母",
+    "first_chapter": 4,
+    "role": "◇ 遣人请薛家留",
+    "paragraph": "§2 E04-12"
+  },
+  {
+    "name": "门子",
+    "first_chapter": 4,
+    "role": "◆ 葫芦庙沙弥，护官符+献计",
+    "paragraph": "§2 E04-03~07、§3 E04-03~04、§4.2、§6"
+  },
+  {
+    "name": "*预言人物（判词/仙曲中出现，△与实际出场人物重叠）*",
+    "first_chapter": 5,
+    "role": "—",
+    "paragraph": "—"
+  },
+  {
+    "name": "众仙子",
+    "first_chapter": 5,
+    "role": "◆ 痴梦仙姑、钟情大士、引愁金女、度恨菩提",
+    "paragraph": "§2 E05-15~16、§4.2、§6"
+  },
+  {
+    "name": "元春（判词）",
+    "first_chapter": 5,
+    "role": "◇(预言) 正册\"二十年来辨是非\"，恨无常",
+    "paragraph": "§4.2预言表"
+  },
+  {
+    "name": "可卿/兼美",
+    "first_chapter": 5,
+    "role": "◆ 梦中仙姬，兼宝钗黛玉之美",
+    "paragraph": "§2 E05-18~19、§4.2、§6"
+  },
+  {
+    "name": "妙玉（判词）",
+    "first_chapter": 5,
+    "role": "◇(预言) 正册\"欲洁何曾洁\"，世难容",
+    "paragraph": "§4.2预言表"
+  },
+  {
+    "name": "宁荣二公之灵",
+    "first_chapter": 5,
+    "role": "◆ 嘱托警幻规引宝玉",
+    "paragraph": "§2 E05-15、§4.2、§6"
+  },
+  {
+    "name": "尤氏",
+    "first_chapter": 5,
+    "role": "◆ 治酒请赏花",
+    "paragraph": "§2 E05-02、§4.2、§6"
+  },
+  {
+    "name": "巧姐（判词）",
+    "first_chapter": 5,
+    "role": "◇(预言) 正册\"势败休云贵\"，留馀庆",
+    "paragraph": "§4.2预言表"
+  },
+  {
+    "name": "惜春（判词）",
+    "first_chapter": 5,
+    "role": "◇(预言) 正册\"勘破三春景不长\"，虚花悟",
+    "paragraph": "§4.2预言表"
+  },
+  {
+    "name": "探春（判词）",
+    "first_chapter": 5,
+    "role": "◇(预言) 正册\"才自清明志自高\"，分骨肉",
+    "paragraph": "§4.2预言表"
+  },
+  {
+    "name": "晴雯",
+    "first_chapter": 5,
+    "role": "◇ 陪侍卧房（又副册判词）",
+    "paragraph": "§2 E05-05,11、§4.2"
+  },
+  {
+    "name": "晴雯（判词）",
+    "first_chapter": 5,
+    "role": "◇(预言) 又副册\"霁月难逢\"",
+    "paragraph": "§4.2预言表"
+  },
+  {
+    "name": "李纨（判词）",
+    "first_chapter": 5,
+    "role": "◇(预言) 正册\"桃李春风结子完\"，晚韶华",
+    "paragraph": "§4.2预言表"
+  },
+  {
+    "name": "林黛玉（判词）△",
+    "first_chapter": 5,
+    "role": "◇(预言) 正册首页\"堪怜咏絮才\"，枉凝眉",
+    "paragraph": "§4.2预言表"
+  },
+  {
+    "name": "湘云（判词）",
+    "first_chapter": 5,
+    "role": "◇(预言) 正册\"富贵又何为\"，乐中悲",
+    "paragraph": "§4.2预言表"
+  },
+  {
+    "name": "王熙凤（判词）",
+    "first_chapter": 5,
+    "role": "◇(预言) 正册\"凡鸟偏从末世来\"，聪明累",
+    "paragraph": "§4.2预言表"
+  },
+  {
+    "name": "秋纹",
+    "first_chapter": 5,
+    "role": "◇ 陪侍卧房",
+    "paragraph": "§2 E05-05、§4.2"
+  },
+  {
+    "name": "秦可卿",
+    "first_chapter": 5,
+    "role": "★ 安置宝玉+梦中可卿+小名悬念",
+    "paragraph": "§2 E05-03~05,21、§4.2、§6"
+  },
+  {
+    "name": "秦可卿（判词）",
+    "first_chapter": 5,
+    "role": "◇(预言) 正册\"情天情海幻情深\"，好事终",
+    "paragraph": "§4.2预言表"
+  },
+  {
+    "name": "薛宝钗（判词）△",
+    "first_chapter": 5,
+    "role": "◇(预言) 正册首页\"可叹停机德\"，终身误",
+    "paragraph": "§4.2预言表"
+  },
+  {
+    "name": "袭人（判词）△",
+    "first_chapter": 5,
+    "role": "◇(预言) 又副册\"枉自温柔和顺\"",
+    "paragraph": "§4.2预言表"
+  },
+  {
+    "name": "警幻仙姑",
+    "first_chapter": 5,
+    "role": "★ 太虚幻境引导者，授意淫",
+    "paragraph": "§2 E05-07~19、§3全表、§4.2、§6"
+  },
+  {
+    "name": "迎春（判词）",
+    "first_chapter": 5,
+    "role": "◇(预言) 正册\"子系中山狼\"，喜冤家",
+    "paragraph": "§4.2预言表"
+  },
+  {
+    "name": "香菱（判词）",
+    "first_chapter": 5,
+    "role": "◇(预言) 副册\"根并荷花一茎香\"",
+    "paragraph": "§4.2预言表"
+  },
+  {
+    "name": "麝月",
+    "first_chapter": 5,
+    "role": "◇ 陪侍卧房",
+    "paragraph": "§2 E05-05、§4.2"
+  },
+  {
+    "name": "刘姥姥",
+    "first_chapter": 6,
+    "role": "★ 乡下来的穷亲戚，一进荣国府主角",
+    "paragraph": "§2全表、§3全表、§4.2、§6"
+  },
+  {
+    "name": "刘氏",
+    "first_chapter": 6,
+    "role": "◇ 狗儿之妻，刘姥姥之女",
+    "paragraph": "§2 E06-05~06、§4.2"
+  },
+  {
+    "name": "周瑞家的",
+    "first_chapter": 6,
+    "role": "◆ 王夫人陪房，引荐人",
+    "paragraph": "§2 E06-08~18、§3 E06-08~17、§4.2、§6"
+  },
+  {
+    "name": "平儿",
+    "first_chapter": 6,
+    "role": "◆ 凤姐心腹通房大丫头",
+    "paragraph": "§2 E06-12~17、§3 E06-12~17、§4.2、§6"
+  },
+  {
+    "name": "板儿",
+    "first_chapter": 6,
+    "role": "◇ 狗儿之子，刘姥姥外孙",
+    "paragraph": "§2 E06-07~18、§4.2"
+  },
+  {
+    "name": "狗儿",
+    "first_chapter": 6,
+    "role": "◆ 刘姥姥女婿，家业萧条",
+    "paragraph": "§2 E06-05~07、§3 E06-05~06、§4.2"
+  },
+  {
+    "name": "王成",
+    "first_chapter": 6,
+    "role": "◇ 狗儿之父，已故",
+    "paragraph": "§2 E06-05、§4.2"
+  },
+  {
+    "name": "青儿",
+    "first_chapter": 6,
+    "role": "◇ 狗儿之女，板儿之妹",
+    "paragraph": "§2 E06-05、§4.2"
+  },
+  {
+    "name": "丰儿",
+    "first_chapter": 7,
+    "role": "◇ 凤姐小丫头",
+    "paragraph": "§2 E07-06、§4.2"
+  },
+  {
+    "name": "余信",
+    "first_chapter": 7,
+    "role": "◇ 管各庙月例银子（间接）",
+    "paragraph": "§2 E07-05、§4.2"
+  },
+  {
+    "name": "侍书",
+    "first_chapter": 7,
+    "role": "◇ 探春丫鬟",
+    "paragraph": "§2 E07-04、§4.2"
+  },
+  {
+    "name": "司棋",
+    "first_chapter": 7,
+    "role": "◇ 迎春丫鬟",
+    "paragraph": "§2 E07-04、§4.2"
+  },
+  {
+    "name": "周瑞女",
+    "first_chapter": 7,
+    "role": "◇ 周瑞之女",
+    "paragraph": "§2 E07-07、§4.2"
+  },
+  {
+    "name": "大姐儿",
+    "first_chapter": 7,
+    "role": "◇ 凤姐之女",
+    "paragraph": "§2 E07-06、§4.2"
+  },
+  {
+    "name": "彩明",
+    "first_chapter": 7,
+    "role": "◇ 凤姐丫鬟",
+    "paragraph": "§2 E07-06、§4.2"
+  },
+  {
+    "name": "惜春",
+    "first_chapter": 7,
+    "role": "◆ 出家伏笔",
+    "paragraph": "§2 E07-05、§4.2、§6"
+  },
+  {
+    "name": "探春",
+    "first_chapter": 7,
+    "role": "◆ 三姑娘初现",
+    "paragraph": "§2 E07-04、§4.2"
+  },
+  {
+    "name": "智能儿",
+    "first_chapter": 7,
+    "role": "◇ 水月庵小姑子",
+    "paragraph": "§2 E07-05、§4.2、§6"
+  },
+  {
+    "name": "焦大",
+    "first_chapter": 7,
+    "role": "◆ 宁府老仆，醉骂揭丑闻",
+    "paragraph": "§2 E07-16~18、§3 E07-17、§4.2、§6"
+  },
+  {
+    "name": "秦钟",
+    "first_chapter": 7,
+    "role": "★ 初登场，宝玉知己",
+    "paragraph": "§2 E07-13~17、§3 E07-13~15、§4.2、§6"
+  },
+  {
+    "name": "茜雪",
+    "first_chapter": 7,
+    "role": "◇ 宝玉丫鬟",
+    "paragraph": "§2 E07-09、§4.2"
+  },
+  {
+    "name": "莺儿",
+    "first_chapter": 7,
+    "role": "◇ 宝钗丫鬟",
+    "paragraph": "§2 E07-01、§4.2"
+  },
+  {
+    "name": "迎春",
+    "first_chapter": 7,
+    "role": "◆ 二木头初现",
+    "paragraph": "§2 E07-04、§4.2"
+  },
+  {
+    "name": "金钏儿",
+    "first_chapter": 7,
+    "role": "◇ 王夫人丫鬟",
+    "paragraph": "§2 E07-01,03、§4.2"
+  },
+  {
+    "name": "香菱",
+    "first_chapter": 7,
+    "role": "◆ 身世伏笔",
+    "paragraph": "§2 E07-02~03、§3 E07-02~03、§4.2、§6"
+  },
+  {
+    "name": "单聘仁",
+    "first_chapter": 8,
+    "role": "◆ 清客相公，谄媚",
+    "paragraph": "§2 E08-02、§4.2"
+  },
+  {
+    "name": "吴新登",
+    "first_chapter": 8,
+    "role": "◇ 管库房总领",
+    "paragraph": "§2 E08-02、§4.2"
+  },
+  {
+    "name": "戴良",
+    "first_chapter": 8,
+    "role": "◇ 仓上头目",
+    "paragraph": "§2 E08-02、§4.2"
+  },
+  {
+    "name": "秦邦业",
+    "first_chapter": 8,
+    "role": "◆ 秦钟之父，营缮司郎中",
+    "paragraph": "§2 E08-15、§4.2"
+  },
+  {
+    "name": "紫鹃",
+    "first_chapter": 8,
+    "role": "◇ 黛玉大丫鬟（鹦哥改名）",
+    "paragraph": "§2 E08-09、§4.2"
+  },
+  {
+    "name": "詹光",
+    "first_chapter": 8,
+    "role": "◆ 清客相公，谄媚",
+    "paragraph": "§2 E08-02、§4.2"
+  },
+  {
+    "name": "贾代儒",
+    "first_chapter": 8,
+    "role": "◇ 家塾老儒",
+    "paragraph": "§2 E08-15、§4.2"
+  },
+  {
+    "name": "钱华",
+    "first_chapter": 8,
+    "role": "◇ 买办，讨斗方儿",
+    "paragraph": "§2 E08-02、§4.2"
+  },
+  {
+    "name": "墨雨",
+    "first_chapter": 9,
+    "role": "◇ 宝玉小厮",
+    "paragraph": "§2 E09-12、§4.2"
+  },
+  {
+    "name": "扫红",
+    "first_chapter": 9,
+    "role": "◇ 宝玉小厮",
+    "paragraph": "§2 E09-12、§4.2"
+  },
+  {
+    "name": "李贵",
+    "first_chapter": 9,
+    "role": "◆ 上下枢纽人物",
+    "paragraph": "§2 E09-02~03,13~15、§4.2"
+  },
+  {
+    "name": "玉爱",
+    "first_chapter": 9,
+    "role": "◆ 闹学参与者",
+    "paragraph": "§2 E09-07,11、§4.2"
+  },
+  {
+    "name": "璜大奶奶",
+    "first_chapter": 9,
+    "role": "◇ 金荣姑妈（间接）",
+    "paragraph": "§2 E09-15、§4.2"
+  },
+  {
+    "name": "茗烟",
+    "first_chapter": 9,
+    "role": "★ 闹学堂主角，宝玉书童",
+    "paragraph": "§2 E09-10~14、§3 E09-11~12、§4.2、§6"
+  },
+  {
+    "name": "贾瑞",
+    "first_chapter": 9,
+    "role": "◆ 义学管理者（不公）",
+    "paragraph": "§2 E09-08~16、§4.2、§6"
+  },
+  {
+    "name": "贾菌",
+    "first_chapter": 9,
+    "role": "◆ 闹学激烈化人物",
+    "paragraph": "§2 E09-12~13、§4.2"
+  },
+  {
+    "name": "贾蓝",
+    "first_chapter": 9,
+    "role": "◆ 旁观者/劝架者",
+    "paragraph": "§2 E09-12~13、§4.2"
+  },
+  {
+    "name": "贾蔷",
+    "first_chapter": 9,
+    "role": "★ 闹学幕后推手",
+    "paragraph": "§2 E09-10~11、§3 E09-10~11、§4.2、§6"
+  },
+  {
+    "name": "金荣",
+    "first_chapter": 9,
+    "role": "★ 闹学冲突核心",
+    "paragraph": "§2 E09-08~16、§3 E09-08,11~13、§4.2、§6"
+  },
+  {
+    "name": "锄药",
+    "first_chapter": 9,
+    "role": "◇ 宝玉小厮",
+    "paragraph": "§2 E09-12、§4.2"
+  },
+  {
+    "name": "香怜",
+    "first_chapter": 9,
+    "role": "◆ 闹学导火索",
+    "paragraph": "§2 E09-07~10、§4.2"
+  },
+  {
+    "name": "冯紫英",
+    "first_chapter": 10,
+    "role": "◆ 荐医（间接）",
+    "paragraph": "§2 E10-07、§4.2"
+  },
+  {
+    "name": "婆子们",
+    "first_chapter": 10,
+    "role": "◇ 秦氏仆人",
+    "paragraph": "§2 E10-09~11、§4.2"
+  },
+  {
+    "name": "张友士",
+    "first_chapter": 10,
+    "role": "★ 张太医，论病源",
+    "paragraph": "§2 E10-07,10~15、§3 E10-10~14、§4.2、§6"
+  },
+  {
+    "name": "胡氏",
+    "first_chapter": 10,
+    "role": "◆ 金荣母，劝忍气",
+    "paragraph": "§2 E10-02~03、§4.2"
+  },
+  {
+    "name": "赖升",
+    "first_chapter": 10,
+    "role": "◇ 宁府管家",
+    "paragraph": "§2 E10-09、§4.2"
+  },
+  {
+    "name": "南安郡王等四王",
+    "first_chapter": 11,
+    "role": "◇（间接）",
+    "paragraph": "§2 E11-08、§4.2"
+  },
+  {
+    "name": "尤老娘",
+    "first_chapter": 11,
+    "role": "◇ 尤氏母亲",
+    "paragraph": "§2 E11-03,05,16-17、§4.2"
+  },
+  {
+    "name": "代儒夫妇",
+    "first_chapter": 12,
+    "role": "◇ 死者家属",
+    "paragraph": "§2 E12-14-15、§4.2"
+  },
+  {
+    "name": "史湘云",
+    "first_chapter": 13,
+    "role": "◇ 十二钗之一",
+    "paragraph": "§2 E13-14、§4.2"
+  },
+  {
+    "name": "宝珠",
+    "first_chapter": 13,
+    "role": "◆ 义女",
+    "paragraph": "§2 E13-12、§4.2"
+  },
+  {
+    "name": "戴权",
+    "first_chapter": 13,
+    "role": "◆ 捐官中间人",
+    "paragraph": "§2 E13-13、§4.2"
+  },
+  {
+    "name": "瑞珠",
+    "first_chapter": 13,
+    "role": "★ 触柱殉主",
+    "paragraph": "§2 E13-11、§4.2、§6"
+  },
+  {
+    "name": "六公+四王+诸王孙",
+    "first_chapter": 14,
+    "role": "◇ 送殡人群",
+    "paragraph": "§2 E14-16-17、§4.2"
+  },
+  {
+    "name": "北静王世荣",
+    "first_chapter": 14,
+    "role": "★ 贤王代表",
+    "paragraph": "§2 E14-17-19、§4.2、§6"
+  },
+  {
+    "name": "昭儿",
+    "first_chapter": 14,
+    "role": "◆ 传信人",
+    "paragraph": "§2 E14-10-12、§4.2"
+  },
+  {
+    "name": "王仁",
+    "first_chapter": 14,
+    "role": "◇ 凤姐胞兄（间接）",
+    "paragraph": "§2 E14-13、§4.2"
+  },
+  {
+    "name": "色空",
+    "first_chapter": 14,
+    "role": "◆ 铁槛寺住持",
+    "paragraph": "§2 E14-12、§4.2"
+  },
+  {
+    "name": "赖升/赖升媳妇",
+    "first_chapter": 14,
+    "role": "◆ 宁府总管",
+    "paragraph": "§2 E14-01-04、§4.2"
+  },
+  {
+    "name": "二丫头",
+    "first_chapter": 15,
+    "role": "◆ 村姑",
+    "paragraph": "§2 E15-03、§4.2"
+  },
+  {
+    "name": "云光节度使",
+    "first_chapter": 15,
+    "role": "◇（间接）",
+    "paragraph": "§2 E15-12、§4.2"
+  },
+  {
+    "name": "张金哥",
+    "first_chapter": 15,
+    "role": "◇（间接）",
+    "paragraph": "§2 E15-07、§4.2"
+  },
+  {
+    "name": "智善",
+    "first_chapter": 15,
+    "role": "◇ 智能儿师姐",
+    "paragraph": "§2 E15-05,08、§4.2"
+  },
+  {
+    "name": "来旺儿",
+    "first_chapter": 15,
+    "role": "◆ 弄权执行者",
+    "paragraph": "§2 E15-12、§4.2"
+  },
+  {
+    "name": "邢夫人/王夫人",
+    "first_chapter": 15,
+    "role": "◆ 荣府太太",
+    "paragraph": "§2 E15-03-04,06、§4.2"
+  },
+  {
+    "name": "静虚",
+    "first_chapter": 15,
+    "role": "◆ 弄权牵线人",
+    "paragraph": "§2 E15-05,07-08,13-14、§4.2"
+  },
+  {
+    "name": "夏秉忠",
+    "first_chapter": 16,
+    "role": "◆ 六宫都太监",
+    "paragraph": "§2 E16-03、§4.2"
+  },
+  {
+    "name": "守备之子",
+    "first_chapter": 16,
+    "role": "◆ 投河（间接）",
+    "paragraph": "§2 E16-02、§4.2"
+  },
+  {
+    "name": "山子野",
+    "first_chapter": 16,
+    "role": "◇ 园林设计师",
+    "paragraph": "§2 E16-15、§4.2"
+  },
+  {
+    "name": "赵嬷嬷",
+    "first_chapter": 16,
+    "role": "◆ 贾琏乳母",
+    "paragraph": "§2 E16-10,12-14,16、§4.2"
+  },
+  {
+    "name": "都判/鬼判",
+    "first_chapter": 16,
+    "role": "◇ 玄幻角色",
+    "paragraph": "§2 E16-17、§4.2"
+  },
+  {
+    "name": "众清客",
+    "first_chapter": 17,
+    "role": "★ 烘托群体",
+    "paragraph": "§2 E17-02,05-07,09-14、§4.2、§6"
+  },
+  {
+    "name": "妙玉",
+    "first_chapter": 17,
+    "role": "★ 十二钗正册（间接）",
+    "paragraph": "§2 E17-18、§4.2、§6"
+  },
+  {
+    "name": "小厮们",
+    "first_chapter": 17,
+    "role": "◇ 群体",
+    "paragraph": "§2 E17-15、§4.2"
+  },
+  {
+    "name": "林之孝家的",
+    "first_chapter": 17,
+    "role": "◆ 管家娘子",
+    "paragraph": "§2 E17-18、§4.2"
+  },
+  {
+    "name": "众太监",
+    "first_chapter": 18,
+    "role": "◇ 群体",
+    "paragraph": "§2 E18-02-06等、§4.2"
+  },
+  {
+    "name": "抱琴",
+    "first_chapter": 18,
+    "role": "◇ 元妃丫鬟",
+    "paragraph": "§2 E18-08、§4.2"
+  },
+  {
+    "name": "龄官",
+    "first_chapter": 18,
+    "role": "◆ 戏子代表",
+    "paragraph": "§2 E18-16、§4.2"
+  },
+  {
+    "name": "万儿",
+    "first_chapter": 19,
+    "role": "◇ 次要角色（宁府丫鬟）",
+    "paragraph": "§2-E19-04, §3, §4.2, §6"
+  },
+  {
+    "name": "花母",
+    "first_chapter": 19,
+    "role": "◇ 次要角色（袭人之母）",
+    "paragraph": "§2-E19-05, §3, §4.2, §6"
+  },
+  {
+    "name": "花自芳",
+    "first_chapter": 19,
+    "role": "◇ 次要角色（袭人之兄）",
+    "paragraph": "§2-E19-05, §3, §4.2, §6"
+  },
+  {
+    "name": "花袭人",
+    "first_chapter": 19,
+    "role": "★ 主角（宝玉贴身大丫鬟）",
+    "paragraph": "§2-E19-02/05/07/08/09/10, §3, §4.2, §5, §6"
+  },
+  {
+    "name": "贾妃",
+    "first_chapter": 19,
+    "role": "◇ 次要角色（元春）",
+    "paragraph": "§2-E19-01, §3"
+  }
+]

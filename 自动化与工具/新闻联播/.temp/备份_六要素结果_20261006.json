@@ -1,0 +1,204 @@
+{
+  "date": "20261006",
+  "date_display": "2026年10月06日",
+  "news_items": [
+    {
+      "idx": "1",
+      "category": "经济要闻",
+      "elements": {
+        "location": "全国",
+        "subject": "中共中央总书记、国家主席、中央军委主席习近平",
+        "event": "强调树立大食物观，构建多元化食物供给体系",
+        "cause": "更好满足人民美好生活需要",
+        "method": "专题报道"
+      }
+    },
+    {
+      "idx": "2",
+      "category": "社会/文化要闻",
+      "elements": {
+        "location": "全国",
+        "subject": "全国文旅市场",
+        "event": "各地开展多彩文旅活动欢度国庆假期",
+        "cause": "礼赞幸福生活、丰富假期体验",
+        "method": "组织文旅活动"
+      }
+    },
+    {
+      "idx": "3",
+      "category": "社会/文化要闻",
+      "elements": {
+        "location": "全国",
+        "subject": "交通运输部",
+        "event": "全社会跨区域人员流动量超3亿人次，迎来返程高峰",
+        "cause": "保障假期旅客顺畅返程",
+        "method": "增加运力投放、优化站车服务"
+      }
+    },
+    {
+      "idx": "4",
+      "category": "经济要闻",
+      "elements": {
+        "location": "全国",
+        "subject": "民间投资",
+        "event": "激活民间投资 打开\"六张网\"建设新空间",
+        "cause": "为民营企业打开发展新空间",
+        "method": "公开推介投资项目、一线调研"
+      }
+    },
+    {
+      "idx": "5",
+      "category": "经济要闻",
+      "elements": {
+        "location": "全国",
+        "subject": "工业和信息化部",
+        "event": "七部门印发《新型电池产业发展\"十五五\"规划》",
+        "cause": "服务全球经济绿色低碳发展",
+        "method": "印发规划文件"
+      }
+    },
+    {
+      "idx": "6",
+      "category": "经济要闻",
+      "elements": {
+        "location": "全国",
+        "subject": "国务院新闻办",
+        "event": "举行2026年\"外媒看中国\"系列主题采访活动",
+        "cause": "展示高质量发展生动实践",
+        "method": "组织多国记者采访"
+      }
+    },
+    {
+      "idx": "7",
+      "category": "社会/文化要闻",
+      "elements": {
+        "location": "天津",
+        "subject": "南开大学图书馆",
+        "event": "\"知中国、服务中国\"专题报道，展现学人报国精神",
+        "cause": "传承报国初心、助力科技自立自强",
+        "method": "专题报道"
+      }
+    },
+    {
+      "idx": "9",
+      "category": "国际新闻",
+      "elements": {
+        "location": "瑞士日内瓦",
+        "subject": "联合国人权理事会",
+        "event": "协商一致通过中国代表47国提出的\"人人享有无障碍\"决议",
+        "cause": "推动无障碍与适老化建设",
+        "method": "提出决议并推动表决通过"
+      }
+    },
+    {
+      "idx": "10",
+      "category": "国际新闻",
+      "elements": {
+        "location": "也门",
+        "subject": "也门冲突双方",
+        "event": "也门政府军多地推进 胡塞武装称仍控制攻下区域",
+        "cause": "—",
+        "method": "公开表态"
+      }
+    },
+    {
+      "idx": "11",
+      "category": "国际新闻",
+      "elements": {
+        "location": "俄罗斯、日本",
+        "subject": "俄罗斯外交部发言人扎哈罗娃",
+        "event": "俄称必对日本反俄措施进行对等反制",
+        "cause": "日本以乌克兰局势为由对俄实施非法制裁",
+        "method": "外交部发言人公开表态"
+      }
+    },
+    {
+      "idx": "13",
+      "category": "其他",
+      "elements": {
+        "location": "全国",
+        "subject": "神州锦绣",
+        "event": "展现金秋丰收景象",
+        "cause": "—",
+        "method": "画面播报"
+      }
+    },
+    {
+      "idx": "8-1",
+      "category": "社会/文化要闻",
+      "elements": {
+        "location": "全国",
+        "subject": "国务院安委会办公室",
+        "event": "调度国庆假期安全防范工作",
+        "cause": "强化假期安全防范",
+        "method": "调度部署"
+      }
+    },
+    {
+      "idx": "8-2",
+      "category": "经济要闻",
+      "elements": {
+        "location": "全国",
+        "subject": "西部陆海新通道",
+        "event": "铁海联运运输量突破100万标箱",
+        "cause": "为西南地区对外贸易增长提供支撑",
+        "method": "公布数据"
+      }
+    },
+    {
+      "idx": "8-3",
+      "category": "经济要闻",
+      "elements": {
+        "location": "全国",
+        "subject": "拱北海关",
+        "event": "\"港车北上\"\"澳车北上\"车辆超8万辆次",
+        "cause": "—",
+        "method": "公布统计数据"
+      }
+    },
+    {
+      "idx": "8-4",
+      "category": "经济要闻",
+      "elements": {
+        "location": "全国",
+        "subject": "国庆档电影市场",
+        "event": "国庆档票房突破10亿元",
+        "cause": "助力文旅消费",
+        "method": "统计发布"
+      }
+    },
+    {
+      "idx": "12-1",
+      "category": "国际新闻",
+      "elements": {
+        "location": "巴勒斯坦加沙地带",
+        "subject": "联合国秘书长古特雷斯",
+        "event": "呼吁各方落实停火承诺、实现持久和平",
+        "cause": "推动下一阶段停火落地",
+        "method": "公开呼吁"
+      }
+    },
+    {
+      "idx": "12-2",
+      "category": "国际新闻",
+      "elements": {
+        "location": "法国",
+        "subject": "欧元汇率",
+        "event": "欧元对美元汇率大幅走低",
+        "cause": "法国财政状况和政治不确定性引发市场担忧",
+        "method": "—"
+      }
+    },
+    {
+      "idx": "12-3",
+      "category": "国际新闻",
+      "elements": {
+        "location": "英国",
+        "subject": "英国航空公司",
+        "event": "客机数分钟急坠超8000米后紧急返航",
+        "cause": "飞行中突发技术问题",
+        "method": "紧急返航处置"
+      }
+    }
+  ]
+}
