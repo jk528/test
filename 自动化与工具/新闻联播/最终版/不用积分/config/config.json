@@ -1,0 +1,28 @@
+{
+  "version": "1.0.0",
+  "description": "新闻联播日报定时自动化配置（不用积分/零成本纯脚本方案）",
+  "python_exe": "C:\\Users\\Administrator\\python-sdk\\python3.13.2\\python.exe",
+  "script_dir": "C:\\Users\\Administrator\\Desktop\\JK-temp\\自动化与工具\\新闻联播\\最终版\\代码",
+  "entry_script": "xwlb_report.py",
+  "auto_complete_script": "auto_complete.py",
+  "archive_root": "C:\\Users\\Administrator\\Desktop\\JK-temp\\自动化与工具\\新闻联播\\归档",
+  "schedule": {
+    "task_name": "XWLB_DailyReport",
+    "trigger_time": "11:10",
+    "missed_run": true,
+    "description": "每日11:10自动生成昨日新闻联播总结报告，首次不全则等待30分钟后补全重跑",
+    "complete_wait_seconds": 1800,
+    "complete_max_retry": 2
+  },
+  "ai_credentials": {
+    "enabled": false,
+    "api_url": "",
+    "api_key": "",
+    "note": "AI凭据仅用于ai_api模式增强六要素；不用积分方案默认关闭。凭据不得写入报告与日志。"
+  },
+  "log": {
+    "encoding": "utf-8",
+    "level": "INFO",
+    "env_var": "PYTHONIOENCODING=utf-8"
+  }
+}

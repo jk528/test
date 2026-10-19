@@ -1,0 +1,36 @@
+# OfficeAce 自动生成的工作区文件夹与身份引导文件
+.office-claw/
+AGENT.md
+IDENTITY.md
+SOUL.md
+USER.md
+HEARTBEAT.md
+BACKLOG.md
+
+# OfficeAce 工作区内部产物
+agents/
+context/
+messages/
+memory/
+skills/
+todo/
+coding_memory/
+prompt_attachment/
+docs/
+.agent_history/
+
+# OfficeAce 工作区标记文件
+.workspace
+
+# 数据库文件
+*.db
+
+# 临时文件
+.temp/
+__pycache__/
+*.pyc
+
+# 系统文件
+Thumbs.db
+Desktop.ini
+.DS_Store
