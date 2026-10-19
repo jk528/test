@@ -80,3 +80,26 @@ Git-2.56.0.2-64-bit.exe
 *.ecdl
 
 sync_gitee.log
+
+# JiuwenSwarm runtime file operation logs
+.agent_history/
+
+# --- OfficeAce / 小通 智能体工作区产物：不随 Gitee 同步（2026-10-19） ---
+# 这些为 OfficeAce 自动生成的工作区文件夹与身份/引导文件，属本机运行状态，无需入版本库。
+# 本地文件完整保留，仅从 Git 索引排除，不影响仓库内其它用户文档。
+/MD文件综合/.office-claw/
+/MD文件综合/agents/
+/MD文件综合/coding_memory/
+/MD文件综合/context/
+/MD文件综合/docs/
+/MD文件综合/memory/
+/MD文件综合/messages/
+/MD文件综合/prompt_attachment/
+/MD文件综合/skills/
+/MD文件综合/todo/
+/MD文件综合/AGENT.md
+/MD文件综合/SOUL.md
+/MD文件综合/IDENTITY.md
+/MD文件综合/USER.md
+/MD文件综合/HEARTBEAT.md
+/MD文件综合/BACKLOG.md

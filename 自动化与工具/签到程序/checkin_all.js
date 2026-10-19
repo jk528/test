@@ -254,6 +254,7 @@ async function checkinTrae(platformName, dirCandidates) {
     const extraNote = status.extra_credits ? `（含额外 ${status.extra_credits}）` : '';
     if (status.checked_in) {
       log(`今日已签到。积分：${status.credits}${extraNote}`);
+      await checkinTraeLottery(headers);
       return true;
     }
     if (!status.enable) { log('签到功能未启用'); return true; }
@@ -267,6 +268,7 @@ async function checkinTrae(platformName, dirCandidates) {
         if (typeof refresh.credits === 'number') credits = refresh.credits;
       } catch {}
       log(`签到成功！积分：${credits}${extraNote}`);
+      await checkinTraeLottery(headers);
       return true;
     } else {
       log(`签到失败：${claim.message || JSON.stringify(claim)}`);
@@ -274,6 +276,38 @@ async function checkinTrae(platformName, dirCandidates) {
     }
   } catch (e) {
     log(`错误：${e.message}`); return false;
+  }
+}
+
+// ---- Trae 1024 签到抽奖（checkin_1024 活动，2026-10-19 00:00 起至 1024 程序员节活动结束，每日签到后可抽奖一次）----
+// 接口：POST /trae/api/v2/ug/activity/action  body={activity_id:"checkin_1024", req_source:2}
+// 判定：响应 data.work_extra.granted===true 表示抽奖成功（prize_type 2=抵扣券 coupon_face_amount_fen 单位分）
+//       code 9102=未签到 / 9090=活动不可用或已结束 / 4001=参数错误 / 1002=鉴权失败
+// 抽奖失败只记日志，不影响签到退出码（签到为主，抽奖为辅）
+async function checkinTraeLottery(headers) {
+  const url = 'https://api.trae.cn/trae/api/v2/ug/activity/action';
+  const body = JSON.stringify({ activity_id: 'checkin_1024', req_source: 2 });
+  try {
+    const res = await fetch(url, { method: 'POST', headers, body });
+    const json = await res.json();
+    const we = (json && typeof json === 'object') ? (json.data?.work_extra || json.work_extra) : undefined;
+    if (we && we.granted === true) {
+      const prizeText = typeof we.prize_text === 'string' && we.prize_text ? we.prize_text : '';
+      const yuan = Number.isSafeInteger(we.coupon_face_amount_fen)
+        ? `${(we.coupon_face_amount_fen / 100).toFixed(0)} 元抵扣券` : '';
+      log(`1024 抽奖成功！奖品：${[prizeText, yuan].filter(Boolean).join(' · ')}`);
+      return true;
+    }
+    const code = (json && typeof json === 'object') ? json.code : undefined;
+    if (code === 9102) { log('1024 抽奖：今日未签到，跳过（签到成功后再抽）'); return true; }
+    if (code === 9090) { log('1024 抽奖：活动不可用（今日已抽过 / 活动未开始或已结束）'); return true; }
+    if (code === 1002) { log('1024 抽奖：鉴权失败'); return false; }
+    if (code === 4001) { log('1024 抽奖：参数错误'); return false; }
+    log(`1024 抽奖：今日已抽过或未中奖（code=${code ?? '无'}，响应=${JSON.stringify(json).slice(0, 160)}）`);
+    return true;
+  } catch (e) {
+    log(`1024 抽奖请求异常：${e.message}`);
+    return false;
   }
 }
 
