@@ -1,0 +1,39 @@
+
+[
+  {
+    "id": "fix-doc",
+    "content": "修正聚合逻辑全链分析文档中的3处重大偏差+4处次要偏差",
+    "activeForm": "修正文档偏差",
+    "description": "修正rex2计数方式、READ_最新字频2.bas归类、排序方向、章节编号、表头偏移、文件选择、dataOffset说明",
+    "status": "completed",
+    "depends_on": [],
+    "result_summary": null,
+    "meta_data": null,
+    "selected_model_id": null,
+    "generation_token": null
+  },
+  {
+    "id": "add-deps",
+    "content": "补充完整依赖关系图和隐藏依赖说明",
+    "activeForm": "补充依赖关系图",
+    "description": "添加正确依赖关系图、依赖汇总表、隐藏依赖说明",
+    "status": "completed",
+    "depends_on": [],
+    "result_summary": null,
+    "meta_data": null,
+    "selected_model_id": null,
+    "generation_token": null
+  },
+  {
+    "id": "add-design",
+    "content": "给出优化设计方案",
+    "activeForm": "编写优化设计方案",
+    "description": "基于偏差和依赖分析，给出架构级优化设计方案",
+    "status": "completed",
+    "depends_on": [],
+    "result_summary": null,
+    "meta_data": null,
+    "selected_model_id": null,
+    "generation_token": null
+  }
+]
