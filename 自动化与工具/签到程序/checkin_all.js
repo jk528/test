@@ -280,13 +280,14 @@ async function checkinTrae(platformName, dirCandidates) {
 }
 
 // ---- Trae 1024 签到抽奖（checkin_1024 活动，2026-10-19 00:00 起至 1024 程序员节活动结束，每日签到后可抽奖一次）----
-// 接口：POST /trae/api/v2/ug/activity/action  body={activity_id:"checkin_1024", req_source:2}
-// 判定：响应 data.work_extra.granted===true 表示抽奖成功（prize_type 2=抵扣券 coupon_face_amount_fen 单位分）
+// 接口：POST /trae/api/v2/ug/activity/action  body={activity_id:"checkin_1024", req_source:1}
+//       （2026-10-20 勘误：req_source 必须为 1，=2 时活动集不含 checkin_1024）
+// 判定：成功响应顶层直接返回 work_extra（无 code/data 包装），granted===true 即抽奖成功（prize_type 2=抵扣券 coupon_face_amount_fen 单位分）
 //       code 9102=未签到 / 9090=活动不可用或已结束 / 4001=参数错误 / 1002=鉴权失败
 // 抽奖失败只记日志，不影响签到退出码（签到为主，抽奖为辅）
 async function checkinTraeLottery(headers) {
   const url = 'https://api.trae.cn/trae/api/v2/ug/activity/action';
-  const body = JSON.stringify({ activity_id: 'checkin_1024', req_source: 2 });
+  const body = JSON.stringify({ activity_id: 'checkin_1024', req_source: 1 });
   try {
     const res = await fetch(url, { method: 'POST', headers, body });
     const json = await res.json();
