@@ -1,0 +1,39 @@
+
+[
+  {
+    "id": "analyze",
+    "content": "分析两个VBA文件逻辑思路",
+    "activeForm": "分析VBA代码逻辑",
+    "description": "深入理解PC_005分词缺失和PC_006分拆示意图的核心算法和存在的问题",
+    "status": "completed",
+    "depends_on": [],
+    "result_summary": null,
+    "meta_data": null,
+    "selected_model_id": null,
+    "generation_token": null
+  },
+  {
+    "id": "optimize",
+    "content": "生成优化后的VBA代码",
+    "activeForm": "编写优化VBA代码",
+    "description": "修复bug、提升性能、规范变量声明、补充缺失函数",
+    "status": "completed",
+    "depends_on": [],
+    "result_summary": null,
+    "meta_data": null,
+    "selected_model_id": null,
+    "generation_token": null
+  },
+  {
+    "id": "doc",
+    "content": "编写MD思路说明文档",
+    "activeForm": "编写思路说明文档",
+    "description": "用MD文件说明原始逻辑、优化思路和改进点",
+    "status": "completed",
+    "depends_on": [],
+    "result_summary": null,
+    "meta_data": null,
+    "selected_model_id": null,
+    "generation_token": null
+  }
+]
