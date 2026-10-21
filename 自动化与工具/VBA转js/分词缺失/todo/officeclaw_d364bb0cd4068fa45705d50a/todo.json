@@ -1,10 +1,10 @@
 
 [
   {
-    "id": "analyze",
-    "content": "分析两个VBA文件逻辑思路",
-    "activeForm": "分析VBA代码逻辑",
-    "description": "深入理解PC_005分词缺失和PC_006分拆示意图的核心算法和存在的问题",
+    "id": "search",
+    "content": "搜索权威数学定理列表源",
+    "activeForm": "搜索权威数学定理列表源",
+    "description": "从Wikipedia/MathWorld/SEP等权威源获取数学定理分类列表，用于交叉验证",
     "status": "completed",
     "depends_on": [],
     "result_summary": null,
@@ -13,10 +13,10 @@
     "generation_token": null
   },
   {
-    "id": "optimize",
-    "content": "生成优化后的VBA代码",
-    "activeForm": "编写优化VBA代码",
-    "description": "修复bug、提升性能、规范变量声明、补充缺失函数",
+    "id": "verify-l1-l3",
+    "content": "验证第1-3层定理完整性",
+    "activeForm": "验证初等+大学核心层",
+    "description": "检查初等数学、中等数学、大学核心层的定理是否有遗漏，附带源链接",
     "status": "completed",
     "depends_on": [],
     "result_summary": null,
@@ -25,10 +25,34 @@
     "generation_token": null
   },
   {
-    "id": "doc",
-    "content": "编写MD思路说明文档",
-    "activeForm": "编写思路说明文档",
-    "description": "用MD文件说明原始逻辑、优化思路和改进点",
+    "id": "verify-l4-l6",
+    "content": "验证第4-6层定理完整性",
+    "activeForm": "验证分析+代数+拓扑层",
+    "description": "检查进阶分析、抽象代数、拓扑几何层的定理是否有遗漏，附带源链接",
+    "status": "completed",
+    "depends_on": [],
+    "result_summary": null,
+    "meta_data": null,
+    "selected_model_id": null,
+    "generation_token": null
+  },
+  {
+    "id": "verify-l7-l8",
+    "content": "验证第7-8层定理完整性",
+    "activeForm": "验证数论+前沿层",
+    "description": "检查数论深水区和现代前沿层的定理是否有遗漏，附带源链接",
+    "status": "completed",
+    "depends_on": [],
+    "result_summary": null,
+    "meta_data": null,
+    "selected_model_id": null,
+    "generation_token": null
+  },
+  {
+    "id": "compile",
+    "content": "汇编验证报告并更新MD",
+    "activeForm": "汇编验证报告",
+    "description": "汇总各子代理结果，生成带源链接的完整性论证报告",
     "status": "completed",
     "depends_on": [],
     "result_summary": null,
