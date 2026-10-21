@@ -53,7 +53,7 @@
     "content": "汇编第三轮复验报告",
     "activeForm": "汇编复验报告",
     "description": "汇总四路排查结果，生成第三轮最终复验报告，补入新发现的遗漏",
-    "status": "in_progress",
+    "status": "completed",
     "depends_on": [],
     "result_summary": null,
     "meta_data": null,
