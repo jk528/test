@@ -31,12 +31,13 @@ set "SCRIPT_DIR=%~dp0"
 :: Scheduled task redirects output to checkin_all.log. Rotate when > 5 MB
 :: (keep one .old generation, same strategy as sync_gitee.ps1). Pure ASCII.
 set "LOG_FILE=%SCRIPT_DIR%checkin_all.log"
-if exist "%LOG_FILE%" (
-    for %%A in ("%LOG_FILE%") do set "LOG_SIZE=%%~zA"
-    if %LOG_SIZE% GTR 5242880 (
-        move /y "%LOG_FILE%" "%LOG_FILE%.old" >nul 2>&1
-        if exist "%LOG_FILE%.old.old" del /q "%LOG_FILE%.old.old" >nul 2>&1
-    )
+:: Read the size OUTSIDE any ( ) block: %LOG_SIZE% is expanded when the
+:: block is parsed, which would leave "if GTR 5242880 (" and abort cmd.
+set "LOG_SIZE=0"
+if exist "%LOG_FILE%" for %%A in ("%LOG_FILE%") do set "LOG_SIZE=%%~zA"
+if %LOG_SIZE% GTR 5242880 (
+    move /y "%LOG_FILE%" "%LOG_FILE%.old" >nul 2>&1
+    if exist "%LOG_FILE%.old.old" del /q "%LOG_FILE%.old.old" >nul 2>&1
 )
 :: ----------------------
 
