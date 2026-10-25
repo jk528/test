@@ -1588,6 +1588,7 @@ const PLATFORMS = [
   { name: 'Qoder',     group: 'daily', fn: checkinQoder },      // 每日 10:00 才重置，不能凌晨跑
   { name: '百度网盘',  group: 'daily', script: 'baidupan_checkin.js' },
   { name: '天翼云盘',  group: 'daily', script: 'tianyi_checkin.js' },
+  { name: '万兴脑图',  group: 'daily', script: 'edraw_checkin.js' },   // 凭证每次从浏览器现提（JWT 2小时有效），零配置
 ];
 
 // 子进程方式执行独立脚本：--no-delay 由主控统一延时，退出码判成败
