@@ -1,0 +1,7 @@
+{
+  "_cookie获取说明": "推荐留空：夸克浏览器登录 https://cloud.189.cn 网页版后，脚本会自动从浏览器 Cookie 库提取（VSS+DPAPI 链路）并回写本文件。也可手动填：浏览器 F12 复制 cloud.189.cn 请求的 Cookie 整段（至少含 COOKIE_LOGIN_USER / JSESSIONID）。有效期数月~一年，改密码即失效，失效后脚本自动重新提取。",
+  "cookie": "",
+  "_username_password说明": "可选兜底：仅在 Cookie 不可用且浏览器自动提取也失败时，走账号密码 RSA 登录。注意：开启设备锁的账号会被要求短信二次验证（result=-133），密码链路无法全自动，优先保证夸克浏览器登录态。",
+  "username": "",
+  "password": ""
+}

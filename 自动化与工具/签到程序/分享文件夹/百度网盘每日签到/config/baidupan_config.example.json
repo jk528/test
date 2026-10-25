@@ -1,0 +1,4 @@
+{
+  "_cookie获取说明": "浏览器登录 pan.baidu.com → F12 开发者工具 → 网络(Network) → 刷新页面点任意请求 → 请求头里的 Cookie 整段复制。至少需含 BDUSS / STOKEN / BAIDUID。有效期通常数月，改密码即失效，失效后重新复制粘贴即可。",
+  "cookie": ""
+}

@@ -1,0 +1,13 @@
+{
+  "_说明": "复制本文件为同目录 kuku_config.json 并填入真实值。kuku_config.json 已被 .gitignore 排除，真实凭证绝不入库",
+  "_bduss获取": "浏览器登录 kuku.baidu.com（或百度文库 wenku.baidu.com / 网盘 pan.baidu.com 任一百度系站点），F12 → Application/应用程序 → Cookies → 复制 BDUSS 值",
+  "_stoken_ptoken": "可选。同一 Cookie 页面的 STOKEN / PTOKEN；填了 ptoken 时脚本可自动换取 genflowpro 的 STOKEN",
+  "bduss": "",
+  "stoken": "",
+  "ptoken": "",
+  "uid": "",
+  "version": "",
+  "user_agent": "",
+  "delayMinSec": 30,
+  "delayMaxSec": 300
+}
