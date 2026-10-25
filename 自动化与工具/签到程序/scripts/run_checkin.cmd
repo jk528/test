@@ -31,9 +31,9 @@ set "SCRIPT_DIR=%~dp0"
 :: ---- log rotation ----
 :: Scheduled tasks redirect output to a per-group log. Rotate when > 5 MB
 :: (keep one .old generation, same strategy as sync_gitee.ps1). Pure ASCII.
-set "LOG_FILE=%SCRIPT_DIR%checkin_all.log"
-if "%~1"=="--group=ai" set "LOG_FILE=%SCRIPT_DIR%checkin_ai.log"
-if "%~1"=="--group=daily" set "LOG_FILE=%SCRIPT_DIR%checkin_daily.log"
+set "LOG_FILE=%SCRIPT_DIR%..\logs\checkin_all.log"
+if "%~1"=="--group=ai" set "LOG_FILE=%SCRIPT_DIR%..\logs\checkin_ai.log"
+if "%~1"=="--group=daily" set "LOG_FILE=%SCRIPT_DIR%..\logs\checkin_daily.log"
 :: Read the size OUTSIDE any ( ) block: %LOG_SIZE% is expanded when the
 :: block is parsed, which would leave "if GTR 5242880 (" and abort cmd.
 set "LOG_SIZE=0"

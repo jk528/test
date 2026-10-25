@@ -104,13 +104,8 @@ Git-2.56.0.2-64-bit.exe
 secrets.vault
 *.key
 
-# 库库AI 独立签到脚本凭证文件（含百度账号 BDUSS/STOKEN，严禁提交）（2026-10-25）
-/自动化与工具/签到程序/kuku_config.json
-
-# 三云盘签到凭证文件（含 Cookie / 账号密码，严禁提交）（2026-10-25）
-/自动化与工具/签到程序/baidupan_config.json
-/自动化与工具/签到程序/tianyi_config.json
-/自动化与工具/签到程序/quark_config.json
+# 签到凭证文件（含 BDUSS/STOKEN/Cookie，严禁提交）（2026-10-25，目录重构后统一在 config/）
+/自动化与工具/签到程序/config/
 
 # ----------------------------------------------------------------------
 # 五、系统 / 编辑器
@@ -156,3 +151,4 @@ Desktop.ini
 JK_del_list.txt
 
 sync_gitee.log
+/自动化与工具/签到程序/logs/

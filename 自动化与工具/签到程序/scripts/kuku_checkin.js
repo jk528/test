@@ -66,7 +66,7 @@ const UA_DEFAULT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
 // 配置加载（kuku_config.json + 环境变量覆盖）
 // ============================================================
 function loadConfig() {
-  const cfgPath = path.join(__dirname, 'kuku_config.json');
+  const cfgPath = path.join(__dirname, '..', 'config', 'kuku_config.json');
   let fileCfg = {};
   if (fs.existsSync(cfgPath)) {
     try {
