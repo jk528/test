@@ -6,12 +6,14 @@
 //   - codearts_checkin.js     CodeArts Agent 签到
 //   - qoder_checkin.js        Qoder 签到
 //   - officeace_checkin.js    果办 OfficeAce 签到
-// 共 6 个签到平台：Trae / TeleAgent / WorkBuddy / CodeArts / Qoder / OfficeAce
+// 共 9 个签到平台，分两组调度（2026-10-25 重构，详见「主流程」注释）：
+//   ai 组（凌晨 00:05）：Trae / TeleAgent / WorkBuddy / CodeArts / OfficeAce / 库库AI
+//   daily 组（白天 10:35）：Qoder（每日 10:00 才重置）/ 百度网盘 / 天翼云盘
 // （2026-10-16：TraeWork 与 TraeCN 客户端已合并为同一客户端/同一账号，两入口合并为单平台 Trae，
 //  数据目录保留新旧名候选：Trae CN 新名优先，TRAE SOLO CN 旧名兑底）
 // 各平台独立执行，互不阻塞，单平台失败不影响其他平台
 // 每个平台签到前随机等待 30~300 秒，打乱固定时间模式（--no-delay 可跳过全部延时）
-// 用法: node checkin_all.js [--no-delay]
+// 用法: node checkin_all.js [--group=ai|daily] [--no-delay]
 // 退出码: 0=全部成功/已签  1=至少一个失败
 // ============================================================
 'use strict';
@@ -20,7 +22,7 @@ const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
 const https = require('https');
-const { execFileSync, execSync } = require('child_process');
+const { execFileSync, execSync, spawnSync } = require('child_process');
 
 // ============================================================
 // 公共工具（内联自 common.js，供全文件共享）
@@ -1564,19 +1566,47 @@ async function checkinOfficeAce() {
 }
 
 // ============================================================
-// 主流程：依次执行 6 个平台签到（2026-10-16 起 TraeWork/TraeCN 合并为单平台 Trae）
+// 主流程（2026-10-25 重构：分组调度）
+// 分组：
+//   ai    凌晨组（每日 0 点刷新，计划任务 00:05 跑）
+//   daily 白天组（Qoder 每日 10:00 才重置；网盘类白天跑即可，10:35）
+// 平台两种形态：
+//   fn     内联函数（本文件内实现）
+//   script 独立脚本（子进程调用，进程隔离，单脚本崩溃不影响主流程）
+// 用法: node checkin_all.js [--group=ai|daily] [--no-delay]
+//   不带 --group 则跑全部平台（向后兼容）
 // ============================================================
+const PLATFORMS = [
+  // ---- AI 凌晨组 ----
+  { name: 'Trae',      group: 'ai',    fn: checkinTraeUnified },
+  { name: 'TeleAgent', group: 'ai',    fn: checkinTeleAgent },
+  { name: 'WorkBuddy', group: 'ai',    fn: checkinWorkBuddy },
+  { name: 'CodeArts',  group: 'ai',    fn: checkinCodeArts },
+  { name: 'OfficeAce', group: 'ai',    fn: checkinOfficeAce },
+  { name: '库库AI',    group: 'ai',    script: 'kuku_checkin.js' },
+  // ---- 白天组 ----
+  { name: 'Qoder',     group: 'daily', fn: checkinQoder },      // 每日 10:00 才重置，不能凌晨跑
+  { name: '百度网盘',  group: 'daily', script: 'baidupan_checkin.js' },
+  { name: '天翼云盘',  group: 'daily', script: 'tianyi_checkin.js' },
+];
+
+// 子进程方式执行独立脚本：--no-delay 由主控统一延时，退出码判成败
+function runScriptPlatform(script) {
+  const r = spawnSync(process.execPath, [path.join(__dirname, script), '--no-delay'], {
+    cwd: __dirname,
+    stdio: 'inherit',
+    timeout: 600000,
+  });
+  return r.status === 0;
+}
+
 async function main() {
   const noDelay = process.argv.includes('--no-delay');
-  log('====== 统一签到开始 ======');
-  const platforms = [
-    { name: 'Trae',      fn: checkinTraeUnified },
-    { name: 'TeleAgent', fn: checkinTeleAgent },
-    { name: 'WorkBuddy', fn: checkinWorkBuddy },
-    { name: 'CodeArts',  fn: checkinCodeArts },
-    { name: 'Qoder',     fn: checkinQoder },
-    { name: 'OfficeAce', fn: checkinOfficeAce },
-  ];
+  const groupArg = (process.argv.find(a => a.startsWith('--group=')) || '').split('=')[1] || '';
+  const platforms = PLATFORMS.filter(p => !groupArg || p.group === groupArg);
+  if (platforms.length === 0) { log(`错误：--group=${groupArg} 无匹配平台（可选 ai / daily）`); process.exitCode = 1; return; }
+
+  log(`====== 统一签到开始（分组：${groupArg || '全部'}，共 ${platforms.length} 平台）======`);
 
   const results = [];
   for (let i = 0; i < platforms.length; i++) {
@@ -1588,7 +1618,7 @@ async function main() {
       await sleep(delay);
     }
     try {
-      const ok = await p.fn();
+      const ok = p.script ? runScriptPlatform(p.script) : await p.fn();
       results.push({ name: p.name, ok });
     } catch (e) {
       log(`[${p.name}] 致命错误：${e.message}`);
