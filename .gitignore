@@ -28,7 +28,13 @@ messages/
 prompt_attachment/
 skills/
 todo/
-docs/
+# 2026-10-25 锚定根部：原任意层级 docs/ 误杀分享文件夹各模板的 docs/ 逆向文档
+/docs/
+# 锚定化后补点名：以下 docs/ 确认为 AI 智能体工作区（decisions/discussions/features 结构），保持忽略
+/6签到创建的本地文件/OfficeAce/docs/
+/MD文件综合/docs/
+/自动化与工具/VBA转js/分词缺失/docs/
+/阅读器项目/ColorTxt项目分析/VBComponents From (test1.xlsm) 260807171641/docs/
 
 # OfficeAce 身份与引导文件
 AGENT.md
