@@ -87,7 +87,7 @@ Get-Content .\logs\checkin.log -Tail 20
 ## 原理简介
 
 签到与刷新接口来自对万兴脑图 APK（DEX strings）与网页版主包的逆向分析，完整过程见
-[docs/万兴脑图签到逆向记录.md](docs/%E4%B8%87%E5%85%B4%E8%84%91%E5%9B%BE%E7%AD%BE%E5%88%B0%E9%80%86%E5%90%91%E8%AE%B0%E5%BD%95.md)。简要链路：
+[docs/万兴脑图签到逆向记录.md](docs/万兴脑图签到逆向记录.md)。简要链路：
 
 ```
 config/edraw_config.json 读 refresh_token
