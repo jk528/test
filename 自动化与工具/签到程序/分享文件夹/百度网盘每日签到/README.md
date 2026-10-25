@@ -86,7 +86,7 @@ Get-Content .\logs\checkin.log -Tail 20
 ## 原理简介
 
 签到、答题、成长值查询三个接口的调用方式移植自开源项目并对照网页端实测确认，
-完整过程见 [docs/百度网盘签到逆向过程.md](docs/百度网盘签到逆向过程.md)。简要链路：
+完整过程见 [docs/百度网盘签到逆向过程.md](docs/%E7%99%BE%E5%BA%A6%E7%BD%91%E7%9B%98%E7%AD%BE%E5%88%B0%E9%80%86%E5%90%91%E8%BF%87%E7%A8%8B.md)。简要链路：
 
 ```
 config/baidupan_config.json 读 Cookie → GET signin 签到 → getdailyquestion 取答案
