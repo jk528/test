@@ -1,0 +1,10 @@
+# 运行产物：日志含本机路径/积分等个人信息，不分享
+logs/
+*.log
+
+# 本地个人配置覆盖（如使用者自行新增）
+config.local.json
+
+# 系统垃圾文件
+Thumbs.db
+Desktop.ini

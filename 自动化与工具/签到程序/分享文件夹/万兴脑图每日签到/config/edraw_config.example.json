@@ -1,0 +1,6 @@
+{
+  "_说明": "本文件是示例。实际凭证文件为 config/edraw_config.json（已在 .gitignore 排除，绝不入库）",
+  "_用法": "首次使用可完全留空（或干脆不创建 edraw_config.json）：脚本会自动从夸克浏览器提取 refresh_token 并回填生成；之后每次运行自动轮换续命",
+  "user_id": "",
+  "refresh_token": ""
+}

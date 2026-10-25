@@ -1,0 +1,13 @@
+# 真实凭证（严禁入库！BDUSS 等同账号密码）
+config/kuku_config.json
+
+# 运行产物：日志含本机路径/账号等个人信息，不分享
+logs/
+*.log
+
+# 本地个人配置覆盖（如使用者自行新增）
+config.local.json
+
+# 系统垃圾文件
+Thumbs.db
+Desktop.ini
