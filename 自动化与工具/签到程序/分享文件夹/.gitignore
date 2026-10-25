@@ -1,0 +1,4 @@
+# 分享文件夹 .gitignore
+# 各模板运行产物不入库（凭证类由各模板自己的 .gitignore 细化排除）
+logs/
+*.log
