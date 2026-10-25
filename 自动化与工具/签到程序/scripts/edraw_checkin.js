@@ -1,26 +1,27 @@
 // ============================================================
-// 万兴脑图（MindMaster）独立签到脚本（网页版会话直连版）
+// 万兴脑图（MindMaster）独立签到脚本（refresh_token 自续命版）
 // 平台：userapi.edrawsoft.cn（APP 与网页版共用后端）
-// 逆向记录：DEX 字符串提取自 MindMaster_7.10.24.apk（2026-10-25）
+// 逆向记录：DEX 字符串 + mm 网页版主包 index-*.js（2026-10-25）
 //
 // 接口（实测验证）：
-//   POST /api/user/{uid}/clockin       签到（响应 msg=="already check in" 为已签）
-//   GET  /api/user/{uid}/clockin/list  本周 7 天签到状态（[1,1,1,1,1,1,1]）
-//   GET  /api/user/{uid}/point         当前积分
+//   POST goapi.edrawsoft.cn/api/user/ws/account/refresh/token
+//        表单 refresh_token -> 换新 token(2h) + 轮换 refresh_token(30d)
+//   POST userapi.edrawsoft.cn/api/user/{uid}/clockin       签到
+//   GET  userapi.edrawsoft.cn/api/user/{uid}/clockin/list  本周状态
+//   GET  userapi.edrawsoft.cn/api/user/{uid}/point         当前积分
 //
-// 凭证：EDCurrent Cookie（夸克浏览器登录 mm.edrawsoft.cn 产生）
-//   值为 URL 编码 JSON：{"user_id":"...","token":"eyJ..."(JWT,2小时有效)}
-//   因 token 短寿，本脚本【每次运行现从浏览器提取】，无配置文件、零维护：
-//   只要浏览器里 mm.edrawsoft.cn 保持登录即永久可用。
-//   提取链路：VSS 卷影绕过 Cookie 库独占 -> DPAPI 解 Local State 主密钥
-//             -> AES-256-GCM 解 v10 密文 -> 剥除 SHA256(host_key) 前缀
+// 凭证机制（自续命闭环，2026-10-25 重构）：
+//   1. config/edraw_config.json 存 refresh_token（30 天有效，每次刷新轮换）
+//   2. 每次运行：refresh_token 换新 token -> 立即保存轮换后的 refresh_token
+//      -> 再签到。只要 30 天内运行过一次即永久续命（每天跑则无风险）
+//   3. 兜底：config 缺失/失效时，从夸克浏览器 EDCurrent Cookie 现提取
+//      （需用户刚在 mm.edrawsoft.cn/app 登录过；登录走 refreshMode=1
+//        流程时 Cookie 内才含 refresh_token 字段）
+//   提取链路（兜底用）：VSS 卷影绕过独占 -> DPAPI 解主密钥 -> AES-GCM 解密
 //
 // 用法: node edraw_checkin.js [--no-delay] [--status]
-//   --status    只查询签到状态（只读，不执行签到）
-//   --no-delay  跳过随机延时（默认签到前等待 30~300 秒防检测）
-//
-// 退出码: 0=签到成功/今日已签/状态查询成功  1=失败（未登录/网络异常）
-// 注意: VSS 提取需管理员权限（计划任务已配 Highest）
+// 退出码: 0=成功/已签/状态查询成功  1=失败
+// 注意: 兜底提取需管理员权限（VSS）；纯刷新路径不需要
 // ============================================================
 'use strict';
 const fs = require('fs');
@@ -30,7 +31,7 @@ const { execFileSync, execSync } = require('child_process');
 const { DatabaseSync } = require('node:sqlite');
 
 // ============================================================
-// 公共工具（与 checkin_all.js 同风格）
+// 公共工具
 // ============================================================
 function log(msg) {
   console.log(`${new Date().toLocaleString('sv-SE')} ${msg}`);
@@ -48,8 +49,29 @@ function randomDelaySec() {
   return 30 + Math.floor(Math.random() * 271);
 }
 
+function jwtExp(jwt) {
+  try {
+    const p = JSON.parse(Buffer.from(jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString());
+    return p.exp || 0;
+  } catch { return 0; }
+}
+
 // ============================================================
-// 浏览器凭证提取（VSS + DPAPI + AES-GCM，与天翼/百度同链路）
+// 配置（refresh_token 持久化）
+// ============================================================
+const CFG_PATH = path.join(__dirname, '..', 'config', 'edraw_config.json');
+
+function loadConfig() {
+  try { return JSON.parse(fs.readFileSync(CFG_PATH, 'utf8')); } catch { return null; }
+}
+
+function saveConfig(obj) {
+  fs.mkdirSync(path.dirname(CFG_PATH), { recursive: true });
+  fs.writeFileSync(CFG_PATH, JSON.stringify(obj, null, 2), 'utf8');
+}
+
+// ============================================================
+// 浏览器凭证提取（兜底路径：VSS + DPAPI + AES-GCM）
 // ============================================================
 const BROWSER_UD = path.join(process.env.LOCALAPPDATA || '', 'Quark', 'User Data');
 const COOKIE_NAME = 'EDCurrent';
@@ -58,10 +80,10 @@ const COOKIE_DOMAIN = 'mm.edrawsoft.cn';
 function dpapiUnprotect(buf) {
   const payload = Buffer.from(buf).toString('base64');
   const ps = [
-    "Add-Type -AssemblyName System.Security;",
+    'Add-Type -AssemblyName System.Security;',
     `$src=[Convert]::FromBase64String('${payload}');`,
     "$k=[Security.Cryptography.ProtectedData]::Unprotect($src,$null,'CurrentUser');",
-    "[Convert]::ToBase64String($k)"
+    '[Convert]::ToBase64String($k)'
   ].join('');
   const out = execFileSync('powershell.exe',
     ['-NoProfile', '-NonInteractive', '-Command', ps],
@@ -69,7 +91,6 @@ function dpapiUnprotect(buf) {
   return Buffer.from(out, 'base64');
 }
 
-// VSS 卷影复制被运行中浏览器独占的 Cookies 库（需管理员）
 function vssCopyCookies(workDir) {
   const src = path.join(BROWSER_UD, 'Default', 'Network', 'Cookies');
   const dstFile = path.join(workDir, 'Cookies');
@@ -84,7 +105,6 @@ function vssCopyCookies(workDir) {
   execSync(`cmd.exe /c mklink /d "${link}" "${shadow}\\"`, { stdio: 'pipe' });
   const rel = src.slice(2);
   fs.copyFileSync(path.join(link, rel), dstFile);
-  // WAL/SHM 附属文件一并拷贝（浏览器写入未落库时数据在 WAL 里）
   for (const ext of ['-wal', '-shm']) {
     try { fs.copyFileSync(path.join(link, rel + ext), dstFile + ext); } catch { /* 可缺省 */ }
   }
@@ -92,8 +112,8 @@ function vssCopyCookies(workDir) {
   return dstFile;
 }
 
-// 从 Cookies 库解密 EDCurrent，返回 { user_id, token }
-function extractEDCurrent() {
+// 从浏览器 EDCurrent 提取 { userId, refreshToken }（兜底，需用户刚登录过）
+function extractFromBrowser() {
   const workDir = path.join(process.env.TEMP, 'edraw_cookie');
   fs.mkdirSync(workDir, { recursive: true });
   const cookiesDb = vssCopyCookies(workDir);
@@ -105,35 +125,52 @@ function extractEDCurrent() {
   const masterKey = dpapiUnprotect(blob.slice(5));
 
   const db = new DatabaseSync(cookiesDb, { readOnly: true });
-  const row = db.prepare("SELECT host_key, encrypted_value FROM cookies WHERE name=? AND host_key LIKE ?").get(COOKIE_NAME, `%${COOKIE_DOMAIN}%`);
+  const row = db.prepare('SELECT host_key, encrypted_value FROM cookies WHERE name=? AND host_key LIKE ?').get(COOKIE_NAME, `%${COOKIE_DOMAIN}%`);
   db.close();
-  if (!row) throw new Error(`浏览器中未找到 ${COOKIE_DOMAIN} 的 ${COOKIE_NAME}，请先在浏览器登录 https://mm.edrawsoft.cn/app`);
+  if (!row) throw new Error(`浏览器中未找到 ${COOKIE_DOMAIN} 的 ${COOKIE_NAME}`);
 
   const b = Buffer.from(row.encrypted_value);
   if (b.slice(0, 3).toString() !== 'v10') throw new Error('EDCurrent 密文前缀非 v10');
   const d = crypto.createDecipheriv('aes-256-gcm', masterKey, b.slice(3, 15));
   d.setAuthTag(b.slice(-16));
   let dec = Buffer.concat([d.update(b.slice(15, -16)), d.final()]);
-  // 新版 Chromium 明文前附 SHA256(host_key) 32 字节，剥除
   const sha = crypto.createHash('sha256').update(row.host_key).digest();
   if (dec.length > 32 && dec.slice(0, 32).equals(sha)) dec = dec.slice(32);
 
   const ed = JSON.parse(decodeURIComponent(dec.toString('utf8')));
-  if (!ed.user_id || !ed.token) throw new Error('EDCurrent 结构异常（缺 user_id/token），请重新登录网页版');
-  return { userId: String(ed.user_id), token: ed.token };
+  if (!ed.user_id || !ed.refresh_token) {
+    throw new Error('EDCurrent 缺 user_id/refresh_token 字段——请在夸克浏览器退出并重新登录 https://mm.edrawsoft.cn/app（应用内登录流程才会写入 refresh_token）');
+  }
+  return { userId: String(ed.user_id), refreshToken: ed.refresh_token };
 }
 
 // ============================================================
 // API 封装
 // ============================================================
 const API = 'https://userapi.edrawsoft.cn';
+const GO_API = 'https://goapi.edrawsoft.cn';
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Quark/4.5.5.275 Chrome/112.0.0.0 Safari/537.36';
 
-async function apiRequest(auth, method, apiPath) {
+// 用 refresh_token 换新 token + 轮换 refresh_token
+async function refreshTokens(refreshToken) {
+  const res = await fetch(`${GO_API}/api/user/ws/account/refresh/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': UA },
+    body: 'refresh_token=' + encodeURIComponent(refreshToken),
+  });
+  let json;
+  try { json = await res.json(); } catch { throw new Error(`刷新接口 HTTP ${res.status} 响应非 JSON`); }
+  if (res.status !== 200 || json?.status !== 'success' || !json?.data?.token) {
+    throw new Error(`刷新失败: HTTP ${res.status} ${json?.msg || JSON.stringify(json).slice(0, 120)}`);
+  }
+  return { token: json.data.token, refreshToken: json.data.refresh_token };
+}
+
+async function apiRequest(token, method, apiPath) {
   const res = await fetch(`${API}${apiPath}?lang=cn`, {
     method,
     headers: {
-      'Authorization': `Bearer ${auth.token}`,
+      'Authorization': `Bearer ${token}`,
       'User-Agent': UA,
       'Accept': 'application/json, text/plain, */*',
       'Accept-Language': 'zh-CN',
@@ -148,9 +185,9 @@ async function apiRequest(auth, method, apiPath) {
   return { status: res.status, json };
 }
 
-async function edrawStatus(auth) {
-  const list = await apiRequest(auth, 'GET', `/api/user/${auth.userId}/clockin/list`);
-  const point = await apiRequest(auth, 'GET', `/api/user/${auth.userId}/point`);
+async function edrawStatus(token, userId) {
+  const list = await apiRequest(token, 'GET', `/api/user/${userId}/clockin/list`);
+  const point = await apiRequest(token, 'GET', `/api/user/${userId}/point`);
   if (list.status !== 200 || list.json?.status !== 'success') {
     return { ok: false, err: `clockin/list 异常: HTTP ${list.status} ${JSON.stringify(list.json).slice(0, 120)}` };
   }
@@ -163,8 +200,8 @@ async function edrawStatus(auth) {
   };
 }
 
-async function edrawSign(auth) {
-  const { status, json } = await apiRequest(auth, 'POST', `/api/user/${auth.userId}/clockin`);
+async function edrawSign(token, userId) {
+  const { status, json } = await apiRequest(token, 'POST', `/api/user/${userId}/clockin`);
   if (status !== 200) return { ok: false, err: `HTTP ${status}` };
   const data = json?.data || {};
   if (json?.status === 'success' && data.signed === true) {
@@ -186,24 +223,51 @@ async function main() {
 
   logSection('万兴脑图 MindMaster');
 
-  // 1) 从浏览器提取凭证（每次现提，token 仅 2 小时有效）
-  let auth;
+  // 1) 取 refresh_token：config 优先，浏览器兜底
+  let userId = null;
+  let refreshToken = null;
+  const cfg = loadConfig();
+  const now = Math.floor(Date.now() / 1000);
+  if (cfg?.refresh_token && jwtExp(cfg.refresh_token) > now) {
+    userId = cfg.user_id;
+    refreshToken = cfg.refresh_token;
+    log(`使用 config 中的 refresh_token（剩余 ${Math.round((jwtExp(refreshToken) - now) / 8640) / 10} 天）`);
+  } else {
+    if (cfg?.refresh_token) log('config 中的 refresh_token 已过期，转浏览器提取');
+    try {
+      ({ userId, refreshToken } = extractFromBrowser());
+      log(`浏览器凭证提取成功：user_id=${userId}`);
+    } catch (e) {
+      log(`错误：凭证获取失败 - ${e.message}`);
+      log('处理：在夸克浏览器打开 https://mm.edrawsoft.cn/app 退出并重新登录后重试');
+      process.exitCode = 1;
+      return;
+    }
+  }
+
+  // 2) 刷新：换新 token + 轮换 refresh_token（先保存再签到，防凭证丢失）
+  let token;
   try {
-    auth = extractEDCurrent();
-    log(`凭证提取成功：user_id=${auth.userId}`);
+    const r = await refreshTokens(refreshToken);
+    token = r.token;
+    saveConfig({ user_id: userId, refresh_token: r.refreshToken, saved_at: new Date().toISOString() });
+    log(`token 刷新成功（新 token 2h 有效，refresh_token 已轮换保存）`);
   } catch (e) {
-    log(`错误：凭证提取失败 - ${e.message}`);
-    log('处理：在夸克浏览器打开 https://mm.edrawsoft.cn/app 并登录万兴账号后重试');
+    log(`错误：token 刷新失败 - ${e.message}`);
+    // config 的 refresh_token 可能已失效，清除避免下次再用
+    if (cfg?.refresh_token === refreshToken) {
+      try { fs.unlinkSync(CFG_PATH); log('已清除失效的 config 文件'); } catch { /* 忽略 */ }
+    }
     process.exitCode = 1;
     return;
   }
 
-  // 2) 查状态
+  // 3) 查状态
   let st;
   try {
-    st = await edrawStatus(auth);
+    st = await edrawStatus(token, userId);
   } catch (e) {
-    log(`错误：状态查询失败 - ${e.message}（token 可能已过期，请在浏览器刷新 mm.edrawsoft.cn 页面后重试）`);
+    log(`错误：状态查询失败 - ${e.message}`);
     process.exitCode = 1;
     return;
   }
@@ -219,7 +283,7 @@ async function main() {
     return;
   }
 
-  // 3) 签到
+  // 4) 签到
   if (st.signedToday) {
     log('今日已签到，跳过');
     return;
@@ -230,7 +294,7 @@ async function main() {
     await sleep(sec);
   }
   try {
-    const r = await edrawSign(auth);
+    const r = await edrawSign(token, userId);
     if (!r.ok) {
       log(`错误：签到失败 - ${r.err}`);
       process.exitCode = 1;
@@ -241,8 +305,7 @@ async function main() {
     } else {
       log(`签到成功！AI点数 +${r.ai}，积分 +${r.score}`);
     }
-    // 签到后复查
-    const st2 = await edrawStatus(auth);
+    const st2 = await edrawStatus(token, userId);
     if (st2.ok) log(`复查：本周 ${st2.week.map(x => x ? '[√]' : '[×]').join('')}　积分：${st2.point}`);
   } catch (e) {
     log(`错误：签到请求异常 - ${e.message}`);
