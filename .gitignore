@@ -31,10 +31,14 @@ todo/
 # 2026-10-25 锚定根部：原任意层级 docs/ 误杀分享文件夹各模板的 docs/ 逆向文档
 /docs/
 # 锚定化后补点名：以下 docs/ 确认为 AI 智能体工作区（decisions/discussions/features 结构），保持忽略
-/6签到创建的本地文件/OfficeAce/docs/
 /MD文件综合/docs/
 /自动化与工具/VBA转js/分词缺失/docs/
 /阅读器项目/ColorTxt项目分析/VBComponents From (test1.xlsm) 260807171641/docs/
+
+# 2026-10-25 本机内容，不跨机同步：
+# 本地 Git 钩子（含本机逻辑）与六大签到平台在本机创建的工作文件（天气报告、平台工作区说明等）
+/.githooks/
+/6签到创建的本地文件/
 
 # OfficeAce 身份与引导文件
 AGENT.md
