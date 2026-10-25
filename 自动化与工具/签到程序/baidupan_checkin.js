@@ -193,11 +193,17 @@ async function main() {
   // 1. 签到
   const sign = await doSignin(cfg.cookie);
   if (!sign.ok) {
-    log(`签到失败：${sign.msg}`);
-    process.exitCode = 1;
-    return;
+    // error_code=421001 repeat signin = 今日已签到，幂等视为成功
+    if (/421001|repeat/i.test(sign.msg)) {
+      log('今日已签到，无需重复操作');
+    } else {
+      log(`签到失败：${sign.msg}`);
+      process.exitCode = 1;
+      return;
+    }
+  } else {
+    log(`签到成功，获得积分: ${sign.points ?? '未返回'}`);
   }
-  log(`签到成功，获得积分: ${sign.points ?? '未返回'}`);
 
   // 2. 每日答题
   const q = await getDailyQuestion(cfg.cookie);

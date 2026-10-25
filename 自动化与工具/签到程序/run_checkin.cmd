@@ -4,16 +4,17 @@ setlocal
 :: ============================================
 :: Daily check-in entry.
 ::
-:: Runs checkin_all.js, which performs every platform in one pass:
-::   Trae / TeleAgent / WorkBuddy / CodeArts / Qoder / OfficeAce
-::   (TraeWork/TraeCN merged into one client - single Trae platform since 2026-10-16)
+:: Runs checkin_all.js with an optional group filter (2026-10-25 refactor):
+::   --group=ai     00:05 daily: Trae/TeleAgent/WorkBuddy/CodeArts/OfficeAce/KukuAI
+::   --group=daily  10:35 daily: Qoder(resets 10:00)/BaiduPan/TianYi cloud
+::   (no group arg runs all 9 platforms; TraeWork/TraeCN merged 2026-10-16)
 ::
 :: Auto-detects the Node.js runtime; no hardcoded paths.
-:: Log redirection is done by the scheduled task, so a manual run
-:: prints straight to the console.
+:: Log redirection is done by the scheduled task (checkin_ai.log /
+:: checkin_daily.log per group), so a manual run prints to console.
 ::
-:: Schedule it ONCE, after 10:30 - Qoder's daily campaign resets at
-:: 10:00 and cannot be claimed before that. OfficeAce additionally
+:: Qoder's daily campaign resets at 10:00 and cannot be claimed before
+:: that, so it stays in the daily group. OfficeAce additionally
 :: needs its desktop client running.
 ::
 :: IMPORTANT: keep this file pure ASCII - cmd.exe re-reads the
@@ -28,9 +29,11 @@ chcp 65001 >nul
 set "SCRIPT_DIR=%~dp0"
 
 :: ---- log rotation ----
-:: Scheduled task redirects output to checkin_all.log. Rotate when > 5 MB
+:: Scheduled tasks redirect output to a per-group log. Rotate when > 5 MB
 :: (keep one .old generation, same strategy as sync_gitee.ps1). Pure ASCII.
 set "LOG_FILE=%SCRIPT_DIR%checkin_all.log"
+if "%~1"=="--group=ai" set "LOG_FILE=%SCRIPT_DIR%checkin_ai.log"
+if "%~1"=="--group=daily" set "LOG_FILE=%SCRIPT_DIR%checkin_daily.log"
 :: Read the size OUTSIDE any ( ) block: %LOG_SIZE% is expanded when the
 :: block is parsed, which would leave "if GTR 5242880 (" and abort cmd.
 set "LOG_SIZE=0"
