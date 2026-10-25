@@ -91,7 +91,7 @@ Cookie 有效期经验值数月~一年，改密码即失效；失效后脚本自
 
 密码登录链路（RSA 加密）与 Cookie 签到接口来自开源社区方案与实测，
 完整过程（含设备锁 -133 撞墙记录、浏览器 Cookie 提取链路）见
-[docs/天翼云盘签到逆向过程.md](docs/%E5%A4%A9%E7%BF%BC%E4%BA%91%E7%9B%98%E7%AD%BE%E5%88%B0%E9%80%86%E5%90%91%E8%BF%87%E7%A8%8B.md)。简要链路：
+[docs/天翼云盘签到逆向过程.md](docs/天翼云盘签到逆向过程.md)。简要链路：
 
 ```
 config/tianyi_config.json 读 Cookie → GET mkt/userSign.action 签到

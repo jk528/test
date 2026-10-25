@@ -80,7 +80,7 @@ Get-Content .\logs\checkin.log -Tail 20
 ## 原理简介
 
 签到接口与请求头来自对 Qoder 客户端的逆向分析，完整过程见
-[docs/Qoder签到逆向过程.md](docs/Qoder%E7%AD%BE%E5%88%B0%E9%80%86%E5%90%91%E8%BF%87%E7%A8%8B.md)。简要链路：
+[docs/Qoder签到逆向过程.md](docs/Qoder签到逆向过程.md)。简要链路：
 
 ```
 auth.v1.dat 读加密登录态 → DPAPI 取主密钥 + AES-256-GCM 解密 → (临期自动刷新)
