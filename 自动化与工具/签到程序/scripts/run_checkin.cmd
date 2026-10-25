@@ -1,4 +1,4 @@
-@echo off
+@echo off & chcp 65001 >nul
 setlocal
 
 :: ============================================
@@ -23,9 +23,11 @@ setlocal
 :: ============================================
 
 :: Force UTF-8 codepage so cmd's own messages and Node output share
-:: one encoding - prevents mixed-encoding log files.
-chcp 65001 >nul
-
+:: one encoding - prevents mixed-encoding log files. NOTE: chcp lives
+:: on line 1 (merged with @echo off) so the codepage is switched at
+:: file offset ~0 - switching it mid-file risks cmd re-reading the
+:: batch from a shifted offset (ghost errors like "'e' is not
+:: recognized", seen 2026-10-25 when this file was edited mid-run).
 set "SCRIPT_DIR=%~dp0"
 
 :: ---- log rotation ----
