@@ -78,7 +78,7 @@ Get-Content .\logs\checkin.log -Tail 20
 ## 原理简介
 
 签到接口与签名算法来自对 CodeArts Agent 客户端的逆向分析，完整过程见
-[docs/CodeArts签到逆向过程.md](docs/CodeArts签到逆向过程.md)。简要链路：
+[docs/CodeArts签到逆向过程.md](docs/CodeArts%E7%AD%BE%E5%88%B0%E9%80%86%E5%90%91%E8%BF%87%E7%A8%8B.md)。简要链路：
 
 ```
 state.vscdb 读加密登录态 → DPAPI 取主密钥 + AES-256-GCM 解密得 STS 凭证

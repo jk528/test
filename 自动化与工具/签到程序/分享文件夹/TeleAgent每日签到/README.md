@@ -73,7 +73,7 @@ Get-Content .\logs\checkin.log -Tail 20
 ## 原理简介
 
 签到接口与请求头来自对 TeleAgent 客户端的逆向分析，完整过程见
-[docs/TeleAgent签到逆向过程.md](docs/TeleAgent签到逆向过程.md)。简要链路：
+[docs/TeleAgent签到逆向过程.md](docs/TeleAgent%E7%AD%BE%E5%88%B0%E9%80%86%E5%90%91%E8%BF%87%E7%A8%8B.md)。简要链路：
 
 ```
 Local State 取 DPAPI 加密主密钥 → 解出 AES 主密钥 → AES-256-GCM 解密 token.json

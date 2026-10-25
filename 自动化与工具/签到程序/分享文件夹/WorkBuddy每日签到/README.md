@@ -75,7 +75,7 @@ Get-Content .\logs\checkin.log -Tail 20
 ## 原理简介
 
 签到接口与请求头来自对 WorkBuddy 客户端的逆向分析，完整过程见
-[docs/WorkBuddy签到逆向过程.md](docs/WorkBuddy签到逆向过程.md)。简要链路：
+[docs/WorkBuddy签到逆向过程.md](docs/WorkBuddy%E7%AD%BE%E5%88%B0%E9%80%86%E5%90%91%E8%BF%87%E7%A8%8B.md)。简要链路：
 
 ```
 workbuddy-desktop.info 读加密 accessToken 信封 → 经 WorkBuddy.exe 原生绑定取密钥

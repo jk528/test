@@ -96,7 +96,7 @@ Get-Content .\logs\checkin.log -Tail 20
 ## 原理简介
 
 签到接口来自对库库AI 客户端（GenFlowPro，Electron）app.asar 的逆向分析，完整过程见
-[docs/库库AI签到逆向过程.md](docs/库库AI签到逆向过程.md)。简要链路：
+[docs/库库AI签到逆向过程.md](docs/%E5%BA%93%E5%BA%93AI%E7%AD%BE%E5%88%B0%E9%80%86%E5%90%91%E8%BF%87%E7%A8%8B.md)。简要链路：
 
 ```
 kuku_config.json 读 BDUSS → (可选) passport 换 STOKEN
