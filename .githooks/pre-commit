@@ -1,0 +1,7 @@
+#!/bin/sh
+# 暂存区没有 .md 文件时直接放行（零开销）
+# 注意尾部的 "?$：core.quotepath 默认开启时 CJK 路径带双引号，以 .md" 结尾
+git diff --cached --name-only --diff-filter=ACM | grep -qiE '\.md"?$' || exit 0
+
+echo "[pre-commit] 校验 Markdown 相对链接..."
+node "自动化与工具/签到程序/文档/99-其他/md_links.js" check "自动化与工具/签到程序/分享文件夹"
