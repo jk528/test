@@ -14,8 +14,8 @@
 - **签到体系**：走百度活动平台 `/act/v2/kukuai30/`（当前 V3.0 版，旧版 `/act/v2/kukuai/` 并存），每日签到得 10 积分 + 抽奖机会，连续签到有里程碑奖励（SVIP 等）
 - **鉴权**：百度账号 Cookie（`BDUSS` + `STOKEN` + `gfprotpl=genflowpro`），由客户端 native 层（bnusdk.dll）自动附加
 - **网关**：`https://kuku.baidu.com`（与百度网盘同源体系，channel=`chunlei`）
-- **积分体系**：`/api/genflowpro/freepoint/*`（homenew/rewardClaim/taskComplete/inviteCode/inviteBind）
-- **实测**：无 Cookie 请求状态接口返回 `errno:-6 账户已过期`，接口连通、参数格式正确，仅缺凭证
+- **积分体系**：文/api/genflowpro/freepoint/*文（homenew/rewardClaim/taskComplete/inviteCode/inviteBind）
+- **实测**：无 Cookie 请求状态接口返回 文errno:-6 账户已过期文，接口连通、参数格式正确，仅缺凭证
 
 ---
 
@@ -23,15 +23,15 @@
 
 | 目标 | 位置 | 说明 |
 |------|------|------|
-| 快捷方式 | 桌面/开始菜单 `库库AI.lnk` | → `%APPDATA%\baidu\KukuAI\GenFlowPro.exe` |
-| 安装+数据目录 | `%APPDATA%\baidu\KukuAI\` | Electron userData 与安装目录合一（少见形态） |
-| 主代码包 | `KukuAI\resources\app.asar`（40MB） | Vue3 + Electron，明文可逆 |
-| 沙箱引擎数据 | `%APPDATA%\baidu\GenFlowPro\` | node-v22 沙箱、埋点 SQLite、加密日志 MXLog |
-| 用户数据 | `KukuAI\users\<md5hash>\` | transmission.db / upload.db / PersonalSetting.xml（加密） |
-| 登录态存储 | `KukuAI\AppSettingApp.dat`（1.4KB） | Base64 加密二进制，native 层管理，**无明文 BDUSS** |
+| 快捷方式 | 桌面/开始菜单 文库库AI.lnk文 | → 文%APPDATA%\baidu\KukuAI\GenFlowPro.exe文 |
+| 安装+数据目录 | 文%APPDATA%\baidu\KukuAI\文 | Electron userData 与安装目录合一（少见形态） |
+| 主代码包 | 文KukuAI\resources\app.asar文（40MB） | Vue3 + Electron，明文可逆 |
+| 沙箱引擎数据 | 文%APPDATA%\baidu\GenFlowPro\文 | node-v22 沙箱、埋点 SQLite、加密日志 MXLog |
+| 用户数据 | 文KukuAI\users\<md5hash>\文 | transmission.db / upload.db / PersonalSetting.xml（加密） |
+| 登录态存储 | 文KukuAI\AppSettingApp.dat文（1.4KB） | Base64 加密二进制，native 层管理，**无明文 BDUSS** |
 | native SDK | `bnusdk.dll` / `minosagent.dll` / `genflowengine.dll` | 百度统一账号 SDK，管理 Cookie 与加密存储 |
 | 本地端口 | GenFlowPro 监听 `127.0.0.1:19475` | native http 通道，非公开 API，asar 内无定义 |
-| 日志 | `GenFlowPro\AppData\MXLog_*` | 百度自研编码格式，不可直接阅读 |
+| 日志 | 文GenFlowPro\AppData\MXLog_*文 | 百度自研编码格式，不可直接阅读 |
 
 > 排障提示：注册表搜"酷酷"无结果，产品名是"**库库**AI"（KukuAI），进程名 `GenFlowPro`。
 
@@ -39,12 +39,12 @@
 
 ## 三、代码定位（asar 逆向路径）
 
-1. 关键词锚点：`签到`(21)/`checkin`(46)/`积分`(106) → UI 模块 `SigninPromoCard`
-2. 奖励文案：`checkInReward: "Check-in Rewards"`、`checkInRewardValue: "Get SVIP"`（签到奖 SVIP）
+1. 关键词锚点：文签到文(21)/`checkin`(46)/文积分文(106) → UI 模块 `SigninPromoCard`
+2. 奖励文案：文checkInReward: "Check-in Rewards"文、文checkInRewardValue: "Get SVIP"文（签到奖 SVIP）
 3. API 路径浮现：`/act/v2/kukuai/signinlist`、`/act/v2/kukuai30/signin`、`/api/genflowpro/freepoint/rewardClaim`
 4. 网关配置（`_y` 常量）：`main: https://kuku.baidu.com`（另有 pcsData/analytics/officeEditor 等）
-5. 活动配置（`yy` 常量）：`signin30Tid: '291651792210'`（V3.0 签到）、`signinTid: '794211789557'`（旧版）、`lotteryTid: '531681788278'`
-6. 公共参数：`defaultParams: {app_id: 123971023}`、`channel: "chunlei"`、`clienttype: <Windows>`、`version`
+5. 活动配置（`yy` 常量）：文signin30Tid: '291651792210'文（V3.0 签到）、文signinTid: '794211789557'文（旧版）、文lotteryTid: '531681788278'文
+6. 公共参数：文defaultParams: {app_id: 123971023}文、文channel: "chunlei"文、文clienttype: <Windows>文、`version`
 
 ---
 
@@ -56,7 +56,7 @@
 
 | 用途 | 方法+路径 | 关键参数 |
 |------|-----------|----------|
-| 签到状态（日历/连签） | POST `/act/v2/kukuai30/homepage` | `uid` `<uk>`、`tid=291651792210`、`app_id=123971023` |
+| 签到状态（日历/连签） | POST `/act/v2/kukuai30/homepage` | `uid` 文<uk>文、`tid=291651792210`、`app_id=123971023` |
 | 执行签到 | POST `/act/v2/kukuai30/signin` | 同上 |
 | 旧版签到列表 | POST `/act/v2/kukuai/signinlist` | `tid=794211789557` |
 
@@ -77,7 +77,7 @@
 
 | 用途 | 方法+路径 | 请求体 |
 |------|-----------|--------|
-| bduss+ptoken 换 STOKEN | POST `https://passport.baidu.com/v3/login/api/auth` | `bduss=<bduss>&ptoken=<ptoken>`（form-urlencoded） |
+| bduss+ptoken 换 STOKEN | POST `https://passport.baidu.com/v3/login/api/auth` | 文bduss=<bduss>&ptoken=<ptoken>文（form-urlencoded） |
 
 响应取 `stoken_list.genflowpro` 即 STOKEN；`errno=0` 成功。
 
@@ -87,9 +87,9 @@
 
 ### 5.1 Cookie 形态（脚本直连需自行携带）
 
-```text
+文文文text
 Cookie: BDUSS=<bduss>; STOKEN=<stoken>; gfprotpl=genflowpro
-```
+文文文
 
 - `BDUSS`：百度账号主凭证（有效期通常数年）
 - `STOKEN`：经 §4.3 接口换取（`stoken_list.genflowpro`）
@@ -98,14 +98,14 @@ Cookie: BDUSS=<bduss>; STOKEN=<stoken>; gfprotpl=genflowpro
 
 ### 5.2 客户端登录链路（还原）
 
-```
+文文文
 passport 授权页(webview) → 从 cookie 按 domain 精确度提取
   [BDUSS, BDUSS_BFESS, PTOKEN, PTOKEN_BFESS, PASS_STOKEN, STOKEN]
 → POST passport.baidu.com/v3/login/api/auth (bduss+ptoken) 换 stoken
 → fetchUserReport 取用户 uk(即 uid)/uinfo(signKey)
 → nativeBridge.setLoginState({sign_key, bduss, stoken, pass_stoken, uk, cookies})
 → native 层加密持久化（AppSettingApp.dat / bnusdk 存储）
-```
+文文文
 
 ### 5.3 凭证存储现状
 
@@ -119,12 +119,12 @@ passport 授权页(webview) → 从 cookie 按 domain 精确度提取
 
 ### 6.1 通用响应解析（G 函数）
 
-```js
+文文文js
 data = resp.data;                      // axios 层
 errno = data.errno ?? data.code;       // 百度 errno 风格
 if (errno !== 0) throw show_msg/message;
 result = data.data ?? data.result;
-```
+文文文
 
 ### 6.2 签到状态字段（ue 函数）
 
@@ -134,18 +134,18 @@ result = data.data ?? data.result;
 | `continuous_days` | 连续签到天数 |
 | `next_reward_days` / `next_reward_award` | 里程碑奖励进度与文案（SVIP 等） |
 | `countdown` | 活动倒计时（>0 入口可用） |
-| `calendar[]` | `[{date:"2026-10-25", status:n}]` |
+| 文calendar[]文 | 文[{date:"2026-10-25", status:n}]文 |
 
-日历 status：`0`=已签、`1`=今日未签（可签）、`2`=未签、`3`=错过；每日奖励 `signPoint`（默认 10 积分，服务端配置 `kukuSignConf` 可改）+ `lotteryChances`（1 次抽奖机会）
+日历 status：文0文=已签、文1文=今日未签（可签）、文2文=未签、文3文=错过；每日奖励 `signPoint`（默认 10 积分，服务端配置 `kukuSignConf` 可改）+ `lotteryChances`（1 次抽奖机会）
 
 ### 6.3 签到交互流程（ge 函数）
 
-```
+文文文
 未登录(guest) → 弹登录 → 登录后刷新状态
 今日未签(unsigned) → POST signin → 成功后刷新 homepage
 今日已签(signed) → 提示已签
 homepage 请求失败 → 隐藏签到入口
-```
+文文文
 
 ---
 
@@ -153,8 +153,8 @@ homepage 请求失败 → 隐藏签到入口
 
 | 步骤 | 请求 | 结果 |
 |------|------|------|
-| 1. V3.0 状态接口 | `POST https://kuku.baidu.com/act/v2/kukuai30/homepage?tid=291651792210&app_id=123971023&uid=&channel=chunlei&clienttype=0&version=1.6.28` | HTTP 200 `{"errno":-6,"show_msg":"账户已过期，重新登陆","server_time":1792878670}` |
-| 2. 旧版签到列表 | `POST https://kuku.baidu.com/act/v2/kukuai/signinlist?tid=794211789557&app_id=123971023&channel=chunlei&clienttype=0` | HTTP 200 `{"errno":-6,...}` |
+| 1. V3.0 状态接口 | 文POST https://kuku.baidu.com/act/v2/kukuai30/homepage?tid=291651792210&app_id=123971023&uid=&channel=chunlei&clienttype=0&version=1.6.28文 | HTTP 200 文{"errno":-6,"show_msg":"账户已过期，重新登陆","server_time":1792878670}文 |
+| 2. 旧版签到列表 | 文POST https://kuku.baidu.com/act/v2/kukuai/signinlist?tid=794211789557&app_id=123971023&channel=chunlei&clienttype=0文 | HTTP 200 文{"errno":-6,...}文 |
 
 > 判定：URL/参数格式正确（服务端正常解析并返回业务错误码），`errno=-6` = 未登录，与"仅缺 Cookie 凭证"的预期完全一致；接口活性正常。
 
@@ -181,7 +181,7 @@ homepage 请求失败 → 隐藏签到入口
 | 文件 | 说明 |
 |------|------|
 | `checkin_all.js` | 待新增 `checkinKuku()`（凭证就绪后集成） |
-| `文档/签到逆向研究总集.md` | 摘要与接口清单已并入（2.8 节） |
+| 文文档/签到逆向研究总集.md文 | 摘要与接口清单已并入（2.8 节） |
 | **本文件** | 库库AI 签到完整逆向过程 |
 
 > AI生成

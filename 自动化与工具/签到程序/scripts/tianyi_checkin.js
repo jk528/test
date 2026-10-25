@@ -93,7 +93,7 @@ function rsaEncryptHex(pubKey, text) {
 // 配置加载
 // ============================================================
 function loadConfig() {
-  const cfgPath = path.join(__dirname, 'tianyi_config.json');
+  const cfgPath = path.join(__dirname, '..', 'config', 'tianyi_config.json');
   let fileCfg = {};
   if (fs.existsSync(cfgPath)) {
     try {

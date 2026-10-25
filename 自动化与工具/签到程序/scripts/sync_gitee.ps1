@@ -1,4 +1,4 @@
-﻿$ErrorActionPreference = "Continue"
+$ErrorActionPreference = "Continue"
 
 # ============================================================
 #  归档 Git 同步（单实例）
@@ -10,7 +10,7 @@
 
 $ScriptDir = $PSScriptRoot
 if (-not $ScriptDir) { $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path }
-$LogFile  = Join-Path $ScriptDir "sync_gitee.log"
+$LogFile  = Join-Path $ScriptDir "..\logs\sync_gitee.log"
 $LockFile = Join-Path $ScriptDir ".sync_gitee.lock"
 
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}

@@ -61,7 +61,7 @@ const URL_USERINFO = 'https://pan.baidu.com/rest/2.0/membership/user?app_id=2505
 // 配置加载
 // ============================================================
 function loadConfig() {
-  const cfgPath = path.join(__dirname, 'baidupan_config.json');
+  const cfgPath = path.join(__dirname, '..', 'config', 'baidupan_config.json');
   let fileCfg = {};
   if (fs.existsSync(cfgPath)) {
     try {
