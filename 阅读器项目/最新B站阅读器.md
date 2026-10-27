@@ -38,3 +38,4 @@
 
 - Kotatsu 有海外媒体（2026-10-22）报道因法律原因宣布停止维护，未经官方确认，以仓库动态为准。
 - Star 数与许可证为 2026-10-28 通过 GitHub API 实时查询。
+- 作者 huangder（Huang Yinfeng）的 Lumi_Books（Android 电子书阅读器，272★，GPL-3.0，<https://github.com/huangder/Lumi_Books>）在 B 站有视频（2026-07-16，UP 主 Huangder_），发布于 3 个多月前，超出本表"近 1 个月"范围，已收录在同目录《开源阅读器项目归纳.md》参考区。
