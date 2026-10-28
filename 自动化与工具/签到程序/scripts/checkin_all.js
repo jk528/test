@@ -176,6 +176,64 @@ function findTraeAppVersion() {
   ]);
 }
 
+// ---- Trae 设备 ID 探测：客户端内部结构随版本变动，多候选 + 目录扫描兜底 ----
+// 大目录（缓存/日志/工作区等）不含设备信息，扫描时跳过以避免性能损耗
+const TRAE_SKIP_DIRS = new Set([
+  'User', 'Cache', 'Code Cache', 'CachedData', 'CachedConfigurations', 'CachedExtensionVSIXs',
+  'CachedProfilesData', 'GPUCache', 'DawnGraphiteCache', 'DawnWebGPUCache', 'blob_storage',
+  'Local Storage', 'Session Storage', 'Service Worker', 'Network', 'WebStorage', 'Backups',
+  'Partitions', 'ProjectWorkspaces', 'Crashpad', 'logs',
+]);
+
+// ttnet 配置为非 JSON 的 key&#*value@$* 链式格式
+function readTtnetDeviceId(file) {
+  try {
+    const m = fs.readFileSync(file, 'utf8').match(/device_id&#\*(\d+)@\$\*/);
+    return m ? m[1] : '';
+  } catch { return ''; }
+}
+
+// 递归查找 tt_net_config*.config（限深 + 跳过缓存目录），应对客户端再次调整存放位置
+function findTtnetDeviceId(dir, depth = 0) {
+  if (depth > 3) return '';
+  let entries;
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return ''; }
+  for (const e of entries) {
+    if (e.isFile() && /^tt_net_config.*\.config$/i.test(e.name)) {
+      const id = readTtnetDeviceId(path.join(dir, e.name));
+      if (id) return id;
+    }
+  }
+  for (const e of entries) {
+    if (!e.isDirectory() || TRAE_SKIP_DIRS.has(e.name)) continue;
+    const id = findTtnetDeviceId(path.join(dir, e.name), depth + 1);
+    if (id) return id;
+  }
+  return '';
+}
+
+/**
+ * 自动探测 Trae 设备 ID（签到接口 x-device-id，缺失会被服务端拒绝）。
+ * 优先级：local_env.json（旧）-> ttnet/ahanet 配置（新）-> 数据目录扫描（兜底）
+ */
+function findTraeDeviceId(root) {
+  try {
+    const id = String(JSON.parse(fs.readFileSync(
+      path.join(root, 'ModularData', 'ckg_server', 'local_env.json'), 'utf8')).device_id || '');
+    if (id) return id;
+  } catch { /* 旧路径不存在时继续 */ }
+
+  for (const p of [
+    path.join(root, 'ModularData', 'ttnet', 'tt_net_config.config'),
+    path.join(root, 'ahanet', 'tt_net_config.config'),
+    path.join(root, 'ModularData', 'ahanet', 'tt_net_config.config'),
+  ]) {
+    const id = readTtnetDeviceId(p);
+    if (id) return id;
+  }
+  return findTtnetDeviceId(root);
+}
+
 // ---- AES-128-CBC + SHA-512 解密常量（Trae 平台，原 TraeWork/TraeCN 共用）----
 const HP = 16, q8_AES128 = 16, WP = HP, rh = 64, Rv = 32, VP = 64, Em = 6;
 const ure = Uint8Array.from([82,9,106,213,48,54,165,56,191,64,163,158,129,243,215,251,124,227,57,130,155,47,255,135,52,142,67,68,196,222,233,203,84,123,148,50,166,194,35,61,238,76,149,11,66,250,195,78,8,46,161,102,40,217,36,178,118,91,162,73,109,139,209,37]);
@@ -225,11 +283,7 @@ async function checkinTrae(platformName, dirCandidates) {
     log(`错误：登录态读取失败 - ${e.message}`); return false;
   }
 
-  let deviceId = '';
-  try {
-    const envPath = path.join(root, 'ModularData', 'ckg_server', 'local_env.json');
-    deviceId = String(JSON.parse(fs.readFileSync(envPath, 'utf8')).device_id || '');
-  } catch {}
+  const deviceId = findTraeDeviceId(root);
 
   const appVersion = findTraeAppVersion();
 

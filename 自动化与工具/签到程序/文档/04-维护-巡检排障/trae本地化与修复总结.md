@@ -282,3 +282,48 @@ device_id&#*2144514107022570@$*tnc_abtest&#*15168109@$*tnc_etag&#*...
 
 - **客户端内部数据文件同样是易变点**：不仅外层目录会更名，`ModularData` 下的子模块（ckg_server → ttnet）也会随版本重构，设备标识读取必须做多候选探测
 - ttnet 配置为 `key&#*value@$*` 链式格式，解析时注意转义正则中的 `&`、`#`、`@`、`$`、`*` 字符
+
+## 十一、2026-10-28 设备 ID 再次迁移修复（ahanet 目录）
+
+### 问题现象
+
+2026-10-28 凌晨 `checkin_ai.log`：
+
+```
+[2026-10-28 00:09:51] 检测到数据目录：C:\Users\Administrator\AppData\Roaming\Trae CN
+[2026-10-28 00:09:51] 警告：未找到设备 ID，签到可能被拒绝
+[2026-10-28 00:09:52] 签到失败：The submitted order parameters are incorrect...
+```
+
+### 根因
+
+客户端更新后目录结构再次变化：`ModularData\ttnet\` 被移除，`ModularData` 下仅剩 `ai-agent`；设备 ID 改由 aha 网络组件写在**数据根目录**的 `ahanet\tt_net_config.config`（不是 `ModularData` 下）。
+
+| 项 | 旧位置（已失效） | 新位置（实测） |
+| --- | --- | --- |
+| 设备 ID | `ModularData\ttnet\tt_net_config.config` | `%APPDATA%\Trae CN\ahanet\tt_net_config.config` |
+
+另外发现：`ahanet\server.json` 里出现的 `device_id` 只是请求头白名单，不是值；`aha\TinyStorage` 的 `aha.device.device_id` 是加密串，均不可用。
+
+### 修复内容
+
+`checkin_all.js` 与 `分享文件夹\Trae每日签到\scripts\trae_checkin.js` 同步新增 `findTraeDeviceId(root)`：
+
+1. `ModularData\ckg_server\local_env.json`（最早的 JSON 位置，兜底）
+2. `ModularData\ttnet\tt_net_config.config`（2026-10-26 位置，兜底）
+3. `ahanet\tt_net_config.config`、`ModularData\ahanet\tt_net_config.config`（当前位置）
+4. **兜底扫描**：限深 3 层递归查找 `tt_net_config*.config`，跳过缓存/日志/工作区等大目录，客户端下次搬位置仍可自动找到
+
+### 验证结果
+
+```
+> trae_checkin.js --status --no-delay  →  当前积分：100（含额外 100）　今日已签：否
+> trae_checkin.js --no-delay           →  签到成功！积分：100（含额外 100）
+> checkin_all.js --group=ai --no-delay →  [OK] Trae（今日已签到。积分：100）
+```
+
+### 经验
+
+- 设备 ID 的存放位置已迁移两次（`ckg_server` → `ModularData\ttnet` → 根目录 `ahanet`），纯路径探测始终滞后于客户端更新
+- 因此必须保留**目录扫描兜底**：只要文件仍叫 `tt_net_config*.config`，位置怎么变都能命中
+- 判断候选文件要看值而非名字：`server.json` 的 `device_id` 是字段名列表，不能误用

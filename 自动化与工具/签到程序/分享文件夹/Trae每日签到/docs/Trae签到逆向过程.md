@@ -17,7 +17,7 @@
 | 必需请求头 | `x-device-id`、`x-device-type`、`x-os-version`、`x-app-version`、`X-User-Region` |
 | 请求体 | 固定 `{"req_source": 2}` |
 | 凭证位置 | `%APPDATA%\Trae CN\User\globalStorage\storage.json` 的<br>`iCubeAuthInfo://icube.cloudide` 字段（**加密存储**） |
-| 设备 ID | `%APPDATA%\Trae CN\ModularData\ckg_server\local_env.json` 的 `device_id` |
+| 设备 ID | `%APPDATA%\Trae CN\ahanet\tt_net_config.config` 的 `device_id`（旧版本：`ModularData\ttnet\` 同名文件 / `ModularData\ckg_server\local_env.json`） |
 | 成功判定 | claim 返回 `code: 0`；重复签到由 status 的 `checked_in` 幂等拦截 |
 | 签名/加密 | 请求本身**无签名**；难点全在本地凭证的加密存储 |
 

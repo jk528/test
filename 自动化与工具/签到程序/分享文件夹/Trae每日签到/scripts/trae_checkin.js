@@ -110,6 +110,60 @@ function findTraeAppVersion() {
   return '';
 }
 
+// 设备 ID（x-device-id）：客户端内部结构随版本变动，多候选 + 目录扫描兜底
+const TRAE_SKIP_DIRS = new Set([
+  'User', 'Cache', 'Code Cache', 'CachedData', 'CachedConfigurations', 'CachedExtensionVSIXs',
+  'CachedProfilesData', 'GPUCache', 'DawnGraphiteCache', 'DawnWebGPUCache', 'blob_storage',
+  'Local Storage', 'Session Storage', 'Service Worker', 'Network', 'WebStorage', 'Backups',
+  'Partitions', 'ProjectWorkspaces', 'Crashpad', 'logs',
+]);
+
+// ttnet 配置为非 JSON 的 key&#*value@$* 链式格式
+function readTtnetDeviceId(file) {
+  try {
+    const m = fs.readFileSync(file, 'utf8').match(/device_id&#\*(\d+)@\$\*/);
+    return m ? m[1] : '';
+  } catch { return ''; }
+}
+
+// 递归查找 tt_net_config*.config（限深 + 跳过缓存目录），应对客户端再次调整存放位置
+function findTtnetDeviceId(dir, depth = 0) {
+  if (depth > 3) return '';
+  let entries;
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return ''; }
+  for (const e of entries) {
+    if (e.isFile() && /^tt_net_config.*\.config$/i.test(e.name)) {
+      const id = readTtnetDeviceId(path.join(dir, e.name));
+      if (id) return id;
+    }
+  }
+  for (const e of entries) {
+    if (!e.isDirectory() || TRAE_SKIP_DIRS.has(e.name)) continue;
+    const id = findTtnetDeviceId(path.join(dir, e.name), depth + 1);
+    if (id) return id;
+  }
+  return '';
+}
+
+// 优先级：local_env.json（旧）-> ttnet/ahanet 配置（新）-> 数据目录扫描（兜底）
+function findTraeDeviceId(root) {
+  try {
+    const id = String(JSON.parse(fs.readFileSync(
+      path.join(root, 'ModularData', 'ckg_server', 'local_env.json'), 'utf8')).device_id || '');
+    if (id) return id;
+  } catch { /* 旧路径不存在时继续 */ }
+
+  for (const p of [
+    path.join(root, 'ModularData', 'ttnet', 'tt_net_config.config'),
+    path.join(root, 'ahanet', 'tt_net_config.config'),
+    path.join(root, 'ModularData', 'ahanet', 'tt_net_config.config'),
+  ]) {
+    const id = readTtnetDeviceId(p);
+    if (id) return id;
+  }
+  return findTtnetDeviceId(root);
+}
+
 // ============================================================
 // 签到 API
 // ============================================================
@@ -144,11 +198,7 @@ async function main() {
   }
 
   // 3) 设备信息（签到接口要求）
-  let deviceId = '';
-  try {
-    const envPath = path.join(root, 'ModularData', 'ckg_server', 'local_env.json');
-    deviceId = String(JSON.parse(fs.readFileSync(envPath, 'utf8')).device_id || '');
-  } catch { /* 可缺省，但会被拒 */ }
+  const deviceId = findTraeDeviceId(root);
   const appVersion = findTraeAppVersion();
 
   const headers = { 'Authorization': `Cloud-IDE-JWT ${auth.token}`, 'Content-Type': 'application/json' };
