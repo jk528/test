@@ -1258,7 +1258,7 @@ async function checkinQoder() {
 // 7. 果办 OfficeAce 每日签到（本地 API 桥接版）
 // 活动：「每日签到有礼」1000 积分/天，每日 00:00（UTC+8）刷新，当日 23:59:59 过期
 // 流程：DPAPI 解密 session.cookie -> oc_sid 会话 -> 查询活动 -> 领取 -> 复查
-// 认证：oc_sid 签名 Cookie + 安装目录自签 root-ca.pem TLS 信任
+// 认证：oc_sid 签名 Cookie + 安装目录自签 root-ca.pem TLS 信任（校验失败自动降级跳过，见 officeaceHttpJson）
 // 依赖：OfficeAce 客户端正在运行（本地 API 服务承载云凭证，无法离线直连）
 // 地址：弹性发现（与其他脚本"候选遍历+验证"风格一致，无硬编码地址）：
 //       ① 运行态快照 <安装目录>\.office-claw\run\windows\runtime-state.json（快/准/零成本）
@@ -1276,6 +1276,9 @@ async function checkinQoder() {
 //         北京时间今日 00:00 之后；未领时列表仅残留昨日已过期记录或无记录）
 //       - 客户端自身每小时整点自动尝试领取（00:00:0X 即代领当天），
 //         脚本主要职责 = 客户端未及时领取时的兑底 + 确认
+// TLS 弹性（2026-10-28 修复）：客户端 1.4.x 每次启动重新生成证书对，磁盘 root-ca.pem
+//       可能落后于运行中服务的实际证书（10-26 客户端重启后连续两天 certificate
+//       signature failure 即此因），校验失败自动降级跳过校验（仅限本机回环）
 // ============================================================
 
 // ============================================================
@@ -1442,7 +1445,17 @@ function officeaceFindRootCaPem(installDir) {
 // ============================================================
 // 本地 API 请求（HTTPS + CA 信任；无 CA 时退化为跳过证书校验）
 // ============================================================
-function officeaceHttpJson(method, urlStr, { cookie, caPem, timeoutMs = 20000 } = {}) {
+function officeaceIsLoopback(urlStr) {
+  try {
+    const h = new URL(urlStr).hostname; // IPv6 形式返回不带方括号（如 ::1）
+    return h === '127.0.0.1' || h === '::1' || h === 'localhost';
+  } catch { return false; }
+}
+
+// 证书类 TLS 错误特征（code 与 message 一并匹配；2026-10-28 实测命中 certificate signature failure）
+const OFFICEACE_TLS_ERR_RE = /ERR_TLS_|ERR_SSL_|CERT_SIGNATURE|SELF_SIGNED_CERT|UNABLE_TO_VERIFY_LEAF|UNABLE_TO_GET_ISSUER|ALTNAME_INVALID|CERT_HAS_EXPIRED|certificate signature failure/i;
+
+function officeaceRequestOnce(method, urlStr, { cookie, timeoutMs = 20000, rejectUnauthorized }) {
   return new Promise((resolve, reject) => {
     const u = new URL(urlStr);
     const headers = {
@@ -1461,12 +1474,8 @@ function officeaceHttpJson(method, urlStr, { cookie, caPem, timeoutMs = 20000 } 
       method,
       headers,
       timeout: timeoutMs,
+      rejectUnauthorized,
     };
-    if (caPem) {
-      options.ca = caPem;
-    } else {
-      options.rejectUnauthorized = false; // 兜底：找不到 CA 文件时跳过证书校验
-    }
     const req = https.request(options, res => {
       let data = '';
       res.on('data', d => { data += d; });
@@ -1476,6 +1485,24 @@ function officeaceHttpJson(method, urlStr, { cookie, caPem, timeoutMs = 20000 } 
     req.on('timeout', () => req.destroy(new Error('请求超时')));
     if (body) req.write(body);
     req.end();
+  });
+}
+
+// 本地 API 请求（HTTPS + CA 信任；CA 缺失或校验失败时退化为跳过证书校验）
+// TLS 弹性（2026-10-28 修复 certificate signature failure）：客户端 1.4.x 起每次启动
+// 会重新生成证书对，磁盘 root-ca.pem 可能落后于运行中服务的实际证书（subject 同名、
+// 公钥不同 → 用旧 CA 验证报 X509_V_ERR_CERT_SIGNATURE_FAILURE）。目标仅限本机回环，
+// 校验失败时降级跳过校验重试一次，签到自动恢复。
+function officeaceHttpJson(method, urlStr, { cookie, caPem, timeoutMs = 20000 } = {}) {
+  const attempt = rejectUnauthorized => officeaceRequestOnce(method, urlStr, { cookie, timeoutMs, rejectUnauthorized });
+  if (!caPem) return attempt(false); // 兜底：找不到 CA 文件时跳过证书校验
+  return attempt().catch(err => {
+    const blob = `${err?.code || ''} ${err?.cause?.code || ''} ${err?.message || ''} ${err?.cause?.message || ''}`;
+    if (officeaceIsLoopback(urlStr) && OFFICEACE_TLS_ERR_RE.test(blob)) {
+      log('警告：root-ca.pem 与运行中服务证书失配（客户端更新后证书轮换），按本机回环跳过校验重试');
+      return attempt(false); // 证书类失败：回环地址降级跳过校验重试
+    }
+    throw err;
   });
 }
 

@@ -56,6 +56,13 @@
 
 - 本地 API 是 **HTTPS 自签证书**：明文 HTTP 请求会被静默断连。Node 请求传
   `root-ca.pem` 作 `ca`；找不到 CA 文件时兜底 `rejectUnauthorized: false`（仅本机回环）。
+- **证书易轮换（2026-10-28 故障案例）**：客户端 1.4.x 起每次启动重新生成证书对
+  （实测磁盘 certs 全部停留在 10-13，而运行中服务 10-26 重启后下发的新证书链
+  subject 同名、公钥不同），脚本拿旧 CA 验证新证书报
+  `certificate signature failure`（X509_V_ERR_CERT_SIGNATURE_FAILURE），
+  10-27/10-28 连续两天签到失败。修复：请求遇证书类 TLS 错误且目标为回环地址时，
+  自动降级 `rejectUnauthorized: false` 重试一次（探测阶段本就走跳过校验，
+  故"能发现 API 但签到失败"是此故障的典型特征）。
 - 401 鉴权：要求 `oc_sid` 签名 Cookie。`session.cookie` 经 DPAPI 解密得
   `{value, expires}`，`value` 即签名后的 Cookie 值，放进 `Cookie: oc_sid=<value>` 即 200。
   会话有效期约一个月，过期需客户端重新登录。
@@ -93,7 +100,7 @@ session.cookie 读 OC-DPAPI-1 块
       │  DPAPI(CurrentUser) 解密 → { value, expires } → Cookie: oc_sid=<value>
       ▼
 本地 API 弹性发现（runtime 快照 → .env → 默认端口 → 回环扫描）
-      │  + root-ca.pem 信任（缺失则回环内跳过证书校验）
+      │  + root-ca.pem 信任（缺失或校验失败时回环内跳过证书校验）
       ▼
 GET /api/subscription/current ──► bonusSkus 中最新 daily 记录
       │  effectiveTime 在今日北京 00:00 后 → 已签结束
@@ -111,8 +118,19 @@ POST /api/subscription/claim-bonus（Content-Type: application/json，body {}）
 - **零配置**：凭证、端口、CA、安装目录全部现场自动探测
 - **无硬编码路径**：注册表 + 环境变量动态定位
 
-## 五、合规说明
+## 五、故障案例速查
+
+| 现象 | 根因 | 处置 |
+|---|---|---|
+| `certificate signature failure`，且日志显示"能发现 API 但状态接口调用失败" | 客户端重启后证书轮换，磁盘 root-ca.pem 落后于运行中服务实际证书 | 已内置自动降级跳过校验（仅回环），无需人工干预；重启客户端后磁盘证书追上新证书即恢复严格校验 |
+| 探测全失败但客户端明明在运行 | 探测时发了空 Cookie 头（`ERR_HTTP_INVALID_HEADER_VALUE` 被吞） | 无会话时省略 Cookie 头（已修复） |
+| claim 返回空 | 当天已被客户端整点定时器代领 | 复查 effectiveTime 确认，算成功 |
+| 未找到每日签到活动 | 活动下线/未刷新 | 按跳过处理，不算失败 |
+
+## 六、合规说明
 
 本逆向仅涉及读取并解密本机自己账号的登录态，调用客户端本地 API（与客户端
 自身行为一致）；云端签名由客户端本地服务完成，未触碰或绕过任何服务端校验。
 仅限个人学习研究，请遵守平台条款。
+
+> AI生成
