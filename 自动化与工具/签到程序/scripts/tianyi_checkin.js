@@ -15,6 +15,9 @@
 // 历史：账号密码登录链路已于 2026-10-25 删除——设备锁（result=-133
 //       二次设备校验）使密码链路无法自动化，逆向过程见
 //       文档\02-逆向中-接口攻坚\三云盘签到平移实现记录.md
+// 2026-10-26 起故障修正：服务端吊销会话（HTTP 400 {errorCode:"InvalidSessionKey"}），
+//       浏览器提取到的同会话 Cookie 同样被拒（云端会话已注销，必须重新登录），
+//       脚本已能精准识别该错误并给出重新登录指引（浏览器登录态过期 ≠ Cookie 提取故障）
 // ============================================================
 'use strict';
 const fs = require('fs');
@@ -71,7 +74,9 @@ const TY_SIGN_HEADERS = {
   'Accept': 'application/json;charset=UTF-8',
 };
 
-// 返回 { ok, isSign, netdiskBonus, invalid }；invalid=true 表示 Cookie 已失效
+// 返回 { ok, isSign, netdiskBonus, invalid, sessionInvalid }；invalid=true 表示 Cookie 已失效，
+// sessionInvalid=true 表示服务端明确返回 InvalidSessionKey（会话已被服务端吊销，
+// 浏览器内重提同一会话也无济于事，需浏览器重新登录）
 async function signinWithCookie(cookie) {
   try {
     const signUrl = `https://cloud.189.cn/mkt/userSign.action?rand=${Date.now()}&clientType=TELEANDROID&version=8.6.3&model=SM-G930K`;
@@ -87,7 +92,10 @@ async function signinWithCookie(cookie) {
         signTime: json.signTime,
       };
     }
-    return { ok: false, invalid: true, raw: text.slice(0, 200) };
+    // 服务端明确会话错误（HTTP 400 {errorCode:"InvalidSessionKey"}）：会话已在服务端吊销
+    const blob = `${json?.errorCode || ''} ${json?.errorMsg || ''} ${json?.error_code || ''} ${json?.error_msg || ''}`;
+    const sessionInvalid = /InvalidSessionKey|cookieUserSession/i.test(blob);
+    return { ok: false, invalid: true, sessionInvalid, raw: text.slice(0, 200) };
   } catch (e) {
     return { ok: false, invalid: false, error: e.message };
   }
@@ -218,6 +226,7 @@ async function main() {
   }
 
   // Cookie 签到；失效自动从夸克浏览器重提取后再试一次
+  let sessionInvalid = false;
   for (let attempt = 0; attempt < 2; attempt++) {
     if (!cookie) break;
     const r = await signinWithCookie(cookie);
@@ -233,6 +242,7 @@ async function main() {
       return;
     }
     if (r.error) { log(`签到请求异常：${r.error}`); break; }
+    sessionInvalid = !!r.sessionInvalid;
     // Cookie 失效 → 自动从浏览器重新提取后再试一次
     log('Cookie 已失效，尝试从夸克浏览器自动提取新 Cookie...');
     cookie = extractCookieFromQuarkBrowser();
@@ -243,7 +253,15 @@ async function main() {
     break;
   }
 
-  log('错误：签到失败 - 无有效 Cookie。请用夸克浏览器登录 https://cloud.189.cn 网页版后重试');
+  if (sessionInvalid) {
+    // 2026-10-26 起的故障形态：服务端已吊销会话（InvalidSessionKey），
+    // 浏览器内提取到的同会话 Cookie 同样被拒，必须重新登录刷新会话
+    log('错误：签到失败 - 服务端会话已失效（InvalidSessionKey），夸克浏览器中的登录态也已过期');
+    log('请打开夸克浏览器访问 https://cloud.189.cn 重新登录（若显示已登录，请退出后重新登录刷新会话）');
+    log('登录后无需改配置，下次签到将自动从浏览器提取新 Cookie');
+  } else {
+    log('错误：签到失败 - 无有效 Cookie。请用夸克浏览器登录 https://cloud.189.cn 网页版后重试');
+  }
   process.exitCode = 1;
 }
 
