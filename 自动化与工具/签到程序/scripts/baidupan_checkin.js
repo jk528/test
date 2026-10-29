@@ -13,6 +13,11 @@
 //   --no-delay  跳过随机延时（默认签到前等待 30~300 秒防检测）
 //
 // 退出码: 0=签到成功/今日已签/状态查询成功  1=失败（凭证缺失/失效/网络异常）
+//
+// 2026-10-29 故障修正：421003 signin not allow = 会员成长值签到需 SVIP 资格。
+// 本账号曾有 1 天 SVIP 体验卡（vip2_1d），2026-10-26 23:59:59 过期后服务端拒绝签到；
+// 处理：识别 421003 → 打印会员过期详情 → 按跳过处理（不算失败），
+// 每日答题继续执行（实测答题任务非会员仍可用）。续费会员后签到自动恢复。
 // ============================================================
 'use strict';
 const fs = require('fs');
@@ -100,9 +105,10 @@ async function doSignin(cookie) {
   if (status !== 200) return { ok: false, msg: `HTTP ${status}` };
   let json;
   try { json = JSON.parse(text); } catch { return { ok: false, msg: '响应非 JSON' }; }
-  // errno 0 = 成功；-6 常见于 Cookie 失效；其他错误带 error_msg
+  // errno 0 = 成功；-6 常见于 Cookie 失效；421001 = 今日已签；
+  // 421003 = signin not allow（SVIP 会员资格不足，非凭证/网络问题）
   if (json.error_code !== 0 && json.error_code !== undefined && json.error_code !== null) {
-    return { ok: false, msg: `error_code=${json.error_code} ${json.error_msg || ''}` };
+    return { ok: false, code: json.error_code, msg: `error_code=${json.error_code} ${json.error_msg || ''}` };
   }
   if (json.errno !== undefined && json.errno !== 0) {
     return { ok: false, msg: `errno=${json.errno} ${json.error_msg || json.errmsg || ''}` };
@@ -132,6 +138,14 @@ async function answerQuestion(cookie, answer, askId) {
   const showMsg = json.show_msg ?? json?.data?.show_msg ?? '';
   if (score !== undefined) return { ok: true, score, showMsg };
   return { ok: false, msg: showMsg || JSON.stringify(json).slice(0, 100) };
+}
+
+// 查询会员资格状态（previous_product 含最近一次会员产品及其过期时间，
+// 2026-10-29 实测样例：{cluster:"vip", detail_cluster:"svip", product_type:"vip2_1d", expired_time:1793030399}）
+async function getMembershipStatus(cookie) {
+  const { status, text } = await panGet(URL_USERINFO, cookie);
+  if (status !== 200) return null;
+  try { return JSON.parse(text); } catch { return null; }
 }
 
 async function getUserInfo(cookie) {
@@ -196,6 +210,18 @@ async function main() {
     // error_code=421001 repeat signin = 今日已签到，幂等视为成功
     if (/421001|repeat/i.test(sign.msg)) {
       log('今日已签到，无需重复操作');
+    } else if (sign.code === 421003) {
+      // 会员成长值签到需 SVIP 资格：账号会员过期后持续命中（2026-10-27 起），
+      // 云端资格判定无法绕过 → 打印过期详情，按跳过处理（不算失败），答题继续
+      log('今日未签到：会员成长值签到需 SVIP 会员资格（421003 signin not allow）');
+      const ms = await getMembershipStatus(cfg.cookie);
+      const prev = ms?.previous_product;
+      if (prev?.expired_time) {
+        const exp = new Date(prev.expired_time * 1000);
+        log(`会员已于 ${exp.toLocaleString('sv-SE')} 过期（${prev.detail_cluster || prev.cluster || 'vip'}，${prev.product_type}），续费会员后签到将自动恢复`);
+      } else {
+        log('当前账号无有效会员产品，续费会员后签到将自动恢复');
+      }
     } else {
       log(`签到失败：${sign.msg}`);
       process.exitCode = 1;
