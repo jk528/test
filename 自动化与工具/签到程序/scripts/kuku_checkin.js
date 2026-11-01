@@ -326,9 +326,18 @@ async function main() {
   if (!sn.ok) {
     if (sn.errno === -6) {
       log('登录态已失效（errno -6）：请更新 kuku_config.json 中的 Cookie');
-    } else {
-      log(`签到失败：errno=${sn.errno} ${sn.showMsg}`);
+      process.exitCode = 1;
+      return;
     }
+    if (sn.errno === 8001) {
+      // 2026-10-30 起实测：{"errno":8001,"errmsg":"账号异常，无法参与活动"}
+      // 用户手机端同日签到成功 → 账号本身正常，是脚本请求特征（裸 API、无 jsToken、
+      // 固定 UA）被活动风控拦截，运行约 6 天后触发。脚本侧无解，手机端签到不受影响。
+      log('今日未签到：请求被活动风控拦截（errno 8001「账号异常」）');
+      log('账号本身正常（手机端可正常签到），属脚本请求特征触发风控；手机端手动签到不受影响，风控可能随时间解除');
+      return; // 跳过不算失败
+    }
+    log(`签到失败：errno=${sn.errno} ${sn.showMsg}`);
     process.exitCode = 1;
     return;
   }
