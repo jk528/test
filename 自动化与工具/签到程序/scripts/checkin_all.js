@@ -1575,12 +1575,6 @@ async function checkinOfficeAce() {
     .sort((a, b) => new Date(b.effectiveTime).getTime() - new Date(a.effectiveTime).getTime());
   const daily = dailies[0];
 
-  if (!daily) {
-    const other = bonuses.length > 0 ? `（现有活动：${bonuses.map(b => b.activityId).join(', ')}）` : '';
-    log(`未找到每日签到活动${other}。活动可能已下线或尚未刷新（每日 00:00 刷新），跳过本次`);
-    return true; // 跳过不算失败
-  }
-
   // ---- 判定语义（2026-10-16 审计流逆向修正）----
   // currentValue 是已消耗量，不作判定依据；「今日已领」看 effectiveTime 是否落在今日北京时间 00:00 之后
   const now = Date.now();
@@ -1588,6 +1582,44 @@ async function checkinOfficeAce() {
     const bj = new Date(now + 8 * 3600 * 1000); // 换算到北京日期
     return Date.UTC(bj.getUTCFullYear(), bj.getUTCMonth(), bj.getUTCDate()) - 8 * 3600 * 1000;
   })();
+
+  if (!daily) {
+    const other = bonuses.length > 0 ? `（现有活动：${bonuses.map(b => b.activityId).join(', ')}）` : '';
+    // 2026-11-01 逆向修正：daily 记录并非每日 00:00 由服务端预生成，而是「领取成功时」才产生
+    // （effectiveTime=claim 打点时刻）。客户端凌晨未运行 → 00:00 代领未执行 → 当天记录缺失，
+    // 此前在此直接按「活动下线」跳过导致 10-30/10-31 两天漏领。claim 接口自带可领项判定
+    // （已领/无可领返回空 bonusSkus，幂等无副作用），故先盲领一次兜底。
+    log(`未找到当日每日签到记录${other}，盲试领取接口兜底...`);
+    try {
+      const res = await post('/api/subscription/claim-bonus');
+      if (res.status === 200) {
+        const got = (JSON.parse(res.body || '{}').bonusSkus || []).find(b => b.activityId === OFFICEACE_DAILY_ACTIVITY_ID);
+        if (got) {
+          log(`领取成功！${got.activityName} +${Number(got.points)} 积分已入账（有效期至 ${got.expiredTime}）`);
+          return true;
+        }
+      }
+    } catch { /* 盲领失败继续走复查 */ }
+    // 盲领无收获：复查一次（覆盖客户端并发代领刚入账的竞态窗口）
+    await sleep(2);
+    try {
+      const res2 = await get('/api/subscription/current');
+      if (res2.status === 200) {
+        const j2 = JSON.parse(res2.body);
+        const d2 = (j2.bonusSkus || [])
+          .filter(b => b.activityId === OFFICEACE_DAILY_ACTIVITY_ID)
+          .sort((a, b) => new Date(b.effectiveTime).getTime() - new Date(a.effectiveTime).getTime())[0];
+        const eff2 = d2 ? new Date(d2.effectiveTime).getTime() : 0;
+        if (d2 && eff2 >= bjTodayStart && eff2 <= Date.now()) {
+          log(`签到完成！${d2.activityName} +${Number(d2.points)} 积分已入账，当前总余额 ${j2.totalCredits}（已用 ${j2.usedCredits}）`);
+          return true;
+        }
+      }
+    } catch { /* 复查失败按未找到处理 */ }
+    log(`未找到当日每日签到记录${other}。该记录由客户端每日 00:00 整点代领时生成，客户端凌晨未运行则缺失且无法补领——请保持 OfficeAce 客户端常开，或白天客户端运行后重跑本脚本验证`);
+    return true; // 跳过不算失败
+  }
+
   const effMs = new Date(daily.effectiveTime).getTime();
   const total = Number(daily.points) || 0;
 
