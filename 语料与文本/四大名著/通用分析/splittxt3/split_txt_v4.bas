@@ -38,6 +38,8 @@ Option Explicit
 '     → 纯净文本（保留≥N）+ 清理文本（清理<N+去重移除）= 完整原始信息
 '   - 修复点：DedupFirst / DedupLongest 记录失败副本；SplitByChapterV3 写入清理文件
 '   - 完成报告新增"去重移除 N 章（内容已并入清理文件）"提示
+'   - 追加修复：DedupKey 对无号 chapter 级章节（如"第0回"）始终按标题区分，
+'     避免所有无号章节共享键 "F|0|单位" 被误合并而遗失内容
 '
 ' 入口：运行 拆分TXTv3（选择文件 → 选择正则 → 选择组合 → 输出模式 → 生成）
 '       运行 分析TXTv3（仅分析不拆分，输出总-分结构详细报告）
@@ -1353,7 +1355,14 @@ Private Function DedupKey(ByVal idx As Long, ByVal volMode As String, _
     End If
     
     ' 标题级去重：追加规范化标题到键中
-    If titleDedup And chNum > 0 Then
+    If chNum > 0 Then
+        If titleDedup Then
+            normTitle = NormalizeTitle(ch_titles(idx))
+            DedupKey = DedupKey & "|T|" & normTitle
+        End If
+    Else
+        ' v3.7 修复：无号 chapter 级章节（如"第0回"/无法解析编号）一律按标题区分
+        '   否则所有无号章节共享键 "F|0|单位"，去重时会误合并、遗失内容
         normTitle = NormalizeTitle(ch_titles(idx))
         DedupKey = DedupKey & "|T|" & normTitle
     End If
