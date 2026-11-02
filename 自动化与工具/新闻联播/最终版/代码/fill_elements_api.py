@@ -66,14 +66,26 @@ logger = logging.getLogger(__name__)
 # 配置读取
 # ============================================================
 def load_config(config_path):
-    """从 config.json 读取 AI API 配置"""
+    """从 config.json 读取 AI API 配置。
+
+    兼容两种写法：
+      · 新版 不用积分/config/config.json：顶层 ai_credentials（api_url/api_key）
+      · 旧版：modes.ai_api（api_base_url/api_model）
+    """
     if not config_path or not os.path.exists(config_path):
         return {}
 
     try:
         with open(config_path, "r", encoding="utf-8") as f:
             config = json.load(f)
-        ai_config = config.get("modes", {}).get("ai_api", {})
+        ai_config = dict(config.get("modes", {}).get("ai_api", {}) or {})
+        legacy = config.get("ai_credentials", {}) or {}
+        if legacy.get("enabled") and not ai_config:
+            ai_config = {
+                "api_key": legacy.get("api_key", ""),
+                "api_base_url": legacy.get("api_url", ""),
+                "api_model": legacy.get("model", ""),
+            }
         return ai_config
     except Exception as e:
         logger.warning(f"读取配置文件失败: {e}")
@@ -487,9 +499,15 @@ def main():
 
     # 解析 API 配置
     config_path = args.config or os.path.join(
-        SCRIPT_DIR, "..", "自动化任务", "config", "config.json"
+        SCRIPT_DIR, "..", "不用积分", "config", "config.json"
     )
     config_path = os.path.normpath(config_path)
+    if not os.path.exists(config_path):
+        fallback = os.path.normpath(
+            os.path.join(SCRIPT_DIR, "..", "自动化任务", "config", "config.json")
+        )
+        if os.path.exists(fallback):
+            config_path = fallback
     settings = resolve_api_settings(args, config_path)
 
     logger.info(f"API 配置: model={settings['model']}, base_url={settings['base_url']}")

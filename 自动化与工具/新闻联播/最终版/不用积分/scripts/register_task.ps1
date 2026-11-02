@@ -1,4 +1,4 @@
-﻿# register_task.ps1 - 注册每日定时新闻联播日报生成任务（含补全）
+﻿﻿# register_task.ps1 - 注册每日定时新闻联播日报生成任务（含补全）
 # 用法: powershell -ExecutionPolicy Bypass -File register_task.ps1
 $ErrorActionPreference = "Stop"
 
@@ -17,21 +17,24 @@ $maxRetry = $config.schedule.complete_max_retry
 if (-not (Test-Path $pythonExe)) { Write-Error "Python解释器不存在: $pythonExe"; exit 1 }
 if (-not (Test-Path $completeScript)) { Write-Error "补全脚本不存在: $completeScript"; exit 1 }
 
-$cmdAction = "$pythonExe `"$completeScript`" --wait $waitSec --max-retry $maxRetry"
+$cmdAction = "`"$completeScript`" --wait $waitSec --max-retry $maxRetry"
 $workDir = $scriptDir
+if (-not (Test-Path $workDir)) { Write-Error "工作目录不存在: $workDir"; exit 1 }
 
-$existing = schtasks /Query /TN $taskName 2>$null
-if ($existing) {
-    Write-Host "任务已存在，先卸载旧任务..."
-    schtasks /Delete /TN $taskName /F | Out-Null
-}
+# 用 ScheduledTasks 模块注册，才能设置 WorkingDirectory（schtasks /Create 无法设置，
+# 任务默认在 System32 下启动，任何相对路径都会失效）。
+$action = New-ScheduledTaskAction -Execute $pythonExe -Argument $cmdAction -WorkingDirectory $workDir
+$trigger = New-ScheduledTaskTrigger -Daily -At ([datetime]::ParseExact($triggerTime, 'HH:mm', $null))
+$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 2)
+Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings `
+    -Description $config.schedule.description -Force | Out-Null
 
-schtasks /Create /TN $taskName /TR $cmdAction /SC DAILY /ST $triggerTime /F | Out-Null
-if ($LASTEXITCODE -ne 0) { Write-Error "任务注册失败"; exit 1 }
+$registered = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+if (-not $registered) { Write-Error "任务注册失败: $taskName"; exit 1 }
 
 Write-Host "已注册定时任务: $taskName"
 Write-Host "  触发时间: 每日 $triggerTime"
-Write-Host "  执行命令: $cmdAction"
+Write-Host "  执行命令: $pythonExe $cmdAction"
 Write-Host "  工作目录: $workDir"
 Write-Host "  补全策略: 首次不全则等待${waitSec}秒后重跑，最多${maxRetry}次"
 Write-Host ""
