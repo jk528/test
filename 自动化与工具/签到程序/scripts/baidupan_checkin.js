@@ -214,6 +214,8 @@ async function main() {
       // 会员成长值签到需 SVIP 资格：账号会员过期后持续命中（2026-10-27 起），
       // 云端资格判定无法绕过 → 打印过期详情，按跳过处理（不算失败），答题继续
       log('今日未签到：会员成长值签到需 SVIP 会员资格（421003 signin not allow）');
+      // SKIP: 标记行供 checkin_all.js 汇总解析（实际未签 ≠ OK，见 runScriptPlatform）
+      log('SKIP:SVIP 会员资格不足（421003），成长值签到未执行，每日答题仍继续');
       const ms = await getMembershipStatus(cfg.cookie);
       const prev = ms?.previous_product;
       if (prev?.expired_time) {
