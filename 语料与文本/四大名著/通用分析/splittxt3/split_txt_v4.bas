@@ -31,7 +31,7 @@ Option Explicit
 '   - 不穿透子文件夹（避免处理输出目录中的已拆分文件）
 '   - g_batchMode 标志：批量时抑制 ShowCompleteReportV3 弹窗，改为 Debug.Print
 '
-' v3.7 变更摘要（去重不遗失修复）：
+' v3.7 变更摘要（去重不遗失 + 入口一致性修复）：
 '   - 去重只"选优"不再"丢弃"：被去重移除的失败副本（标题级去重默认开启=同章号+同标题才算重复）正文不再丢失
 '   - 全局集合 g_dedupRemovedIdx 记录被去重移除章节的原索引
 '   - 清洁模式：被去重移除的章节正文并入"清理"合并文件（带【去重移除】标题标记）
@@ -40,6 +40,9 @@ Option Explicit
 '   - 完成报告新增"去重移除 N 章（内容已并入清理文件）"提示
 '   - 追加修复：DedupKey 对无号 chapter 级章节（如"第0回"）始终按标题区分，
 '     避免所有无号章节共享键 "F|0|单位" 被误合并而遗失内容
+'   - 入口一致性修复：手动清洁模式补齐"固定五件套"（新增 分析报告.txt + 拆分文档\ 子目录），
+'     与 自动TXTv3 / 批量自动TXTv3 结构对齐；三入口重跑前统一清理输出目录；
+'     聚合模式补齐 拆分完成报告.txt 落盘
 '
 ' 入口：运行 拆分TXTv3（选择文件 → 选择正则 → 选择组合 → 输出模式 → 生成）
 '       运行 分析TXTv3（仅分析不拆分，输出总-分结构详细报告）
@@ -2489,8 +2492,23 @@ Public Sub 拆分TXTv3()
             End If
             cleanN = CLng(paramStr)
         End If
-        SplitByChapterV3 InputPath:=filePath, GenerateTitleOnly:=False, _
-                         MinBodyLen:=cleanN, MergeFlag:=2
+
+        ' v3.7 一致性修复：手动清洁模式补齐"固定五件套"输出结构
+        '   = 分析报告.txt + 拆分完成报告.txt + 保留≥N/清理<N 双合并文件 + 拆分文档\ 单章文件
+        '   （与 自动TXTv3 / 批量自动TXTv3 结构对齐；输出目录 <源名>_拆分\，单章文件落 拆分文档\ 子目录）
+        Dim fsoM As Object, mOutDir As String, mSubDir As String
+        Set fsoM = CreateObject("Scripting.FileSystemObject")
+        mOutDir = fsoM.GetParentFolderName(filePath) & "\" & _
+                  fsoM.GetBaseName(filePath) & "_拆分"
+        mSubDir = mOutDir & "\拆分文档"
+        If Dir(mOutDir, vbDirectory) = "" Then MkDir mOutDir
+        If Dir(mSubDir, vbDirectory) = "" Then MkDir mSubDir
+        CleanOutputDir mOutDir            ' 重跑不残留旧合并文件/报告
+        DeepAnalyzeFile filePath, mOutDir ' 生成 分析报告.txt（有 outputDir 则不弹窗）
+        SplitByChapterV3 InputPath:=filePath, OutputDir:=mSubDir, _
+                         GenerateTitleOnly:=False, MinBodyLen:=cleanN, _
+                         MergeFlag:=2, MergeOutputDir:=mOutDir
+        Set fsoM = Nothing
     ElseIf modeStr = "2" Then
         ' 聚合模式
         If Len(paramStr) = 0 Then
@@ -2683,6 +2701,8 @@ Public Sub 自动TXTv3()
     autoSubDir = autoDir & "\拆分文档"
     If Dir(autoDir, vbDirectory) = "" Then MkDir autoDir
     If Dir(autoSubDir, vbDirectory) = "" Then MkDir autoSubDir
+    ' v3.7 一致性修复：重跑前清理输出目录，不残留旧的合并文件/报告
+    CleanOutputDir autoDir
 
     ' 生成分析报告
     DeepAnalyzeFile filePath, autoDir
@@ -3295,8 +3315,10 @@ Public Sub SplitByGroupsV3(ByVal InputPath As String, _
     Dim extraInfo As String
     extraInfo = "  聚合格式：" & ChunkStr & "（单位：" & unitStr & "）"
 
+    ' v3.7 一致性修复：聚合模式同样落盘 拆分完成报告.txt（与清洁模式一致）
     ShowCompleteReportV3 "聚合模式", fileCount, outDirFull, _
-                         tRead, tScan, tDedup, tWrite, extraInfo
+                         tRead, tScan, tDedup, tWrite, extraInfo, _
+                         outDirFull & "\拆分完成报告.txt"
     Exit Sub
 
 GroupWriteErrV3:
@@ -4128,6 +4150,8 @@ Private Function ProcessFileAuto(ByVal filePath As String) As String
     autoSubDir = autoDir & "\拆分文档"
     If Dir(autoDir, vbDirectory) = "" Then MkDir autoDir
     If Dir(autoSubDir, vbDirectory) = "" Then MkDir autoSubDir
+    ' v3.7 一致性修复：重跑前清理输出目录，不残留旧的合并文件/报告
+    CleanOutputDir autoDir
 
     ' 生成分析报告（outputDir 非空 → 不弹MsgBox）
     DeepAnalyzeFile filePath, autoDir
