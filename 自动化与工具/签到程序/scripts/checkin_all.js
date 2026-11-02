@@ -905,7 +905,7 @@ async function checkinCodeArts() {
                   items.find((it) => it.type === 'USER_LOGIN');
     if (!daily) {
       log('未找到每日签到活动（可能活动已下线），跳过。');
-      return true;
+      return { skip: '未找到每日签到活动（疑活动下线），今日未签' };
     }
 
     // 3. 状态判定（ELIGIBLE 可领 / CLAIMED 已领待确认 / CONFIRMED、CONSUMED 已到账）
@@ -933,6 +933,7 @@ async function checkinCodeArts() {
         }
       } else {
         log(`每日签到当前不可领取（claimable=${daily.claimable}，status=${daily.status}），跳过。`);
+        return { skip: `每日签到当前不可领取（claimable=${daily.claimable}），今日未签` };
       }
       return true;
     }
@@ -1202,7 +1203,7 @@ async function checkinQoder() {
   const campaigns = (data.campaigns || []).filter(c => c.actionType === 'CLAIM_BENEFIT');
   if (campaigns.length === 0) {
     log('当前无 Credits 领取类活动（活动可能已下线）');
-    return true;
+    return { skip: '无 Credits 领取类活动（疑活动下线），今日未签' };
   }
 
   const claimable = campaigns.filter(c => c.claimStatus === 'CLAIMABLE');
@@ -1220,7 +1221,7 @@ async function checkinQoder() {
     // 都是昨天的活动 -> 今天 10:00 才刷新
     const latest = campaigns[campaigns.length - 1];
     log(`今日活动尚未刷新（每日 10:00 刷新），跳过本次。最近活动：${latest?.campaignKey || '无'}`);
-    return true; // 跳过不算失败（由 10:30 的定时任务完成当天领取）
+    return { skip: '今日活动尚未刷新（每日 10:00 刷新），待白天定时任务领取，当前未签' };
   }
 
   // 6. 领取
@@ -1617,7 +1618,7 @@ async function checkinOfficeAce() {
       }
     } catch { /* 复查失败按未找到处理 */ }
     log(`未找到当日每日签到记录${other}。该记录由客户端每日 00:00 整点代领时生成，客户端凌晨未运行则缺失且无法补领——请保持 OfficeAce 客户端常开，或白天客户端运行后重跑本脚本验证`);
-    return true; // 跳过不算失败
+    return { skip: '当日签到记录未生成（客户端凌晨未运行，00:00 代领未执行），盲领兑底亦未领到，今日未签' }; // 实际未签，汇总按跳过展示
   }
 
   const effMs = new Date(daily.effectiveTime).getTime();
@@ -1704,14 +1705,23 @@ const PLATFORMS = [
   { name: '万兴脑图',  group: 'daily', script: 'edraw_checkin.js' },   // 凭证每次从浏览器现提（JWT 2小时有效），零配置
 ];
 
-// 子进程方式执行独立脚本：--no-delay 由主控统一延时，退出码判成败
+// 子进程方式执行独立脚本：--no-delay 由主控统一延时，退出码判成败；
+// 捕获输出回显 + 解析 SKIP: 标记行（脚本实际没签上但非故障时打印，如风控/资格不足），
+// 汇总中按「跳过（实际未签）」展示原因，不再误计 [OK]
 function runScriptPlatform(script) {
   const r = spawnSync(process.execPath, [path.join(__dirname, script), '--no-delay'], {
     cwd: __dirname,
-    stdio: 'inherit',
+    stdio: ['ignore', 'pipe', 'pipe'],
     timeout: 600000,
+    encoding: 'utf8',
   });
-  return r.status === 0;
+  const out = `${r.stdout || ''}${r.stderr || ''}`;
+  if (out) process.stdout.write(out);
+  if (r.error || r.status === null) return { state: 'fail', reason: r.error ? r.error.message : '子进程异常终止' };
+  if (r.status !== 0) return { state: 'fail' };
+  const m = out.match(/SKIP:(.+)/);
+  if (m) return { state: 'skip', reason: m[1].trim() };
+  return { state: 'ok' };
 }
 
 async function main() {
@@ -1732,23 +1742,31 @@ async function main() {
       await sleep(delay);
     }
     try {
-      const ok = p.script ? runScriptPlatform(p.script) : await p.fn();
-      results.push({ name: p.name, ok });
+      const res = p.script ? runScriptPlatform(p.script) : await p.fn();
+      // 统一归一化：fn 返回 true=成功 / false=失败 / {skip:'原因'}=实际未签（非故障）
+      if (res && typeof res === 'object') {
+        results.push({ name: p.name, state: res.state || (res.skip ? 'skip' : 'ok'), reason: res.reason || res.skip || '' });
+      } else {
+        results.push({ name: p.name, state: res ? 'ok' : 'fail' });
+      }
     } catch (e) {
       log(`[${p.name}] 致命错误：${e.message}`);
-      results.push({ name: p.name, ok: false });
+      results.push({ name: p.name, state: 'fail' });
     }
   }
 
-  // 汇总
+  // 汇总（三态：OK=真实签到/已签；SKIP=实际未签但有原因，不算故障；FAIL=故障需处置）
   console.log(`\n${'='.repeat(50)}`);
   log('签到汇总：');
-  const success = results.filter(r => r.ok).length;
-  const fail = results.filter(r => !r.ok).length;
+  const success = results.filter(r => r.state === 'ok').length;
+  const skipped = results.filter(r => r.state === 'skip').length;
+  const fail = results.filter(r => r.state === 'fail').length;
   for (const r of results) {
-    log(`  ${r.ok ? '[OK]' : '[FAIL]'} ${r.name}`);
+    if (r.state === 'ok') log(`  [OK] ${r.name}`);
+    else if (r.state === 'skip') log(`  [SKIP-未签] ${r.name}：${r.reason || '原因见上方日志'}`);
+    else log(`  [FAIL] ${r.name}`);
   }
-  log(`成功 ${success}/${results.length}，失败 ${fail}/${results.length}`);
+  log(`成功 ${success}/${results.length}，跳过 ${skipped}（实际未签，原因已注明），失败 ${fail}/${results.length}`);
   log('====== 统一签到结束 ======');
 
   // 用 exitCode 而非 process.exit()：fetch(undici) 后立即强杀会触发 libuv 断言崩溃
