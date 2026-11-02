@@ -68,12 +68,130 @@ HEADERS = {
 
 # 复用 fetch_xwlb.py
 sys.path.insert(0, SCRIPT_DIR)
-from fetch_xwlb import fetch_xwlb_list as _fetch_xwlb_raw, desensitize as _desensitize_raw
+from fetch_xwlb import (
+    fetch_xwlb_list as _fetch_xwlb_raw,
+    desensitize as _pii_desensitize,
+    NAME_TO_CODE,
+    CODE_TO_POSITION,
+)
+
+# 最终版口径：默认保留真实姓名。设置 XWLB_NO_DESENSITIZE=0 可回到旧的占位符模式。
+NO_DESENSITIZE = os.environ.get("XWLB_NO_DESENSITIZE", "1").strip().lower() not in (
+    "0", "false", "no",
+)
+
+_NAME_TO_POSITION = {
+    name: CODE_TO_POSITION.get(code, "") for name, code in NAME_TO_CODE
+}
+_PERSON_POSITIONS = [
+    "国家主席", "国务院总理", "全国人大常委会委员长", "全国政协主席",
+    "国家副主席", "中共中央政治局常委", "国务院副总理", "中央纪委书记",
+]
+
+
+def _name_outside_book_title(title, name):
+    """姓名是否在书名号之外（《…》里的姓名不算新闻行动主体）。"""
+    before = title.split(name)[0]
+    return before.count("《") <= before.count("》")
+
+
+def _real_name_subject(title):
+    """真实姓名 → “职务+姓名”；按姓名长度倒序，避免短名先命中长名的一部分。"""
+    for name in sorted(_NAME_TO_POSITION, key=len, reverse=True):
+        if name in title and _name_outside_book_title(title, name):
+            pos = _NAME_TO_POSITION.get(name, "")
+            return f"{pos}{name}" if pos else name
+    return None
+
+
+def _position_outside_book(title, pos):
+    before = title.split(pos)[0]
+    after = title.split(pos, 1)[1] if pos in title else ""
+    return not (re.search(r"《[^》]*$", before) and re.search(r"^[^《]*》", after))
+
+
+def _real_name_person_entry(subject):
+    """从主体字符串解析“姓名 + 职务”；解析不出人物时返回 None。"""
+    if not subject or subject in ("—", "多部门/机构"):
+        return None
+    for name in sorted(_NAME_TO_POSITION, key=len, reverse=True):
+        if name in subject:
+            role = subject.replace(name, "").strip("、，, ")
+            return name, (role or _NAME_TO_POSITION.get(name, ""))
+    cut = -1
+    for kw in _PERSON_POSITIONS + [
+        "总统", "总理", "首相", "主席", "秘书长", "发言人", "部长",
+        "行长", "书记", "院长", "主任", "总干事", "市长", "州长", "议长", "外长",
+    ]:
+        i = subject.rfind(kw)
+        if i >= 0 and i + len(kw) > cut:
+            cut = i + len(kw)
+    if cut <= 0:
+        return None
+    name_part = subject[cut:].strip("、，, ")
+    if not name_part:
+        return subject, subject
+    if 2 <= len(name_part) <= 5 and not any(
+        suf in name_part
+        for suf in ("部", "委", "局", "办", "会", "院", "公司", "大学",
+                    "市场", "集团", "组织", "中心")
+    ):
+        return name_part, subject[:cut].rstrip("、，, ")
+    return None
+
+
+def _collect_real_name_persons(normal_videos, domestic_briefs, international_briefs,
+                               domestic_idx, international_idx, date_display):
+    """扫描常规新闻与快讯主体，汇总真实姓名人物表（姓名 → 职务 + 出现位置）。"""
+    entries = {}
+
+    def _add(subject, pos_label):
+        parsed = _real_name_person_entry(subject)
+        if not parsed:
+            return
+        name, role = parsed
+        entry = entries.setdefault(name, {"title": role, "positions": []})
+        if len(role) > len(entry["title"]):
+            entry["title"] = role
+        if pos_label not in entry["positions"]:
+            entry["positions"].append(pos_label)
+
+    for i, v in enumerate(normal_videos):
+        elements = extract_six_elements(v, v["detail"], date_display)
+        _add(elements.get("subject", "—"), f"第{i+1}条")
+    if domestic_idx:
+        for i, item in enumerate(domestic_briefs):
+            detail = item.get("detail") or {}
+            subject = _extract_subject(item["title"], detail.get("full_text", ""), "社会/文化要闻")
+            _add(subject, f"{domestic_idx}-{i+1}")
+    if international_idx:
+        for i, item in enumerate(international_briefs):
+            detail = item.get("detail") or {}
+            subject = _extract_subject(item["title"], detail.get("full_text", ""), "国际新闻")
+            _add(subject, f"{international_idx}-{i+1}")
+    return entries
 
 
 def desensitize(text, mark=True):
-    """脱敏处理，复用 fetch_xwlb.py 中的实现"""
-    return _desensitize_raw(text, mark)
+    """不脱敏版默认保留真实姓名；XWLB_NO_DESENSITIZE=0 时恢复旧的人名→占位符。
+
+    · 默认：调用 fetch_xwlb 的字段级脱敏（只掩码个人信息，人名/职务原样）。
+    · 旧模式：先把 NAME_TO_CODE 里的人名替换为 <u>职务</u>，再做个人信息掩码，
+      保证 legacy 的“脱敏版”仍可运行。
+    """
+    if not text:
+        return text
+    out = str(text)
+    if not NO_DESENSITIZE:
+        for name, _code in sorted(NAME_TO_CODE, key=lambda x: -len(x[0])):
+            if name in out:
+                pos = _NAME_TO_POSITION.get(name, "")
+                if pos:
+                    out = out.replace(name, f"<u>{pos}</u>" if mark else pos)
+    return _pii_desensitize(out, mark)
+
+
+ARCHIVE_ROOT = os.environ.get("XWLB_ARCHIVE_ROOT") or os.path.join(BASE_DIR, "归档")
 
 
 # ============================================================
@@ -941,21 +1059,20 @@ def _extract_subject(title, text, category):
         return "多部门/机构"
 
     # 领导人主体判断（排除书名中的情况）
-    person_positions = [
-        "国家主席", "国务院总理", "全国人大常委会委员长", "全国政协主席",
-        "国家副主席", "中共中央政治局常委", "国务院副总理", "中央纪委书记",
-    ]
-    for pos in person_positions:
-        if pos in title:
-            # 检查是否在书名号里（《...》），如果是则不算行动主体
-            before = title.split(pos)[0]
-            book_title_match = re.search(r'《[^》]*$', before)
-            after = title.split(pos)[1] if pos in title else ""
-            book_close_match = re.search(r'^[^《]*》', after)
-            if book_title_match and book_close_match:
-                # 在书名号里，跳过
-                continue
-            return f"<u>{pos}</u>"
+    person_positions = _PERSON_POSITIONS
+    if NO_DESENSITIZE:
+        # 真实姓名优先：习近平 / 普京 / 特朗普 → “职务+姓名”
+        person = _real_name_subject(title)
+        if person:
+            return person
+        # 只有职务、无可识别姓名时，直接返回职务（不加占位符标记）
+        for pos in person_positions:
+            if pos in title and _position_outside_book(title, pos):
+                return pos
+    else:
+        for pos in person_positions:
+            if pos in title and _position_outside_book(title, pos):
+                return f"<u>{pos}</u>"
 
     # 第1层：行动主体（高优先级）
     action_patterns = [
@@ -1710,7 +1827,7 @@ def generate_report(date_str, videos, domestic_briefs, international_briefs, iqi
 
     # 构建输出路径
     year_month = f"{target_date.year}年{target_date.month}月"
-    archive_dir = os.path.join(BASE_DIR, "归档", year_month)
+    archive_dir = os.path.join(ARCHIVE_ROOT, year_month)
     os.makedirs(archive_dir, exist_ok=True)
     output_path = os.path.join(archive_dir, f"新闻联播总结_{date_str}.md")
 
@@ -2031,9 +2148,13 @@ def generate_report(date_str, videos, domestic_briefs, international_briefs, iqi
     # --- 第六部分：六要素索引 ---
     L("## 六、新闻六要素索引")
     L("")
-    L("> 完整版单独列出，不纳入常规新闻编号。常规新闻按当天央视网实际分条顺序编号，快讯子条目使用\"序号-子序号\"编号（如9-1、9-2）。")
-    L("> 新闻主体列填写每条新闻的核心行动者：人物使用占位符（如\"国家领导人\"），不出现具体人名；无人物主体时填写机构名称（如\"全国人大常委会\"）或事件核心对象（如\"俄乌冲突双方\"\"暑期档电影市场\"）。")
-    L("> **脱敏标记规则**：所有由人名替换而来的占位符，均使用HTML下划线标记，格式为 `<u>占位符</u>`（如 `<u>国家领导人</u>`、`<u>以色列总理</u>`）。机构名称、事件核心对象等非人名替换内容不加下划线。此规则适用于全文所有部分（标题、新闻主体列、占位符统合表等）。")
+    L('> 完整版单独列出，不纳入常规新闻编号。常规新闻按当天央视网实际分条顺序编号，快讯子条目使用"序号-子序号"编号（如9-1、9-2）。')
+    if NO_DESENSITIZE:
+        L('> 新闻主体列填写每条新闻的核心行动者：人物直接写"职务+姓名"（如"国家主席习近平"），不加占位符标签；无人物主体时填写机构名称或事件核心对象。')
+        L('> **本报告为不脱敏版**：保留新闻原始人名，人物以"职务+姓名"形式呈现，与央视网原始播报一致。')
+    else:
+        L('> 新闻主体列填写每条新闻的核心行动者：人物使用占位符（如"国家领导人"），不出现具体人名；无人物主体时填写机构名称（如"全国人大常委会"）或事件核心对象（如"俄乌冲突双方""暑期档电影市场"）。')
+        L('> **脱敏标记规则**：所有由人名替换而来的占位符，均使用HTML下划线标记，格式为 `<u>占位符</u>`（如 `<u>国家领导人</u>`、`<u>以色列总理</u>`）。机构名称、事件核心对象等非人名替换内容不加下划线。此规则适用于全文所有部分（标题、新闻主体列、占位符统合表等）。')
     L("")
     L("| 序号 | 新闻标题（可点击跳转） | 类别 | 时间 | 地点 | 新闻主体 | 事件 | 原因 | 方式 | 详细信息源链接 |")
     L("|------|---------|------|------|------|------|------|------|------|------|")
@@ -2107,26 +2228,36 @@ def generate_report(date_str, videos, domestic_briefs, international_briefs, iqi
     L("### 7.1 新闻主体占位符")
     L("")
     L("#### 7.1.1 人物类")
-    L("| 序号 | 占位符 | 职务/身份 | 出现位置 |")
-    L("|------|--------|----------|---------|")
-    person_placeholders = set()
-    for v in normal_videos:
-        safe_title = desensitize(v["title"])
-        from fetch_xwlb import CODE_TO_POSITION as _ctp
-        for code, position in _ctp.items():
-            if position in safe_title:
-                person_placeholders.add(position)
-    position_order = [
-        "国家主席", "国务院总理", "全国人大常委会委员长", "全国政协主席",
-        "国家副主席", "中共中央政治局常委", "国务院副总理", "中央纪委书记",
-    ]
-    sorted_persons = sorted(person_placeholders, key=lambda x: position_order.index(x) if x in position_order else 99)
-    for i, pos in enumerate(sorted_persons):
-        positions_found = []
-        for j, v in enumerate(normal_videos):
-            if pos in desensitize(v["title"]):
-                positions_found.append(str(j + 1))
-        L(f"| {i+1} | <u>{pos}</u> | {pos} | 第{'、'.join(positions_found)}条 |")
+    if NO_DESENSITIZE:
+        L("| 序号 | 姓名 | 职务/身份 | 出现位置 |")
+        L("|------|------|----------|---------|")
+        person_entries = _collect_real_name_persons(
+            normal_videos, domestic_briefs, international_briefs,
+            domestic_idx, international_idx, date_display,
+        )
+        for i, (name, info) in enumerate(person_entries.items(), 1):
+            L(f"| {i} | {name} | {info['title']} | {'、'.join(info['positions'])} |")
+        if not person_entries:
+            L("| — | — | 本日无人物类 | — |")
+    else:
+        L("| 序号 | 占位符 | 职务/身份 | 出现位置 |")
+        L("|------|--------|----------|---------|")
+        person_placeholders = set()
+        for v in normal_videos:
+            safe_title = desensitize(v["title"])
+            for position in CODE_TO_POSITION.values():
+                if position in safe_title:
+                    person_placeholders.add(position)
+        sorted_persons = sorted(
+            person_placeholders,
+            key=lambda x: _PERSON_POSITIONS.index(x) if x in _PERSON_POSITIONS else 99,
+        )
+        for i, pos in enumerate(sorted_persons):
+            positions_found = []
+            for j, v in enumerate(normal_videos):
+                if pos in desensitize(v["title"]):
+                    positions_found.append(str(j + 1))
+            L(f"| {i+1} | <u>{pos}</u> | {pos} | 第{'、'.join(positions_found)}条 |")
     L("")
 
     L("#### 7.1.2 机构类")

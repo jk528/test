@@ -19,9 +19,20 @@ Write-Host "=" * 60
 # 1. 定时任务状态
 Write-Host ""
 Write-Host "[1] 定时任务状态"
-$taskInfo = schtasks /Query /TN $taskName /V /FO LIST 2>$null
-if ($taskInfo) {
-    $taskInfo | Select-String "任务名|状态|下次运行|上次运行|计划类型" | ForEach-Object { Write-Host "  $_" }
+# schtasks /Query 的输出列名随系统语言变化（英文系统为 TaskName/Status/Next Run Time），
+# 旧实现按中文列名过滤，在英文环境会静默输出空行。改用 ScheduledTasks 模块，语言无关
+# 且能直接拿到 LastResult（判断任务成败的关键字段）。
+$task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+if ($task) {
+    $info = Get-ScheduledTaskInfo -TaskName $taskName
+    $action = $task.Actions | Select-Object -First 1
+    Write-Host "  任务名: $taskName"
+    Write-Host "  状态: $($task.State)"
+    Write-Host "  执行: $($action.Execute) $($action.Arguments)"
+    Write-Host "  工作目录: $($action.WorkingDirectory)"
+    Write-Host "  上次运行: $($info.LastRunTime)"
+    Write-Host "  上次结果: $($info.LastTaskResult)"
+    Write-Host "  下次运行: $($info.NextRunTime)"
 } else {
     Write-Host "  任务未注册: $taskName"
 }

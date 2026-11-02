@@ -58,7 +58,7 @@ logger = logging.getLogger(__name__)
 sys.path.insert(0, SCRIPT_DIR)
 
 import gen_report_v2 as gv2
-from fetch_xwlb import desensitize
+from gen_report_v2 import desensitize  # 与 v2 共用“不脱敏/占位符”两种模式
 
 
 # ============================================================
@@ -372,8 +372,8 @@ def build_datasource(
                 }
             )
 
-    # 指令与脱敏模式联动（不脱敏版：人物直接写职务+姓名）
-    if os.environ.get("XWLB_NO_DESENSITIZE"):
+    # 指令与脱敏模式联动（默认不脱敏：人物直接写职务+姓名）
+    if gv2.NO_DESENSITIZE:
         instructions = (
             "不脱敏版。请根据每条 title/url/summary/full_text 填写 elements 中的 "
             "location/subject/event/cause/method 五个字段（仅 elements 为 null 的行需要填）。"
@@ -426,7 +426,7 @@ def phase3_merge(date_str):
     # 计算路径
     target_date = datetime.strptime(date_str, "%Y%m%d").date()
     year_month = f"{target_date.year}年{target_date.month}月"
-    archive_dir = os.path.join(BASE_DIR, "归档", year_month)
+    archive_dir = os.path.join(gv2.ARCHIVE_ROOT, year_month)
     report_path = os.path.join(archive_dir, f"新闻联播总结_{date_str}.md")
     result_json_path = os.path.join(archive_dir, f"六要素结果_{date_str}.json")
     datasource_json_path = os.path.join(archive_dir, f"六要素数据源_{date_str}.json")
@@ -537,7 +537,7 @@ def generate_part67(items, date_display, date_str):
     - 不脱敏版支持：人物直接列姓名+职务
     - 空表兜底：无数据时显示"本日无XXX"
     """
-    no_desensitize = bool(os.environ.get("XWLB_NO_DESENSITIZE"))
+    no_desensitize = gv2.NO_DESENSITIZE
 
     lines = []
     def L(s):
@@ -1010,7 +1010,7 @@ def main():
         # 计算输出路径
         target_date = datetime.strptime(date_str, "%Y%m%d").date()
         year_month = f"{target_date.year}年{target_date.month}月"
-        archive_dir = os.path.join(BASE_DIR, "归档", year_month)
+        archive_dir = os.path.join(gv2.ARCHIVE_ROOT, year_month)
         report_path = os.path.join(archive_dir, f"新闻联播总结_{date_str}.md")
 
         if args.force and os.path.exists(report_path):

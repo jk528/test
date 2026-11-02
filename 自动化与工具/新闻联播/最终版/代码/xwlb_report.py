@@ -67,9 +67,40 @@ import requests
 # 路径与常量
 # ============================================================
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-FLOW_DIR = os.path.dirname(SCRIPT_DIR)                      # 流程/
-BASE_DIR = os.path.dirname(FLOW_DIR)                        # 工程根/
-ARCHIVE_ROOT = os.path.join(BASE_DIR, "归档")
+FLOW_DIR = os.path.dirname(SCRIPT_DIR)                      # 流程/（最终版结构下即 最终版/）
+BASE_DIR = os.path.dirname(FLOW_DIR)                        # 工程根/（最终版结构下即 新闻联播/）
+
+
+def _resolve_archive_root():
+    """解析归档根目录，优先级：环境变量 > config.json > 脚本位置推导。
+
+    旧实现只按脚本所在层级向上推导，部署到其他目录时会悄悄写到别的
+    “归档”目录（实测部署副本把报告写到了 Desktop\\归档）。这里改为
+    优先读取显式配置，保证脚本位置与配置不一致时仍落到同一归档。
+    """
+    env_root = os.environ.get("XWLB_ARCHIVE_ROOT")
+    if env_root:
+        return os.path.abspath(env_root)
+
+    candidates = [
+        os.path.join(FLOW_DIR, "不用积分", "config", "config.json"),
+        os.path.join(FLOW_DIR, "config", "config.json"),
+        os.path.join(SCRIPT_DIR, "config.json"),
+    ]
+    for cfg_path in candidates:
+        if not os.path.isfile(cfg_path):
+            continue
+        try:
+            with open(cfg_path, "r", encoding="utf-8") as f:
+                root = json.load(f).get("archive_root", "")
+        except Exception:
+            continue
+        if root:
+            return os.path.abspath(root)
+    return os.path.join(BASE_DIR, "归档")
+
+
+ARCHIVE_ROOT = _resolve_archive_root()
 
 TEMP_DIR = os.path.join(os.environ.get("TEMP", os.environ.get("TMP", "/tmp")), "xwlb_cache")
 os.makedirs(TEMP_DIR, exist_ok=True)
@@ -100,6 +131,7 @@ for _h in logging.getLogger().handlers:
         except Exception:
             pass
 logger = logging.getLogger("xwlb")
+logger.info(f"归档根目录：{ARCHIVE_ROOT}")
 
 
 # ============================================================
@@ -267,23 +299,31 @@ def load_contract():
 # HTTP 工具（带内存缓存）
 # ============================================================
 _CACHE = {}
+HTTP_MAX_RETRIES = 2          # 单次请求最多重试次数（共 1 + 2 次尝试）
+HTTP_RETRY_DELAY = 3          # 重试等待秒数
 
 
 def http_get(url, use_cache=True):
     if use_cache and url in _CACHE:
         return _CACHE[url]
-    time.sleep(REQUEST_DELAY)
-    try:
-        resp = requests.get(url, headers=HEADERS, timeout=REQUEST_TIMEOUT)
-        resp.raise_for_status()
-        resp.encoding = "utf-8"
-        content = resp.text
-        if use_cache:
-            _CACHE[url] = content
-        return content
-    except Exception as e:
-        logger.warning(f"请求失败 {url}: {e}")
-        return None
+    last_error = None
+    for attempt in range(HTTP_MAX_RETRIES + 1):
+        time.sleep(REQUEST_DELAY if attempt == 0 else HTTP_RETRY_DELAY)
+        try:
+            resp = requests.get(url, headers=HEADERS, timeout=REQUEST_TIMEOUT)
+            resp.raise_for_status()
+            resp.encoding = "utf-8"
+            content = resp.text
+            if use_cache:
+                _CACHE[url] = content
+            return content
+        except Exception as e:
+            last_error = e
+            logger.warning(
+                f"请求失败 {url}（第{attempt + 1}/{HTTP_MAX_RETRIES + 1}次）: {e}"
+            )
+    logger.error(f"请求最终失败 {url}: {last_error}")
+    return None
 
 
 # ============================================================
@@ -1136,6 +1176,38 @@ PERSON_TITLE_DETAIL = {
     "墨西哥总统": "墨西哥合众国总统",
 }
 
+# 最终版为“不脱敏”，标题里的人名不会再被替换成职务占位符，
+# 因此原来的“职务占位符”分支（PERSON_TITLE_DETAIL）在真实人名标题上永远命中不了。
+# 这里补一张“姓名 → 职务”表，命中标题中的人名时输出“职务+姓名”，
+# 与 contract.json 中“人物以职务+姓名形式呈现”的约定一致。
+PERSON_NAME_ROLES = {
+    "习近平": "国家主席",
+    "李强": "国务院总理",
+    "赵乐际": "全国人大常委会委员长",
+    "王沪宁": "全国政协主席",
+    "蔡奇": "中央书记处书记",
+    "丁薛祥": "国务院副总理",
+    "李希": "中央纪委书记",
+    "韩正": "国家副主席",
+    "普京": "俄罗斯总统",
+    "特朗普": "美国总统",
+    "泽连斯基": "乌克兰总统",
+    "马克龙": "法国总统",
+    "斯塔默": "英国首相",
+    "内塔尼亚胡": "以色列总理",
+}
+
+
+def _name_outside_book_title(text, name):
+    """判断人名是否出现在书名/文件名之外（避免把《习近平谈治国理政》的作者当主体）"""
+    for m in re.finditer(re.escape(name), text):
+        before, after = text[: m.start()], text[m.end():]
+        if re.search(r"《[^》]*$", before) and re.search(r"^[^《]*》", after):
+            continue
+        return True
+    return False
+
+
 # 动作 → 方式的映射
 _METHOD_RULES = [
     ("回信", "回信勉励"), ("贺信", "致贺信"), ("致电", "致电"),
@@ -1183,7 +1255,8 @@ _COUNTRY_ALIAS = {"美": "美国", "俄": "俄罗斯", "乌": "乌克兰", "以"
 _ACTOR_OVERRIDES = [
     (r"^央视快评", "中央广播电视总台"),
     (r"^本台评论", "中央广播电视总台"),
-    (r"^《[^》]+》出版发行", "中央宣传部"),
+    (r"^《[^》]+》[^，。]{0,8}(?:出版发行|单行本出版)", "中央宣传部"),
+    (r"^中共中央(?:关于|印发|发布|作出|召开)", "中共中央"),
 ]
 
 # 名词短语合法性：用于判断"从标题截出来的东西"能否当主体/事件核心对象
@@ -1312,6 +1385,11 @@ def extract_subject(safe_title, text, category, is_brief=False):
     for pat, actor in _ACTOR_OVERRIDES:
         if re.search(pat, title_plain):
             return actor
+
+    # T0b 真实人名（不脱敏版）：姓名 → “职务+姓名”
+    for name, role in PERSON_NAME_ROLES.items():
+        if _name_outside_book_title(title_plain, name):
+            return f"{role}{name}"
 
     # T1 人名占位符（排除书名号内的人名）
     for pos in PERSON_TITLE_DETAIL:
@@ -1888,12 +1966,21 @@ def extract_documents(texts):
     return out
 
 
+def _person_names_in(subject):
+    """从主体字符串中提取人物姓名：优先 <u> 占位符，其次真实姓名。"""
+    s = (subject or "").strip()
+    names = re.findall(r"<u>(.+?)</u>", s)
+    if names:
+        return names
+    return [name for name in PERSON_NAME_ROLES if _name_outside_book_title(s, name)]
+
+
 def classify_subject_kind(subject):
     """主体 → person / org / event_object"""
     s = (subject or "").strip()
     if not s or s == "—":
         return "event_object"
-    if re.search(r"<u>.+?</u>", s):
+    if _person_names_in(s):
         return "person"
     if s in INSTITUTIONS:
         return "org"
@@ -2332,7 +2419,7 @@ def _render_part7(ds, contract):
         subj = el["subject"]
         kind = classify_subject_kind(subj)
         if kind == "person":
-            for ph in re.findall(r"<u>(.+?)</u>", subj):
+            for ph in _person_names_in(subj):
                 persons.setdefault(ph, [])
                 if pos not in persons[ph]:
                     persons[ph].append(pos)
@@ -2382,8 +2469,23 @@ def _render_part7(ds, contract):
              "| 序号 | 占位符 | 职务/身份 | 出现位置 |",
              "|------|--------|----------|---------|"]
     order = list(PERSON_TITLE_DETAIL.keys())
-    for i, ph in enumerate(sorted(persons, key=lambda x: order.index(x) if x in order else 99), start=1):
-        detail = PERSON_TITLE_DETAIL.get(ph, ph)
+
+    def _person_sort_key(name):
+        if name in order:
+            return order.index(name)
+        role = PERSON_NAME_ROLES.get(name)
+        if role in order:
+            return order.index(role)
+        return 99
+
+    for i, ph in enumerate(sorted(persons, key=_person_sort_key), start=1):
+        role = PERSON_NAME_ROLES.get(ph)
+        if ph in PERSON_TITLE_DETAIL:
+            detail = PERSON_TITLE_DETAIL[ph]
+        elif role:
+            detail = PERSON_TITLE_DETAIL.get(role, role)
+        else:
+            detail = ph
         lines.append(f"| {i} | <u>{ph}</u> | {detail} | {'、'.join(persons[ph])} |")
     if not persons:
         lines.append("| — | — | 本日无人物类占位符 | — |")
@@ -2934,9 +3036,15 @@ def main():
             return _report_issues(issues, output_path)
         logger.info(f"报告存在但仅 {size} 字节（≤10KB），视为不完整，重新生成")
 
-    ds = build_dataset(date_str)
-    report = render_report(ds, contract)
-    issues = self_check(ds, report, contract)
+    try:
+        ds = build_dataset(date_str)
+        report = render_report(ds, contract)
+        issues = self_check(ds, report, contract)
+    except Exception as e:
+        logger.exception(f"生成失败：{date_str} - {e}")
+        print(f"生成失败：{e}")
+        print(f"详细堆栈见日志：{os.path.join(TEMP_DIR, 'xwlb_report.log')}")
+        return 1
 
     if args.dry_run or args.preview:
         if args.preview:
