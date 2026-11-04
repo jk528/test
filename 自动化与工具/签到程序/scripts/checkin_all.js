@@ -309,7 +309,7 @@ async function checkinTrae(platformName, dirCandidates) {
     // extra_credits 为可选的额外奖励字段，仅在存在时附加到日志
     const extraNote = status.extra_credits ? `（含额外 ${status.extra_credits}）` : '';
     if (status.checked_in) {
-      log(`今日已签到。积分：${status.credits}${extraNote}`);
+      log(`今日已签到。积分：${status.credits}${extraNote}（推测：华为云服务器已于 00:10 先签，本机重复签到确认）`);
       return true;
     }
     if (!status.enable) { log('签到功能未启用'); return true; }
