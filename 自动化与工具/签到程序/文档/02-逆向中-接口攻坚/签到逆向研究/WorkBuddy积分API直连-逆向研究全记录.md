@@ -355,7 +355,7 @@ native 模块 `electron_browser_workbuddy_storage`（编译在 WorkBuddy.exe 里
 ```json
 {
   "version": 1,
-  "atRestSecretKey": "Sik9U5aXhCdwTVEwsEySDOmDoB9r9ntFxVHF1fst9LQI=",
+  "atRestSecretKey": "****************************==",
   "atRestDeveloperPublicKey": { "alg": "RSA-OAEP-256", "id": "...", "key": "..." }
 }
 ```

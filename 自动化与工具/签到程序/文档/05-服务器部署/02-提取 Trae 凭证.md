@@ -30,7 +30,7 @@ node ".temp\extract_trae_cred.js"
 
 ```
 OK token_len=1004 prefix=eyJhbGciOi...
-device_id=1870736766583371
+device_id=1870736766****（真实值见 .temp/trae_cred.json）
 region=CN
 app_version=1.107.1
 os_version=10.0.20348
