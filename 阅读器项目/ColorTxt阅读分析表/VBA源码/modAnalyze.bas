@@ -227,6 +227,8 @@ Private Sub AnaResolve(ByVal i As Long)
     Dim dimCounts As Object, wordSeen As Object
     Dim words As String, dims As String, cm As String, primary As String
     Dim tmpS As String, tmpV As Long
+    Dim tLen As Long, tDim As String, tPrio As Long
+    Dim dn As Long, dk() As String, dv() As Long, d As Long, v As Variant
 
     If hN = 0 Then
         gHitCount(i) = 0
@@ -281,7 +283,6 @@ Private Sub AnaResolve(ByVal i As Long)
     For k = 2 To aN
         tmpV = aPos(k)
         tmpS = aKw(k)
-        Dim tLen As Long, tDim As String, tPrio As Long
         tLen = aLen(k): tDim = aDim(k): tPrio = aPrio(k)
         j = k - 1
         Do While j >= 1
@@ -324,7 +325,6 @@ Private Sub AnaResolve(ByVal i As Long)
     Next k
 
     ' 维度按命中次数降序、同次数按维度优先级
-    Dim dn As Long, dk() As String, dv() As Long, d As Long, v As Variant
     dn = dimCounts.Count
     If dn > 0 Then
         ReDim dk(1 To dn)

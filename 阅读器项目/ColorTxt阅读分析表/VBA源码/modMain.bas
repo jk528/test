@@ -21,7 +21,7 @@ Public Sub RunFullAnalysis()
     LogMsg "CONFIG", "配置摘要: " & ConfigSnapshot()
 
     tPhase = Timer
-    LoadLexicon
+    LexLoad
     If gRuleCount = 0 Then
         Err.Raise vbObjectError + 1001, , "词表没有可用关键词，请检查「词表」的启用列与维度开关"
     End If
@@ -145,7 +145,7 @@ Public Function MainSelfCheck() As String
     logRows = SheetLog().Cells(SheetLog().Rows.Count, 1).End(xlUp).Row
     s = s & "|logRows=" & logRows
     hasFormula = False
-    If Not SheetResults().UsedRange Is Nothing Then
+    If SheetResults().UsedRange.Rows.Count > 0 Then
         hasFormula = SheetResults().UsedRange.HasFormula
     End If
     s = s & "|resultsHasFormula=" & hasFormula

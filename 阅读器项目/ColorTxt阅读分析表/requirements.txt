@@ -1,0 +1,4 @@
+# ColorTxt 阅读分析（一键版）生成脚本依赖
+# 仅支持 Windows，且本机需安装 Microsoft Excel（用于写入 VBA 工程与运行宏）
+
+pywin32>=306

@@ -47,7 +47,7 @@ Public Sub OutWriteResults()
         arr(i, 9) = gPrimary(i)
         If gPrimary(i) <> "" Then
             If gDimColor.Exists(gPrimary(i)) Then
-                arr(i, 10) = RGBToHex(CLng(gDimColor(gPrimary(i)))
+                arr(i, 10) = RGBToHex(CLng(gDimColor(gPrimary(i))))
             Else
                 arr(i, 10) = ""
             End If
@@ -58,10 +58,8 @@ Public Sub OutWriteResults()
             arr(i, 11) = "未启用上色"
         ElseIf i <= gCfg.MaxColorSentences Then
             st = ""
-            If i <= gSentCount Then
-                If Not IsEmpty(gColStatus) Then
-                    If i <= UBound(gColStatus) Then st = gColStatus(i)
-                End If
+            If gColReady Then
+                If i <= UBound(gColStatus) Then st = gColStatus(i)
             End If
             If Len(st) = 0 Then st = "已上色预览"
             arr(i, 11) = st
@@ -200,6 +198,7 @@ Public Sub OutWriteSummary()
     OutMetric ws, r, "上色命中数", 0
     OutMetric ws, r, "上色是否截断", "待更新"
     OutMetric ws, r, "日志错误数", 0
+    OutMetric ws, r, "图表对象数", 0
 
     ' 维度统计
     r = r + 2
@@ -446,7 +445,12 @@ Public Sub OutWriteTop()
     ws.Cells(1, 6).Value = "排名"
     ws.Cells(1, 7).Value = "字"
     ws.Cells(1, 8).Value = "次数"
-    StyleHeader ws.Range("F1:H1"), 3, 1
+    With ws.Range("F1:H1")
+        .Font.Bold = True
+        .Font.Color = RGB(255, 255, 255)
+        .Interior.Color = RGB(31, 78, 121)
+        .HorizontalAlignment = xlCenter
+    End With
     n = DictTopKeys(gCharFreq, gCfg.TopN, ks, vs)
     If n > 0 Then
         ReDim arr(1 To n, 1 To 3)
