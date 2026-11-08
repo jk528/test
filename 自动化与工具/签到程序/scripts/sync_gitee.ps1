@@ -115,10 +115,11 @@ try {
     }
     if ($dirty.Count -eq 0) {
         Write-Log "working tree clean, pull-only round"
-        git -c http.lowSpeedLimit=1 -c http.lowSpeedTime=60 pull origin main --no-edit --ff-only 2>&1 | ForEach-Object { Write-Log $_ }
+        git -c http.lowSpeedLimit=1 -c http.lowSpeedTime=60 pull origin main --no-edit --rebase --autostash 2>&1 | ForEach-Object { Write-Log $_ }
         $pullExit = $LASTEXITCODE
         Write-Log "pull exit code: $pullExit"
         if ($pullExit -ne 0) {
+            git rebase --abort 2>&1 | ForEach-Object { Write-Log $_ }
             Write-Log "pull failed"
             Write-Log "===== sync end (pull failed) ====="
             exit 1
@@ -155,12 +156,13 @@ try {
         }
     }
 
-    Write-Log "git pull origin main --no-edit --ff-only"
-    git -c http.lowSpeedLimit=1 -c http.lowSpeedTime=60 pull origin main --no-edit --ff-only 2>&1 | ForEach-Object { Write-Log $_ }
+    Write-Log "git pull origin main --no-edit --rebase --autostash"
+    git -c http.lowSpeedLimit=1 -c http.lowSpeedTime=60 pull origin main --no-edit --rebase --autostash 2>&1 | ForEach-Object { Write-Log $_ }
     $pullExit = $LASTEXITCODE
     Write-Log "pull exit code: $pullExit"
 
     if ($pullExit -ne 0) {
+        git rebase --abort 2>&1 | ForEach-Object { Write-Log $_ }
         Write-Log "pull failed (diverged or network issue), stop push"
         Write-Log "===== sync end (pull failed) ====="
         exit 1
