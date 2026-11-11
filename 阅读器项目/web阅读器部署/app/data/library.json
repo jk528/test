@@ -1,0 +1,18 @@
+{
+  "updated": "2026-11-11",
+  "books": [
+    {
+      "id": "hongloumeng",
+      "title": "红楼梦",
+      "author": "曹雪芹",
+      "desc": "程乙本 · 一百二十回",
+      "total": 120,
+      "perVolume": 20,
+      "volumes": 6,
+      "cover": {
+        "from": "#7d3b2f",
+        "to": "#c98b5f"
+      }
+    }
+  ]
+}
