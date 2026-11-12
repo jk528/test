@@ -1692,7 +1692,10 @@ async function checkinOfficeAce() {
 // ============================================================
 const PLATFORMS = [
   // ---- AI 凌晨组 ----
-  { name: 'Trae',      group: 'ai',    fn: checkinTraeUnified },
+  // 2026-11-12：本地 Trae 签到已停止，135/191 两个账号统一由华为云服务器
+  // /opt/checkin/run_all.sh 签到（Trae（135）用 Linux profile，Trae（191）用 trae_cred.json）。
+  // 如需恢复本地签到，取消下一行注释即可（回滚见 backup\20261112\checkin_all.js.bak）。
+  // { name: 'Trae',      group: 'ai',    fn: checkinTraeUnified },
   { name: 'TeleAgent', group: 'ai',    fn: checkinTeleAgent },
   { name: 'WorkBuddy', group: 'ai',    fn: checkinWorkBuddy },
   { name: 'CodeArts',  group: 'ai',    fn: checkinCodeArts },
