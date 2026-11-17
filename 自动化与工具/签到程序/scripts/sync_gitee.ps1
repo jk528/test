@@ -1,11 +1,9 @@
-$ErrorActionPreference = "Continue"
+﻿$ErrorActionPreference = "Continue"
 
 # ============================================================
 #  归档 Git 同步（单实例）
-#  调用方：XinWenLianBo_Sync_0600（每天 06:15）
-#          XinWenLianBo_Sync_30min（每 30 分钟，相位 :27/:57）
-#  两个计划任务跑的是同一份脚本，靠文件锁保证不会并发执行，
-#  避免 git 的 index.lock 撞车。
+#  调用方：计划任务 Gitee同步1小时（每 1 小时，整点 :00）
+#  靠文件锁保证不会并发执行，避免 git 的 index.lock 撞车。
 # ============================================================
 
 $ScriptDir = $PSScriptRoot
@@ -66,7 +64,7 @@ try {
 try {
     Write-Log "===== sync start (pid $PID) ====="
 
-    $repoRoot = "C:\Users\Administrator\Desktop\JK-temp"
+    $repoRoot = "A:\HuaweiMoveData\Users\代\Desktop\JK-temp"
     Set-Location $repoRoot -ErrorAction Stop
 
     Write-Log "repo root: $repoRoot"
@@ -106,7 +104,26 @@ try {
         }
     } catch {}
 
-    # --- 空闲轮快速退出：树干净时跳过 add/commit/push，只同步远端变更 ---
+    # --- 统一拉取：--rebase 而不是 --ff-only ---
+    #     两台机器都在自动提交，历史随时可能分叉；--ff-only 一旦分叉就永久失败。
+    #     --autostash 保证工作区有未提交改动时也能拉取，失败则回滚 rebase。
+    function Invoke-PullRebase {
+        git -c http.lowSpeedLimit=1 -c http.lowSpeedTime=60 pull origin main --no-edit --rebase --autostash 2>&1 | ForEach-Object { Write-Log $_ }
+        $code = $LASTEXITCODE
+        Write-Log "pull exit code: $code"
+        if ($code -ne 0) {
+            git rebase --abort 2>&1 | ForEach-Object { Write-Log $_ }
+        }
+        return $code
+    }
+
+    function Get-AheadCount {
+        $n = git rev-list --count "origin/main..HEAD" 2>$null
+        if ($LASTEXITCODE -ne 0) { return -1 }
+        return [int]$n
+    }
+
+    # --- 空闲轮快速退出：树干净时只同步远端变更；若本地领先（有未推送提交）则补推 ---
     $dirty = @(git status --porcelain 2>$null)
     if ($LASTEXITCODE -ne 0) {
         Write-Log "ERROR: git status failed, abort this round"
@@ -115,14 +132,21 @@ try {
     }
     if ($dirty.Count -eq 0) {
         Write-Log "working tree clean, pull-only round"
-        git -c http.lowSpeedLimit=1 -c http.lowSpeedTime=60 pull origin main --no-edit --rebase --autostash 2>&1 | ForEach-Object { Write-Log $_ }
-        $pullExit = $LASTEXITCODE
-        Write-Log "pull exit code: $pullExit"
-        if ($pullExit -ne 0) {
-            git rebase --abort 2>&1 | ForEach-Object { Write-Log $_ }
+        if ((Invoke-PullRebase) -ne 0) {
             Write-Log "pull failed"
             Write-Log "===== sync end (pull failed) ====="
             exit 1
+        }
+        $ahead = Get-AheadCount
+        if ($ahead -gt 0) {
+            Write-Log "local ahead of origin by $ahead commit(s), push"
+            git -c http.lowSpeedLimit=1 -c http.lowSpeedTime=60 push origin main 2>&1 | ForEach-Object { Write-Log $_ }
+            $pushExit = $LASTEXITCODE
+            Write-Log "push exit code: $pushExit"
+            if ($pushExit -ne 0) {
+                Write-Log "===== sync end (push failed) ====="
+                exit 1
+            }
         }
         Write-Log "===== sync end (clean, nothing to push) ====="
         exit 0
@@ -156,14 +180,9 @@ try {
         }
     }
 
-    Write-Log "git pull origin main --no-edit --rebase --autostash"
-    git -c http.lowSpeedLimit=1 -c http.lowSpeedTime=60 pull origin main --no-edit --rebase --autostash 2>&1 | ForEach-Object { Write-Log $_ }
-    $pullExit = $LASTEXITCODE
-    Write-Log "pull exit code: $pullExit"
-
-    if ($pullExit -ne 0) {
-        git rebase --abort 2>&1 | ForEach-Object { Write-Log $_ }
-        Write-Log "pull failed (diverged or network issue), stop push"
+    Write-Log "pull before push (rebase)"
+    if ((Invoke-PullRebase) -ne 0) {
+        Write-Log "pull failed (conflict or network issue), stop push"
         Write-Log "===== sync end (pull failed) ====="
         exit 1
     }
@@ -172,6 +191,16 @@ try {
     git -c http.lowSpeedLimit=1 -c http.lowSpeedTime=60 push origin main 2>&1 | ForEach-Object { Write-Log $_ }
     $pushExit = $LASTEXITCODE
     Write-Log "push exit code: $pushExit"
+
+    # --- push 被拒（远端恰好又有新提交）时：再拉取变基一次后重试，避免本轮白跑 ---
+    if ($pushExit -ne 0) {
+        Write-Log "push rejected, retry after pull rebase"
+        if ((Invoke-PullRebase) -eq 0) {
+            git -c http.lowSpeedLimit=1 -c http.lowSpeedTime=60 push origin main 2>&1 | ForEach-Object { Write-Log $_ }
+            $pushExit = $LASTEXITCODE
+            Write-Log "push retry exit code: $pushExit"
+        }
+    }
 
     if ($pushExit -ne 0) {
         Write-Log "push failed"
