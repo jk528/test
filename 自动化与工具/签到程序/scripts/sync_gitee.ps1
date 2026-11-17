@@ -147,6 +147,8 @@ try {
                 Write-Log "===== sync end (push failed) ====="
                 exit 1
             }
+            Write-Log "===== sync end (clean, pushed local commits) ====="
+            exit 0
         }
         Write-Log "===== sync end (clean, nothing to push) ====="
         exit 0
