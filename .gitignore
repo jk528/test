@@ -19,7 +19,8 @@
 .agent_history/
 .workspace
 # Trae 本机工作区根目录（2026-11-25：仅不入库/不同步 Gitee，本地正常显示）
-/.temp/
+# 2026-11-26：.temp 改为任意层级匹配——MD文件综合/.temp 同属本机质检产物，不入库、不同步
+.temp/
 /.trae/
 /.trae-html-share-packages/
 
