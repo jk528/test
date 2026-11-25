@@ -32,6 +32,9 @@ if(-not (Test-Path -LiteralPath $ProjectDir)){
 }
 $proj = (Resolve-Path -LiteralPath $ProjectDir).Path
 $hlm  = Split-Path -Parent $proj
+$probe = $hlm
+while($probe -and -not (Test-Path -LiteralPath (Join-Path $probe $SplitName))){ $probe = Split-Path -Parent $probe }
+if($probe){ $hlm = $probe }
 $splitDir = Join-Path $hlm $SplitName
 $nieqDir  = Join-Path $hlm $NieqName
 $enc = [System.Text.Encoding]::UTF8
