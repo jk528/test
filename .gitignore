@@ -18,6 +18,9 @@
 .workbuddy/
 .agent_history/
 .workspace
+# Trae 本机工作区根目录（2026-11-25：仅不入库/不同步 Gitee，本地正常显示）
+/.temp/
+/.trae/
 
 # OfficeAce（果办）/ 小通 智能体工作区子目录
 agents/
