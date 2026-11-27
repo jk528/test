@@ -93,7 +93,7 @@ python P readme --config "<…>/chenghu.config.json"
 | 项 | 规格 |
 | :--- | :--- |
 | 单篇字符 | ≥ 15,700（含空白），目标 15,700–17,000 |
-| 称呼事件 | 12 件；§1 表 12 行，`\| 1 \|`…`\| 12 \|` 连续无缺号；§0 声明数＝表行数＝尾注数 |
+| 称呼事件 | **10–12 件**：以一次称谓变更／立场冲突／授权拒绝为单位按情节切分，不凑数；§1 表 1–N 连续（N＝10–12）；§0 声明数＝表行数＝尾注数；`check` 对越界（<10 或 >12）报 ERROR |
 | 重点解构 | `###` 恰 3 段；声明「重点解构 3 段」 |
 | 定律表 | 55–72 行，表头 `\| 定律 / 命中（编号） \| 本回证据 \|` |
 | 引文「」 | 185–215 处，全部逐字锚定本回底本或本回列锦 |
@@ -107,9 +107,9 @@ python P readme --config "<…>/chenghu.config.json"
 
 | 命令 | 作用 | 关键参数 |
 | :--- | :--- | :--- |
-| `init` | 探查底本、校正回数、生成 config／简报／输出目录 | `--root --book --book-dir --split-dir --chapters` |
+| `init` | 探查底本、校正回数、生成 config／简报／输出目录（写入 `min_events`＝10、`max_events`＝`--events`） | `--root --book --book-dir --split-dir --chapters --events` |
 | `plan` | 底本→稿件映射、批次划分、缺口清单 | `--batch --from-chapter --to-chapter --missing-only` |
-| `check` | 单篇六节／计数守恒／引文锚定／密度／英文残留 | `<file.md>` 或 `--all` |
+| `check` | 单篇六节／**事件数 10–12 区间**／计数守恒／引文锚定／密度／英文残留 | `<file.md>` 或 `--all` |
 | `qc` | 全书完整性 + 五维质检 + 汇总 | `--config` |
 | `readme` | 生成 README 统计表与批次表 | `--config` |
 

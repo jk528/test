@@ -85,6 +85,7 @@ foreach($f in (Get-ChildItem -LiteralPath $proj -Filter '*.md' | Sort-Object Nam
   $decl=0; if($c -match '本回解构\s*(\d+)\s*件'){ $decl=[int]$Matches[1] }
   $sumDecl+=$decl
   if($decl -lt 1 -or $decl -ne $rows){ $iss+=("计数不符(声明$decl/表行$rows)") }
+  if($rows -lt 10 -or $rows -gt 12){ $iss+=("事件数越界($rows,允许10-12)") }
   $d2=0; if($c -match '重点解构\s*(\d+)\s*段'){ $d2=[int]$Matches[1] }
   $h3=[regex]::Matches($c,'(?m)^###\s').Count
   if($d2 -and $d2 -ne $h3){ $iss+=("解构段不符(声明$d2/实际$h3)") }

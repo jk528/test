@@ -140,6 +140,10 @@ def check_one(md, cfg, src, nq):
     decl = int(decl.group(1)) if decl else 0
     if decl < 1 or decl != len(rows):
         errors.append('计数不符(声明%d/表行%d)' % (decl, len(rows)))
+    ev_min = int(cfg.get('min_events', 10))
+    ev_max = int(cfg.get('max_events', cfg.get('events_per_chapter', 12)))
+    if not (ev_min <= len(rows) <= ev_max):
+        errors.append('事件数越界(%d, 允许%d–%d)' % (len(rows), ev_min, ev_max))
     nums = [int(re.sub(r'b$', '', r)) for r in rows]
     if nums and nums != list(range(1, len(nums) + 1)):
         errors.append('事件编号不连续:%s' % nums[:15])
@@ -227,7 +231,9 @@ def cmd_init(a):
         'nieq_dir': a.nieq_dir,
         'out_dir': a.out_dir,
         'chapters': actual,
-        'events_per_chapter': a.events,
+        'events_per_chapter': a.events,   # 兼容旧字段：每回目标件数（上限）
+        'min_events': 10,
+        'max_events': a.events,
         'focus_segments': 3,
         'min_chars': a.min_chars,
         'min_quotes': 185,
@@ -340,7 +346,7 @@ def cmd_qc(a):
         nwarn += bool(w)
         for k in totals:
             totals[k] += st[k]
-    print('=== 声明事件总数＝%d（须与 README 批次表累计一致）===' % totals['events'])
+    print('=== 累计事件数＝%d（各篇实际件数求和，须与 README 批次表一致）===' % totals['events'])
     print('=== 引文片段＝%d；未锚定＝%d；字符合计＝%d；「」合计＝%d ===' %
           (totals['segs'], totals['miss'], totals['chars'], totals['quotes']))
     print('=== 篇数 %d，FAIL %d，WARN %d ===' % (len(files), nfail, nwarn))
@@ -404,8 +410,9 @@ def cmd_readme(a):
         got = sum(1 for n in range(lo, hi + 1)
                   if any(os.path.basename(f).startswith('%03d_' % n) for f in out_files(cfg)))
         state = '**已完成（质检退出码 0、未锚定 0）**' if got == hi - lo + 1 else '进行中（%d/%d）' % (got, hi - lo + 1)
+        ev_sum = sum(st['events'] for name, st in rows if lo <= int(name[:3]) <= hi)
         L.append('| 第 %d–%d 回 | %d 篇 | %s | %d |' %
-                 (lo, hi, got, state, got * int(cfg.get('events_per_chapter', 12))))
+                 (lo, hi, got, state, ev_sum))
     L.append('')
     L.append('## 5. 生成纪律')
     L.append('')
@@ -435,7 +442,7 @@ def main():
     p.add_argument('--nieq-dir', default='名词列锦章节', help='名词列锦目录名')
     p.add_argument('--out-dir', default='称呼学解构/整合版可查', help='输出目录（相对 book-dir）')
     p.add_argument('--chapters', type=int, required=True, help='声明回数（以底本实际数为准自动校正）')
-    p.add_argument('--events', type=int, default=12, help='每回事件数')
+    p.add_argument('--events', type=int, default=12, help='每回事件上限（默认12；下限固定10，按情节切分不凑数）')
     p.add_argument('--min-chars', type=int, default=15700, help='单篇字符下限')
     p.add_argument('--batch', type=int, default=5, help='并行单元每批回数')
     p.set_defaults(func=cmd_init)
