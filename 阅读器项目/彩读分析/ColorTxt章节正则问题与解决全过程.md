@@ -9,8 +9,8 @@
 
 | 方案 | 位置 | 特点 | 状态 |
 |------|------|------|------|
-| **A. splittxt 原版** | `四大名著/通用分析/splittxt/`（bas/py/js） | 单一硬编码正则，宽松尾部 | 保留（旧版参考） |
-| **B. splittxt2 多正则版** | `四大名著/通用分析/splittxt2/split_txt.bas` | 9 套预设、可多选、终极字符类、行首容错+尾部收紧 | 在用 |
+| **A. splittxt 原版** | `四大名著/通用分析/_archive/splittxt/`（bas/py/js） | 单一硬编码正则，宽松尾部 | 保留（旧版参考） |
+| **B. splittxt2 多正则版** | `四大名著/通用分析/_archive/splittxt2/split_txt.bas` | 9 套预设、可多选、终极字符类、行首容错+尾部收紧 | 在用 |
 | **C. 彩读内置规则** | `.temp/ColorTxt/src/shared/chapterMatchBuiltinPatterns.ts` | 3 条内置 + 8 条 splittxt2 适配，组1=完整序号 | 在用 |
 
 三者在「捕获组约定」「标题来源」「字符类」「尾部约束」四点上互不相同，这也是历次问题的根源。
@@ -205,9 +205,9 @@ splittxt2:  ^…第([数字]+)(章|回|节|卷)…
 
 | 文件 | 角色 |
 |------|------|
-| `四大名著/通用分析/splittxt/split_txt.{bas,py,js}` | A 原版（宽松尾部，123 回事故源） |
-| `四大名著/通用分析/splittxt2/split_txt.bas` | B 多正则版（终极字符类 + 收紧，现行） |
-| `四大名著/通用分析/章节正则统合.md` | 正则统合文档（含 9.5 缺第字案例） |
+| `四大名著/通用分析/_archive/splittxt/split_txt.{bas,py,js}` | A 原版（宽松尾部，123 回事故源） |
+| `四大名著/通用分析/_archive/splittxt2/split_txt.bas` | B 多正则版（终极字符类 + 收紧，现行） |
+| `四大名著/通用分析/方法/章节正则统合.md` | 正则统合文档（含 9.5 缺第字案例） |
 | `彩读分析/.temp/ColorTxt/src/shared/chapterMatchBuiltinPatterns.ts` | C 内置规则定义（终极字符类） |
 | `彩读分析/.temp/ColorTxt/src/renderer/src/chapter.ts` | 消费方：`matchToTitle` + SUPERSEDED 升级表 |
 | `彩读分析/.temp/ColorTxt/src/renderer/src/composables/useAppPersistence.ts` | 持久化加载 + 升级调用链（L1522） |
