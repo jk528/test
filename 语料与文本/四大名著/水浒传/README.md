@@ -23,7 +23,7 @@
 
 - 整合版 120 篇齐全，无缺号、无重号；累计称呼事件 1,404 件，重点解构 360 段。
 - 全书脚本质检：FAIL 0、WARN 0、未锚定 0；全部「」短引文另经逐字审计，事件标题双锚与 L1–L4 主体条数均已复核。
-- 锚定自检已参数化：`python 通用分析/chenghu-jiegou-pipeline/scripts/pipeline.py qc --config 水浒传/chenghu.config.json`。
+- 锚定自检已参数化：`python 通用分析/方法/chenghu-jiegou-pipeline/scripts/pipeline.py qc --config 水浒传/chenghu.config.json`。
 - 第 120 回已完成预判四题全书总收束，并以纯转述回扣第 1 回称谓起点。
 
 > AI生成

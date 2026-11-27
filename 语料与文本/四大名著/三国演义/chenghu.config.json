@@ -1,0 +1,25 @@
+{
+  "book": "三国演义",
+  "root": "A:\\HuaweiMoveData\\Users\\代\\Desktop\\JK-temp\\语料与文本\\四大名著",
+  "book_dir": "三国演义",
+  "split_dir": "三国演义_拆分",
+  "nieq_dir": "名词列锦章节",
+  "out_dir": "称呼学解构/整合版可查",
+  "chapters": 120,
+  "events_per_chapter": 12,
+  "min_events": 10,
+  "max_events": 12,
+  "focus_segments": 3,
+  "min_chars": 15700,
+  "min_quotes": 185,
+  "max_quotes": 230,
+  "min_law_rows": 55,
+  "max_law_rows": 75,
+  "batch_size": 5,
+  "themes": [
+    "题1：待定（全书称谓主轴）",
+    "题2：待定",
+    "题3：待定",
+    "题4：待定"
+  ]
+}
